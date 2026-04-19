@@ -36,4 +36,12 @@ abstract class Transport {
     required TypingOp op,
     required ScopeFilter scope,
   }) async {}
+
+  /// List channels visible to the connected viewer. Default implementation
+  /// returns empty so transports that don't enumerate subscriptions
+  /// (snapshot) can stay quiet without overriding.
+  Future<List<Channel>> listChannels() async => const [];
+
+  /// List topics inside [channel]. Same default rationale as listChannels.
+  Future<List<Topic>> listTopics(String channel) async => const [];
 }

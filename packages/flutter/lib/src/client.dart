@@ -64,6 +64,10 @@ class ZulipClient {
     return transport.deleteMessage(messageId);
   }
 
+  Future<List<Channel>> listChannels() => transport.listChannels();
+  Future<List<Topic>> listTopics(String channel) =>
+      transport.listTopics(channel);
+
   /// Fire a typing start/stop ping for the current scope. Best-effort —
   /// failures are swallowed by the transport.
   Future<void> sendTyping(TypingOp op) async {

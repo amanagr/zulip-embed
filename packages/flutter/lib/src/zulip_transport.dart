@@ -404,6 +404,57 @@ class ZulipTransport implements Transport {
     }
   }
 
+  @override
+  Future<List<Channel>> listChannels() async {
+    final body = await _getJson('/api/v1/users/me/subscriptions');
+    final subs = (body['subscriptions'] as List?) ?? const [];
+    final channels = <Channel>[];
+    for (final raw in subs) {
+      final s = raw as Map<String, dynamic>;
+      final id = (s['stream_id'] as num?)?.toInt();
+      final name = s['name'] as String?;
+      if (id == null || name == null) continue;
+      channels.add(Channel(
+        channelId: id,
+        name: name,
+        description: s['description'] as String? ?? '',
+        color: s['color'] as String?,
+        pinToTop: (s['pin_to_top'] as bool?) ?? false,
+        isMuted: (s['is_muted'] as bool?) ?? false,
+      ));
+    }
+    // Pinned first, then alphabetical — same ordering Zulip's own web
+    // app applies so the component output matches user expectations.
+    channels.sort((a, b) {
+      if (a.pinToTop != b.pinToTop) return a.pinToTop ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return List.unmodifiable(channels);
+  }
+
+  @override
+  Future<List<Topic>> listTopics(String channel) async {
+    final streamId = await _resolveStreamId(channel);
+    if (streamId == null) return const [];
+    final body = await _getJson('/api/v1/users/me/$streamId/topics');
+    final rows = (body['topics'] as List?) ?? const [];
+    const resolvedPrefix = '\u2714 ';
+    final topics = <Topic>[];
+    for (final raw in rows) {
+      final t = raw as Map<String, dynamic>;
+      final name = t['name'] as String?;
+      final maxId = (t['max_id'] as num?)?.toInt();
+      if (name == null || maxId == null) continue;
+      final isResolved = name.startsWith(resolvedPrefix);
+      topics.add(Topic(
+        name: isResolved ? name.substring(resolvedPrefix.length) : name,
+        maxMessageId: maxId,
+        isResolved: isResolved,
+      ));
+    }
+    return List.unmodifiable(topics);
+  }
+
   Future<int?> _resolveStreamId(String channel) async {
     final cached = _streamIdCache[channel];
     if (cached != null) return cached;

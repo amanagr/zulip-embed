@@ -100,6 +100,42 @@ class ScopeFilter {
 }
 
 @immutable
+class Channel {
+  const Channel({
+    required this.channelId,
+    required this.name,
+    this.description = '',
+    this.color,
+    this.pinToTop = false,
+    this.isMuted = false,
+    this.unreadCount = 0,
+  });
+
+  final int channelId;
+  final String name;
+  final String description;
+  final String? color;
+  final bool pinToTop;
+  final bool isMuted;
+  final int unreadCount;
+}
+
+@immutable
+class Topic {
+  const Topic({
+    required this.name,
+    required this.maxMessageId,
+    this.unreadCount = 0,
+    this.isResolved = false,
+  });
+
+  final String name;
+  final int maxMessageId;
+  final int unreadCount;
+  final bool isResolved;
+}
+
+@immutable
 class EditMessageParams {
   const EditMessageParams({required this.messageId, this.content, this.topic});
   final int messageId;

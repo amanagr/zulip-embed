@@ -81,6 +81,41 @@ class DemoTransport extends Transport {
   }
 
   @override
+  Future<List<Channel>> listChannels() async {
+    final channels = <String, Message>{};
+    for (final m in _messages) {
+      // Keep the most-recent message per channel for the summary.
+      final prev = channels[m.channel];
+      if (prev == null || m.id > prev.id) channels[m.channel] = m;
+    }
+    return [
+      for (final entry in channels.entries)
+        Channel(
+          channelId: entry.value.id,
+          name: entry.key,
+          description: 'In-memory demo channel',
+          color: '#7f56d9',
+          pinToTop: true,
+        ),
+    ];
+  }
+
+  @override
+  Future<List<Topic>> listTopics(String channel) async {
+    final byTopic = <String, int>{};
+    for (final m in _messages) {
+      if (m.channel != channel) continue;
+      final prev = byTopic[m.topic] ?? -1;
+      if (m.id > prev) byTopic[m.topic] = m.id;
+    }
+    final entries = byTopic.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return [
+      for (final e in entries) Topic(name: e.key, maxMessageId: e.value),
+    ];
+  }
+
+  @override
   Future<Message> sendMessage(SendMessageParams params) async {
     final msg = Message(
       id: _nextId++,
