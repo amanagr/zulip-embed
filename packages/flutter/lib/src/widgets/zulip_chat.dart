@@ -376,6 +376,10 @@ class _ConnectionDot extends StatelessWidget {
     final (color, label) = switch (status) {
       ConnectionStatus.connected => (const Color(0xFF22C55E), 'Connected'),
       ConnectionStatus.connecting => (const Color(0xFFF59E0B), 'Connecting…'),
+      ConnectionStatus.reconnecting => (
+          const Color(0xFFF59E0B),
+          'Reconnecting…',
+        ),
       ConnectionStatus.error => (const Color(0xFFEF4444), 'Error'),
       ConnectionStatus.disconnected => (theme.muted, 'Offline'),
     };

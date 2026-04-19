@@ -27,8 +27,16 @@ void main() {
         scope: const ScopeFilter(channel: 'design', topic: 'intro'),
       );
       expect(messages.length, greaterThanOrEqualTo(2));
-      expect(messages.every((m) => m.channel == 'design'), isTrue);
-      expect(messages.every((m) => m.topic == 'intro'), isTrue);
+      expect(
+        messages.every(
+          (m) => m is ChannelMessage && m.channelName == 'design',
+        ),
+        isTrue,
+      );
+      expect(
+        messages.every((m) => m is ChannelMessage && m.topic == 'intro'),
+        isTrue,
+      );
       await transport.close();
     });
 
@@ -40,7 +48,7 @@ void main() {
         onEvent: events.add,
       );
       await transport.sendMessage(
-        const SendMessageParams(
+        const ChannelSendParams(
           channel: 'general',
           topic: 'welcome',
           content: 'Hello Zulip',
@@ -63,7 +71,11 @@ void main() {
         onEvent: events.add,
       );
       await transport.sendMessage(
-        const SendMessageParams(channel: 'general', content: 'hi'),
+        const ChannelSendParams(
+          channel: 'general',
+          topic: 'general chat',
+          content: 'hi',
+        ),
       );
       final before = events.whereType<MessageEvent>().length;
       await transport.close();

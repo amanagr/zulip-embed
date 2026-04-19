@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:http/http.dart' as http;
 
@@ -37,6 +38,15 @@ class SnapshotTransport extends Transport {
   int? get currentUserId => null;
 
   @override
+  Future<User> getCurrentUser() {
+    // Snapshots are anonymous reads — there is no logged-in viewer.
+    // Mirrors the TS rejection text so cross-SDK diagnostics match.
+    return Future.error(
+      StateError('Snapshot transport has no logged-in viewer'),
+    );
+  }
+
+  @override
   Future<void> connect({
     required ScopeFilter scope,
     required ZulipEventListener onEvent,
@@ -48,7 +58,7 @@ class SnapshotTransport extends Transport {
           .toList(growable: false);
       onEvent(const ConnectionEvent(ConnectionStatus.connected));
     } catch (e) {
-      onEvent(ErrorEvent(e.toString()));
+      onEvent(ErrorEvent(code: _classifyError(e), message: e.toString()));
       onEvent(const ConnectionEvent(ConnectionStatus.error));
       rethrow;
     }
@@ -106,7 +116,7 @@ class SnapshotTransport extends Transport {
     }
     final decoded = jsonDecode(resp.body);
     if (decoded is! Map<String, dynamic>) {
-      throw FormatException('Snapshot root must be a JSON object');
+      throw const FormatException('Snapshot root must be a JSON object');
     }
     return decoded;
   }
@@ -145,8 +155,17 @@ class SnapshotTransport extends Transport {
   }
 }
 
+ErrorCode _classifyError(Object e) {
+  if (e is SocketException) return ErrorCode.network;
+  if (e is http.ClientException) return ErrorCode.network;
+  return ErrorCode.unknown;
+}
+
 bool _inScope(Message message, ScopeFilter scope) {
-  if (message.channel != scope.channel) return false;
+  // Snapshots are channel feeds — only ChannelMessages match. DMs in a
+  // snapshot (if any) are filtered out since ScopeFilter has no DM form.
+  if (message is! ChannelMessage) return false;
+  if (message.channelName != scope.channel) return false;
   if (scope.topic != null && message.topic != scope.topic) return false;
   return true;
 }
@@ -193,18 +212,59 @@ Message _parseMessage(Map<String, dynamic> m) {
       );
     }
   }
-  return Message(
-    id: (m['id'] as num).toInt(),
-    senderId: (m['senderId'] as num).toInt(),
-    senderName: m['senderFullName'] as String? ?? 'Unknown',
-    senderAvatarUrl: m['avatarUrl'] as String?,
-    channel: m['channelName'] as String? ?? '',
+  final id = (m['id'] as num).toInt();
+  final senderId = (m['senderId'] as num).toInt();
+  final senderName = m['senderFullName'] as String? ?? 'Unknown';
+  final senderAvatarUrl = m['avatarUrl'] as String?;
+  final content = m['content'] as String? ?? '';
+  final contentIsHtml = m['contentIsHtml'] as bool? ?? false;
+  final timestamp = DateTime.fromMillisecondsSinceEpoch(
+    (m['timestamp'] as num).toInt(),
+  );
+
+  // Discriminated on `type`. Default to "channel" when absent so older
+  // snapshot files written before v0.2 still parse.
+  final type = m['type'] as String? ?? 'channel';
+  if (type == 'direct') {
+    final rawRecipients = m['recipients'];
+    final recipients = <User>[];
+    if (rawRecipients is List) {
+      for (final r in rawRecipients) {
+        if (r is! Map<String, dynamic>) continue;
+        final uid = (r['userId'] as num?)?.toInt();
+        if (uid == null) continue;
+        recipients.add(
+          User(
+            id: uid,
+            fullName: r['fullName'] as String? ?? '',
+            email: r['email'] as String? ?? '',
+            avatarUrl: r['avatarUrl'] as String?,
+          ),
+        );
+      }
+    }
+    return DirectMessage(
+      id: id,
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatarUrl: senderAvatarUrl,
+      recipients: recipients,
+      content: content,
+      contentIsHtml: contentIsHtml,
+      timestamp: timestamp,
+      reactions: reactions,
+    );
+  }
+  return ChannelMessage(
+    id: id,
+    senderId: senderId,
+    senderName: senderName,
+    senderAvatarUrl: senderAvatarUrl,
+    channelName: m['channelName'] as String? ?? '',
     topic: m['topic'] as String? ?? '',
-    content: m['content'] as String? ?? '',
-    contentIsHtml: m['contentIsHtml'] as bool? ?? false,
-    timestamp: DateTime.fromMillisecondsSinceEpoch(
-      (m['timestamp'] as num).toInt(),
-    ),
+    content: content,
+    contentIsHtml: contentIsHtml,
+    timestamp: timestamp,
     reactions: reactions,
   );
 }

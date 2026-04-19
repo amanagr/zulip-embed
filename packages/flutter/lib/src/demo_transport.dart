@@ -6,6 +6,16 @@ import 'types.dart';
 const int _demoBotId = 1;
 const int _viewerId = 2;
 
+// Synthetic "guest" viewer for the in-process demo transport. Kept stable
+// so tests and reaction-toggle logic can reason about ownership without a
+// real /users/me round-trip. Mirrors DEMO_GUEST_USER in the TS SDK.
+const User _demoGuestUser = User(
+  id: _viewerId,
+  fullName: 'You',
+  email: 'you@example.com',
+  avatarUrl: '',
+);
+
 /// In-memory fake transport that seeds a few messages and echoes whatever
 /// you send after a short delay. Useful for docs, examples, and tests so
 /// the widgets render without a Zulip server.
@@ -17,6 +27,9 @@ class DemoTransport extends Transport {
 
   @override
   int? get currentUserId => _viewerId;
+
+  @override
+  Future<User> getCurrentUser() async => _demoGuestUser;
 
   @override
   Future<void> connect({
@@ -34,20 +47,20 @@ class DemoTransport extends Transport {
     final topic = scope.topic ?? 'welcome';
     final now = DateTime.now();
     _messages.addAll([
-      Message(
+      ChannelMessage(
         id: 1,
         senderId: _demoBotId,
         senderName: 'Zulip Bot',
-        channel: scope.channel,
+        channelName: scope.channel,
         topic: topic,
         content: 'Welcome to the Zulip embed preview. 👋',
         timestamp: now.subtract(const Duration(minutes: 5)),
       ),
-      Message(
+      ChannelMessage(
         id: 2,
         senderId: _demoBotId,
         senderName: 'Zulip Bot',
-        channel: scope.channel,
+        channelName: scope.channel,
         topic: topic,
         content:
             'Messages you send will be echoed back by this in-process bot — '
@@ -72,7 +85,11 @@ class DemoTransport extends Transport {
     int limit = 50,
   }) async {
     final matching = _messages.where((m) {
-      if (m.channel != scope.channel) return false;
+      // Demo transport only ever seeds ChannelMessages, but narrow
+      // defensively so future DM support doesn't silently leak DMs
+      // into channel scopes.
+      if (m is! ChannelMessage) return false;
+      if (m.channelName != scope.channel) return false;
       if (scope.topic != null && m.topic != scope.topic) return false;
       return true;
     }).toList();
@@ -82,11 +99,12 @@ class DemoTransport extends Transport {
 
   @override
   Future<List<Channel>> listChannels() async {
-    final channels = <String, Message>{};
+    final channels = <String, ChannelMessage>{};
     for (final m in _messages) {
+      if (m is! ChannelMessage) continue;
       // Keep the most-recent message per channel for the summary.
-      final prev = channels[m.channel];
-      if (prev == null || m.id > prev.id) channels[m.channel] = m;
+      final prev = channels[m.channelName];
+      if (prev == null || m.id > prev.id) channels[m.channelName] = m;
     }
     return [
       for (final entry in channels.entries)
@@ -104,7 +122,8 @@ class DemoTransport extends Transport {
   Future<List<Topic>> listTopics(String channel) async {
     final byTopic = <String, int>{};
     for (final m in _messages) {
-      if (m.channel != channel) continue;
+      if (m is! ChannelMessage) continue;
+      if (m.channelName != channel) continue;
       final prev = byTopic[m.topic] ?? -1;
       if (m.id > prev) byTopic[m.topic] = m.id;
     }
@@ -117,18 +136,39 @@ class DemoTransport extends Transport {
 
   @override
   Future<Message> sendMessage(SendMessageParams params) async {
-    final msg = Message(
-      id: _nextId++,
-      senderId: _viewerId,
-      senderName: 'You',
-      channel: params.channel,
-      topic: params.topic ?? 'general chat',
-      content: params.content,
-      timestamp: DateTime.now(),
-    );
+    // Demo transport only models channel sends today — DM support would
+    // require a synthetic recipient directory. Accept but store a
+    // ChannelMessage either way so existing widgets keep rendering.
+    final Message msg = switch (params) {
+      ChannelSendParams(
+        :final channel,
+        :final topic,
+        :final content,
+      ) =>
+        ChannelMessage(
+          id: _nextId++,
+          senderId: _viewerId,
+          senderName: 'You',
+          channelName: channel,
+          topic: topic,
+          content: content,
+          timestamp: DateTime.now(),
+        ),
+      DirectSendParams(:final recipients, :final content) => DirectMessage(
+          id: _nextId++,
+          senderId: _viewerId,
+          senderName: 'You',
+          recipients: [
+            for (final email in recipients)
+              User(id: 0, fullName: email, email: email),
+          ],
+          content: content,
+          timestamp: DateTime.now(),
+        ),
+    };
     _messages.add(msg);
     _listener?.call(MessageEvent(msg));
-    _scheduleEcho(msg);
+    if (msg is ChannelMessage) _scheduleEcho(msg);
     return msg;
   }
 
@@ -142,16 +182,23 @@ class DemoTransport extends Transport {
     if (current.senderId != _viewerId) {
       throw StateError('Only the author can edit this message');
     }
-    _messages[idx] = current.copyWith(
-      content: params.content,
-      topic: params.topic,
+    final (String? newContent, String? newTopic) = switch (params) {
+      EditContentParams(:final content) => (content, null),
+      EditTopicParams(:final topic) => (null, topic),
+      EditContentAndTopicParams(:final content, :final topic) => (
+          content,
+          topic,
+        ),
+    };
+    _messages[idx] = current.copyWith(content: newContent, topic: newTopic);
+    _listener?.call(
+      MessageUpdateEvent(
+        messageId: params.messageId,
+        content: newContent,
+        topic: newTopic,
+        editedTimestamp: DateTime.now(),
+      ),
     );
-    _listener?.call(MessageUpdateEvent(
-      messageId: params.messageId,
-      content: params.content,
-      topic: params.topic,
-      editedTimestamp: DateTime.now(),
-    ));
   }
 
   @override
@@ -198,24 +245,26 @@ class DemoTransport extends Transport {
         Reaction(emoji: entry.key, userIds: entry.value.toList()),
     ];
     _messages[idx] = current.copyWith(reactions: next);
-    _listener?.call(ReactionEvent(
-      messageId: params.messageId,
-      reactions: next,
-    ));
+    _listener?.call(
+      ReactionEvent(
+        messageId: params.messageId,
+        reactions: next,
+      ),
+    );
   }
 
-  void _scheduleEcho(Message prompt) {
+  void _scheduleEcho(ChannelMessage prompt) {
     late Timer timer;
     timer = Timer(const Duration(milliseconds: 800), () {
       _pendingReplies.remove(timer);
       if (_listener == null) return;
-      final reply = Message(
+      final reply = ChannelMessage(
         id: _nextId++,
         senderId: _demoBotId,
         senderName: 'Zulip Bot',
-        channel: prompt.channel,
+        channelName: prompt.channelName,
         topic: prompt.topic,
-        content: _echoReply(prompt.content),
+        content: _echoReply(prompt),
         timestamp: DateTime.now(),
       );
       _messages.add(reply);
@@ -224,12 +273,12 @@ class DemoTransport extends Transport {
     _pendingReplies.add(timer);
   }
 
-  String _echoReply(String content) {
-    final trimmed = content.trim();
+  String _echoReply(ChannelMessage prompt) {
+    final trimmed = prompt.content.trim();
     if (trimmed.isEmpty) return 'I heard… nothing?';
     if (trimmed.endsWith('?')) {
       return 'Great question — in a real deployment your team would answer '
-          'this in #${_messages.last.channel} > ${_messages.last.topic}.';
+          'this in #${prompt.channelName} > ${prompt.topic}.';
     }
     return 'Echo: $trimmed';
   }

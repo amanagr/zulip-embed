@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show SocketException;
 
 import 'package:http/http.dart' as http;
 
@@ -22,7 +23,13 @@ class ZulipTransport implements Transport {
     http.Client? httpClient,
   })  : serverUrl = _normalize(serverUrl),
         _http = httpClient ?? http.Client(),
-        _ownsHttp = httpClient == null;
+        _ownsHttp = httpClient == null {
+    // Deferred so callers of whenReady / getCurrentUser can await the
+    // full user record even when they beat the /users/me round-trip.
+    // Settled by _loadCurrentUser() on success or by connect()/close()
+    // on failure.
+    _currentUserCompleter = Completer<User>();
+  }
 
   final Uri serverUrl;
   final String email;
@@ -31,6 +38,7 @@ class ZulipTransport implements Transport {
   final bool _ownsHttp;
 
   int? _userId;
+  late Completer<User> _currentUserCompleter;
   String? _queueId;
   int _lastEventId = -1;
   bool _closed = false;
@@ -89,6 +97,9 @@ class ZulipTransport implements Transport {
   @override
   int? get currentUserId => _userId;
 
+  @override
+  Future<User> getCurrentUser() => _currentUserCompleter.future;
+
   Map<String, String> get _authHeaders {
     final token = base64.encode(utf8.encode('$email:$apiKey'));
     return {'Authorization': 'Basic $token'};
@@ -102,8 +113,7 @@ class ZulipTransport implements Transport {
     _onEvent = onEvent;
     onEvent(const ConnectionEvent(ConnectionStatus.connecting));
     try {
-      final me = await _getJson('/api/v1/users/me');
-      _userId = (me['user_id'] as num).toInt();
+      await _loadCurrentUser();
 
       // Operator is 'stream' (not 'channel') for compatibility with Zulip
       // < 9, which doesn't know the 'channel' alias. Every supported
@@ -131,8 +141,12 @@ class ZulipTransport implements Transport {
       onEvent(const ConnectionEvent(ConnectionStatus.connected));
       unawaited(_pollLoop(onEvent));
     } catch (e) {
-      onEvent(ErrorEvent(e.toString()));
+      final code = _classifyError(e);
+      onEvent(ErrorEvent(code: code, message: e.toString()));
       onEvent(const ConnectionEvent(ConnectionStatus.error));
+      if (!_currentUserCompleter.isCompleted) {
+        _currentUserCompleter.completeError(e);
+      }
       rethrow;
     }
   }
@@ -147,7 +161,13 @@ class ZulipTransport implements Transport {
         final resp = await _http.get(uri, headers: _authHeaders);
         if (_closed) return;
         if (resp.statusCode != 200) {
-          onEvent(ErrorEvent('events HTTP ${resp.statusCode}'));
+          onEvent(
+            ErrorEvent(
+              code: _classifyStatus(resp.statusCode),
+              message: 'events HTTP ${resp.statusCode}',
+              retryAfterMs: _retryAfterMs(resp),
+            ),
+          );
           await Future<void>.delayed(const Duration(seconds: 2));
           continue;
         }
@@ -160,7 +180,7 @@ class ZulipTransport implements Transport {
         }
       } catch (e) {
         if (_closed) return;
-        onEvent(ErrorEvent(e.toString()));
+        onEvent(ErrorEvent(code: _classifyError(e), message: e.toString()));
         await Future<void>.delayed(const Duration(seconds: 2));
       }
     }
@@ -172,6 +192,11 @@ class ZulipTransport implements Transport {
     _closed = true;
     _queueId = null;
     _onEvent = null;
+    if (!_currentUserCompleter.isCompleted) {
+      _currentUserCompleter.completeError(
+        StateError('Transport closed before /users/me completed'),
+      );
+    }
     if (_ownsHttp) _http.close();
   }
 
@@ -216,22 +241,62 @@ class ZulipTransport implements Transport {
 
   @override
   Future<Message> sendMessage(SendMessageParams params) async {
+    return switch (params) {
+      ChannelSendParams(
+        :final channel,
+        :final topic,
+        :final content,
+      ) =>
+        _sendChannel(channel: channel, topic: topic, content: content),
+      DirectSendParams(:final recipients, :final content) =>
+        _sendDirect(recipients: recipients, content: content),
+    };
+  }
+
+  Future<Message> _sendChannel({
+    required String channel,
+    required String topic,
+    required String content,
+  }) async {
     // Wire type is 'stream' for Zulip < 9 compatibility — /messages still
     // accepts the legacy value on every supported server.
     final body = await _postForm('/api/v1/messages', {
       'type': 'stream',
-      'to': params.channel,
-      'topic': params.topic ?? 'general chat',
-      'content': params.content,
+      'to': channel,
+      'topic': topic,
+      'content': content,
     });
     final id = (body['id'] as num).toInt();
-    return Message(
+    return ChannelMessage(
       id: id,
       senderId: _userId ?? 0,
       senderName: 'You',
-      channel: params.channel,
-      topic: params.topic ?? 'general chat',
-      content: params.content,
+      channelName: channel,
+      topic: topic,
+      content: content,
+      timestamp: DateTime.now(),
+    );
+  }
+
+  Future<Message> _sendDirect({
+    required List<String> recipients,
+    required String content,
+  }) async {
+    final body = await _postForm('/api/v1/messages', {
+      'type': 'direct',
+      'to': jsonEncode(recipients),
+      'content': content,
+    });
+    final id = (body['id'] as num).toInt();
+    return DirectMessage(
+      id: id,
+      senderId: _userId ?? 0,
+      senderName: 'You',
+      recipients: [
+        for (final email in recipients)
+          User(id: 0, fullName: email, email: email),
+      ],
+      content: content,
       timestamp: DateTime.now(),
     );
   }
@@ -263,10 +328,22 @@ class ZulipTransport implements Transport {
 
   @override
   Future<void> editMessage(EditMessageParams params) async {
-    if (params.content == null && params.topic == null) return;
     final body = <String, String>{};
-    if (params.content != null) body['content'] = params.content!;
-    if (params.topic != null) body['topic'] = params.topic!;
+    String? newContent;
+    String? newTopic;
+    switch (params) {
+      case EditContentParams(:final content):
+        body['content'] = content;
+        newContent = content;
+      case EditTopicParams(:final topic):
+        body['topic'] = topic;
+        newTopic = topic;
+      case EditContentAndTopicParams(:final content, :final topic):
+        body['content'] = content;
+        body['topic'] = topic;
+        newContent = content;
+        newTopic = topic;
+    }
     final resp = await _http.patch(
       _endpoint('/api/v1/messages/${params.messageId}'),
       headers: _authHeaders,
@@ -282,11 +359,13 @@ class ZulipTransport implements Transport {
     // /events, but firing one now keeps the UI responsive. Handler in
     // ZulipChat is idempotent so double-delivery is harmless.
     if (!_reactionState.containsKey(params.messageId)) return;
-    _onEvent?.call(MessageUpdateEvent(
-      messageId: params.messageId,
-      content: params.content,
-      topic: params.topic,
-    ));
+    _onEvent?.call(
+      MessageUpdateEvent(
+        messageId: params.messageId,
+        content: newContent,
+        topic: newTopic,
+      ),
+    );
   }
 
   @override
@@ -326,17 +405,19 @@ class ZulipTransport implements Transport {
         if (!_reactionState.containsKey(id)) return;
         final editedMs = (evt['edit_timestamp'] as num?)?.toInt();
         final rendered = evt['rendered_content'] as String?;
-        onEvent(MessageUpdateEvent(
-          messageId: id,
-          // Absent when the edit only touched topic/channel. Stay null
-          // in that case so consumers can distinguish content edits from
-          // topic moves.
-          content: rendered == null ? null : _stripHtml(rendered),
-          topic: evt['subject'] as String?,
-          editedTimestamp: editedMs == null
-              ? null
-              : DateTime.fromMillisecondsSinceEpoch(editedMs * 1000),
-        ));
+        onEvent(
+          MessageUpdateEvent(
+            messageId: id,
+            // Absent when the edit only touched topic/channel. Stay null
+            // in that case so consumers can distinguish content edits from
+            // topic moves.
+            content: rendered == null ? null : _stripHtml(rendered),
+            topic: evt['subject'] as String?,
+            editedTimestamp: editedMs == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(editedMs * 1000),
+          ),
+        );
       case 'delete_message':
         final ids = <int>[];
         final single = (evt['message_id'] as num?)?.toInt();
@@ -439,14 +520,16 @@ class ZulipTransport implements Transport {
       final id = (s['stream_id'] as num?)?.toInt();
       final name = s['name'] as String?;
       if (id == null || name == null) continue;
-      channels.add(Channel(
-        channelId: id,
-        name: name,
-        description: s['description'] as String? ?? '',
-        color: s['color'] as String?,
-        pinToTop: (s['pin_to_top'] as bool?) ?? false,
-        isMuted: (s['is_muted'] as bool?) ?? false,
-      ));
+      channels.add(
+        Channel(
+          channelId: id,
+          name: name,
+          description: s['description'] as String? ?? '',
+          color: s['color'] as String?,
+          pinToTop: (s['pin_to_top'] as bool?) ?? false,
+          isMuted: (s['is_muted'] as bool?) ?? false,
+        ),
+      );
     }
     // Pinned first, then alphabetical — same ordering Zulip's own web
     // app applies so the component output matches user expectations.
@@ -471,11 +554,13 @@ class ZulipTransport implements Transport {
       final maxId = (t['max_id'] as num?)?.toInt();
       if (name == null || maxId == null) continue;
       final isResolved = name.startsWith(resolvedPrefix);
-      topics.add(Topic(
-        name: isResolved ? name.substring(resolvedPrefix.length) : name,
-        maxMessageId: maxId,
-        isResolved: isResolved,
-      ));
+      topics.add(
+        Topic(
+          name: isResolved ? name.substring(resolvedPrefix.length) : name,
+          maxMessageId: maxId,
+          isResolved: isResolved,
+        ),
+      );
     }
     return List.unmodifiable(topics);
   }
@@ -528,18 +613,72 @@ class ZulipTransport implements Transport {
     ];
   }
 
+  Future<void> _loadCurrentUser() async {
+    final me = await _getJson('/api/v1/users/me');
+    final id = (me['user_id'] as num).toInt();
+    _userId = id;
+    final user = User(
+      id: id,
+      email: me['email'] as String? ?? '',
+      fullName: me['full_name'] as String? ?? '',
+      avatarUrl: me['avatar_url'] as String?,
+    );
+    if (!_currentUserCompleter.isCompleted) {
+      _currentUserCompleter.complete(user);
+    }
+  }
+
   Message _parseMessage(Map<String, dynamic> m) {
-    return Message(
-      id: (m['id'] as num).toInt(),
-      senderId: (m['sender_id'] as num).toInt(),
-      senderName: (m['sender_full_name'] as String?) ?? 'Unknown',
-      senderAvatarUrl: m['avatar_url'] as String?,
-      channel: (m['display_recipient'] as String?) ?? '',
+    final id = (m['id'] as num).toInt();
+    final senderId = (m['sender_id'] as num).toInt();
+    final senderName = (m['sender_full_name'] as String?) ?? 'Unknown';
+    final senderAvatarUrl = m['avatar_url'] as String?;
+    final content = _stripHtml((m['content'] as String?) ?? '');
+    final timestamp = DateTime.fromMillisecondsSinceEpoch(
+      (m['timestamp'] as num).toInt() * 1000,
+    );
+
+    // Zulip <9 emits "stream" on message.type; 9+ may emit "channel".
+    // Treat both as ChannelMessage and normalize in the SDK so callers
+    // never need to special-case the wire dialect (see CLAUDE.md).
+    final wireType = m['type'] as String?;
+    if (wireType == 'private' || wireType == 'direct') {
+      final rawRecipients = m['display_recipient'];
+      final recipients = <User>[];
+      if (rawRecipients is List) {
+        for (final r in rawRecipients) {
+          if (r is! Map<String, dynamic>) continue;
+          final uid = (r['id'] as num?)?.toInt();
+          if (uid == null) continue;
+          recipients.add(
+            User(
+              id: uid,
+              fullName: r['full_name'] as String? ?? '',
+              email: r['email'] as String? ?? '',
+              avatarUrl: null,
+            ),
+          );
+        }
+      }
+      return DirectMessage(
+        id: id,
+        senderId: senderId,
+        senderName: senderName,
+        senderAvatarUrl: senderAvatarUrl,
+        recipients: recipients,
+        content: content,
+        timestamp: timestamp,
+      );
+    }
+    return ChannelMessage(
+      id: id,
+      senderId: senderId,
+      senderName: senderName,
+      senderAvatarUrl: senderAvatarUrl,
+      channelName: (m['display_recipient'] as String?) ?? '',
       topic: (m['subject'] as String?) ?? '',
-      content: _stripHtml((m['content'] as String?) ?? ''),
-      timestamp: DateTime.fromMillisecondsSinceEpoch(
-        (m['timestamp'] as num).toInt() * 1000,
-      ),
+      content: content,
+      timestamp: timestamp,
     );
   }
 
@@ -573,4 +712,34 @@ class ZulipTransport implements Transport {
     }
     return jsonDecode(resp.body) as Map<String, dynamic>;
   }
+}
+
+ErrorCode _classifyError(Object e) {
+  if (e is SocketException) return ErrorCode.network;
+  if (e is http.ClientException) return ErrorCode.network;
+  final message = e.toString();
+  if (message.contains('HTTP 401') || message.contains('HTTP 403')) {
+    return ErrorCode.unauthorized;
+  }
+  if (message.contains('HTTP 429')) return ErrorCode.rateLimited;
+  return ErrorCode.unknown;
+}
+
+ErrorCode _classifyStatus(int status) {
+  if (status == 401 || status == 403) return ErrorCode.unauthorized;
+  if (status == 429) return ErrorCode.rateLimited;
+  if (status >= 500) return ErrorCode.network;
+  return ErrorCode.unknown;
+}
+
+int? _retryAfterMs(http.Response resp) {
+  // Parse Retry-After: either seconds (RFC 7231) or an HTTP-date. We only
+  // honour the seconds form — HTTP-dates on a Zulip rate-limit response
+  // are effectively unheard-of and parsing them here isn't worth the
+  // surface area.
+  final header = resp.headers['retry-after'];
+  if (header == null) return null;
+  final seconds = int.tryParse(header.trim());
+  if (seconds == null) return null;
+  return seconds * 1000;
 }

@@ -7,6 +7,12 @@ typedef ZulipEventListener = void Function(ZulipEvent event);
 abstract class Transport {
   int? get currentUserId;
 
+  /// Resolves with the connected viewer's full [User] record once the
+  /// transport has identity. Implementations back this by `/users/me`
+  /// (live), a synthetic guest user (demo), or a rejected future
+  /// (snapshot — no logged-in viewer). Mirrors TS `getCurrentUser`.
+  Future<User> getCurrentUser();
+
   Future<void> connect({
     required ScopeFilter scope,
     required ZulipEventListener onEvent,

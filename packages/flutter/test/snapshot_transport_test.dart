@@ -101,7 +101,11 @@ void main() {
       );
       await expectLater(
         transport.sendMessage(
-          const SendMessageParams(channel: 'general', content: 'hi'),
+          const ChannelSendParams(
+            channel: 'general',
+            topic: 'general chat',
+            content: 'hi',
+          ),
         ),
         throwsA(isA<StateError>()),
       );
