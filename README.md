@@ -117,8 +117,10 @@ deployment runs that script every six hours against chat.zulip.org and
 bakes the latest ~30 messages into the site. Required secrets on the
 `github-pages` environment:
 
-- `GH_ACTIONS_BOT_API_KEY` (secret) — Zulip API key for a bot subscribed
-  to the channel you want to snapshot.
+- `GH_ACTIONS_BOT_API_KEY` (secret) — Zulip API key for a **Generic bot**
+  subscribed to the channel you want to snapshot. **Incoming-webhook
+  bots won't work** — they return HTTP 401 on `/api/v1/messages`
+  because they can only post, not read.
 - `ZULIP_ANNOUNCE_EMAIL` (secret) — the bot's email.
 - `ZULIP_ANNOUNCE_SERVER` (environment variable, optional) — defaults to
   `https://chat.zulip.org`.

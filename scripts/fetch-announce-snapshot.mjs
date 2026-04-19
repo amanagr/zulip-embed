@@ -76,6 +76,14 @@ const response = await fetch(url, {headers: {Authorization: authHeader}});
 if (!response.ok) {
     const body = await response.text();
     console.error(`[fetch-snapshot] HTTP ${String(response.status)}: ${body.slice(0, 400)}`);
+    // Zulip returns a specific 401 code for incoming-webhook bots that
+    // try to read messages. Point maintainers at the fix so they don't
+    // have to dig through API docs.
+    if (body.includes("not available to incoming webhook bots")) {
+        console.error(
+            "[fetch-snapshot] The configured API key belongs to an 'incoming webhook' bot, which can only POST messages. Create a 'generic' bot in Zulip (Personal settings → Bots → Add a new bot → type=Generic bot), subscribe it to the channel, and use its API key instead.",
+        );
+    }
     process.exit(1);
 }
 
