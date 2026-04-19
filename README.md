@@ -223,57 +223,68 @@ DOMPurify with a strict allow-list before it hits the DOM. See
 | Rich showcase + read-only `#announce` demos | ✅ |
 | Floating-messenger mode | ✅ |
 | Light + dark themes | ✅ |
-| Direct messages | ❌ (scoped to channels for v0.1) |
-| Typing indicators | ❌ |
+| Typing indicators (send + receive, per-scope filtered) | ✅ |
+| Unread separator + "new messages" jump-to-bottom pill | ✅ |
+| Curated emoji reaction picker | ✅ |
+| Message pagination (scroll-up loads older) | ✅ |
+| KaTeX math (lazy-loaded) | ✅ |
+| Channel + topic enumeration (`listChannels`, `listTopics`) | ✅ |
+| Direct messages | ❌ (v0.5) |
 | Presence (online/offline dots) | ❌ |
 | File uploads from the composer | ❌ |
 | Message search | ❌ |
-| Thread / per-topic nav drawer | ❌ |
 | Unread counters, read receipts | ❌ |
 | Draft persistence | ❌ |
 
+## Plug-and-play components
+
+v1 ships a catalog of composable custom elements so you can drop any
+subset of the Zulip web app's UI into your own product:
+
+| Component | Status | Description |
+| --- | --- | --- |
+| `<zulip-chat>` | ✅ | Full channel/topic feed + composer + reactions + typing + edit/delete |
+| `<zulip-channel-list>` | 🚧 | Subscribed channels with unread / pin / color / mute |
+| `<zulip-topic-list>` | 🚧 | Topics inside a channel, resolved markers |
+| `<zulip-compose>` | ⏳ | Standalone composer (drafts, scheduled send, file upload) |
+| `<zulip-inbox>` | ⏳ | Unreads grouped by channel > topic |
+| `<zulip-recent>` | ⏳ | Recent conversations view |
+| `<zulip-dm-list>` | ⏳ | Direct-message pane |
+| `<zulip-user-list>` | ⏳ | Presence sidebar |
+| `<zulip-user-card>` | ⏳ | Hover / click profile popover |
+| `<zulip-search>` | ⏳ | Advanced-filter search box + results |
+| `<zulip-message>` | ⏳ | Single-message embed for quote-of-the-day widgets |
+
+## Frameworks
+
+| Framework | Status | Path |
+| --- | --- | --- |
+| Web Components (framework-agnostic) | ✅ | this repo root |
+| Flutter | ✅ | [`packages/flutter/`](./packages/flutter/) |
+| React (thin wrapper over WCs) | 🚧 | `packages/react/` |
+| React Native | ⏳ | `packages/react-native/` |
+| SwiftUI (iOS) | ⏳ planned | `packages/swiftui/` |
+| Jetpack Compose (Android) | ⏳ planned | `packages/compose/` |
+
 ## Roadmap
 
-Prioritized by what's blocking real-world embedding use cases. Checked
-items ship in the current preview; the rest are in rough "we'd work on
-next" order.
+**v1.0 — Component + framework parity**
+1. ✅ Sanitized HTML rendering (DOMPurify) + KaTeX math
+2. ✅ Live message edits, deletes, reactions, typing
+3. ✅ Message pagination + unread separator
+4. ✅ Flutter parity (live chat, edit/delete, typing, snapshot)
+5. ✅ `Transport.listChannels()` + `listTopics()` primitives
+6. 🚧 `<zulip-channel-list>` + `<zulip-topic-list>` components
+7. 🚧 React wrapper package
+8. ⏳ React Native package
+9. ⏳ Composer file / image upload (multipart to `/user_uploads`)
+10. ⏳ Direct messages, presence, search, inbox/recent views
+11. ⏳ JWT SSO handoff (replace HTML-attribute `api-key`)
+12. ⏳ SwiftUI + Compose native SDKs
+13. ⏳ Publish to npm + pub.dev; developer-docs site
 
-**v0.2 — Read-path completeness**
-1. ✅ Sanitized HTML rendering (DOMPurify)
-2. ✅ Live message edits, deletes, and reactions
-3. ✅ Rendering showcase + `#announce` read-only demo
-4. ✅ Spoiler reveal toggle
-5. ✅ Code-block syntax highlighting (bundle a Pygments-compatible theme)
-6. KaTeX math rendering (opt-in, lazy-loaded)
-7. Unread separator + "new messages" indicator
-
-**v0.3 — Write-path completeness**
-8. Emoji picker (replace `prompt()` fallback)
-9. Composer file / image upload (multipart to `/user_uploads`)
-10. Message edit + delete from the composer
-11. Typing indicators (send + receive)
-12. Draft autosave per channel + topic
-
-**v0.4 — Navigation & scale**
-13. Channel / topic switcher inside the widget
-14. Direct messages
-15. Message history paging (scroll up to load older)
-16. Message search
-17. Unread counts + read-receipt events
-
-**v0.5 — Identity & auth**
-18. JWT SSO handoff (replace HTML-attribute `api-key`)
-19. Scoped API keys with channel-level ACLs
-20. Guest / web-public read mode without any credentials
-
-**v1.0 — Cross-tier parity**
-21. React bindings with typed props + hooks
-22. React Native + SwiftUI + Compose SDKs
-23. Publish `zulip_embed` to pub.dev + DartPad snippets in docs
-24. Subresource integrity + signed release bundles
-25. CSP-friendly build (no inline styles in host page)
-
-See the parent discussion for the full Tier 1 → Tier 3 plan.
+See [`SECURITY.md`](./SECURITY.md) for the threat model and
+[`CLAUDE.md`](./CLAUDE.md) for code conventions.
 
 ## License
 
