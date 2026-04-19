@@ -83,7 +83,13 @@ export default defineConfig(() => {
         plugins: [
             dts({
                 include: ["src/**/*.ts"],
-                rollupTypes: true,
+                // rollupTypes was dropped when we went multi-entry: the
+                // rolled output placed some bundled .d.ts files at
+                // dist/<name>.d.ts and left channel-list / topic-list
+                // without a top-level rollup. Emit per-file .d.ts
+                // mirroring src/ instead — subpath types resolve
+                // cleanly via relative imports and the tree matches
+                // what tsc would produce standalone.
                 outDir: "dist",
             }),
         ],

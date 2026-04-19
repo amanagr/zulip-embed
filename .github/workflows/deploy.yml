@@ -46,6 +46,10 @@ jobs:
       # consumers hit.
       - run: pnpm -w run build
 
+      # Enforce per-subpath gzipped bundle budgets. See
+      # scripts/bundle-check.mjs and V1_PLAN.md §10 for target sizes.
+      - run: pnpm check:bundle
+
       # Typecheck + test the React wrapper alongside the core bundle.
       # Kept as explicit per-package steps rather than a `pnpm -r`
       # sweep so a failure surfaces against the right package name.

@@ -1,20 +1,44 @@
 {
   "name": "zulip-embed",
-  "version": "0.2.0",
+  "version": "0.8.0-rc.0",
   "description": "Embed Zulip chat as a framework-agnostic Web Component or headless SDK.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/zulip-embed.js",
   "module": "./dist/zulip-embed.js",
-  "types": "./dist/zulip-embed.d.ts",
+  "types": "./dist/index.d.ts",
   "unpkg": "./dist/zulip-embed.iife.js",
   "exports": {
     ".": {
-      "types": "./dist/zulip-embed.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/zulip-embed.js"
     },
+    "./all": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/zulip-embed.js"
+    },
+    "./chat": {
+      "types": "./dist/entries/chat.d.ts",
+      "import": "./dist/entries/chat.js"
+    },
+    "./channel-list": {
+      "types": "./dist/entries/channel-list.d.ts",
+      "import": "./dist/entries/channel-list.js"
+    },
+    "./topic-list": {
+      "types": "./dist/entries/topic-list.d.ts",
+      "import": "./dist/entries/topic-list.js"
+    },
+    "./agent": {
+      "types": "./dist/entries/agent.d.ts",
+      "import": "./dist/entries/agent.js"
+    },
+    "./demo": {
+      "types": "./dist/entries/demo.d.ts",
+      "import": "./dist/entries/demo.js"
+    },
     "./element": {
-      "types": "./dist/zulip-embed.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/zulip-embed.js"
     }
   },
@@ -32,6 +56,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:bundle": "node scripts/bundle-check.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
