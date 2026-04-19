@@ -1451,6 +1451,68 @@ button {
     background: var(--zc-color-border);
 }
 
+/*
+ * Per-part author attribution — multi-agent chats distinguish parts
+ * emitted by different agents (planner, researcher, tool executor)
+ * inside a single Message bubble. Each part root gets a 2px left
+ * accent bar painted with the author's --part-author-color (or the
+ * neutral border color when none was supplied), and a small chip
+ * with avatar/initials + name above the part content.
+ */
+.part-tool-call[data-author-id],
+.part-tool-result[data-author-id],
+.confirmation-card[data-author-id],
+.message-text-part[data-author-id] {
+    border-left: 2px solid var(--part-author-color, var(--zc-color-border));
+    padding-left: var(--zc-spacing-sm);
+}
+
+.part-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 11.5px;
+    color: var(--zc-color-muted);
+    line-height: 1;
+}
+
+.part-author-avatar {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.part-author-initials {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--zc-color-accent-contrast);
+    background: var(--part-author-color, var(--zc-color-accent));
+    line-height: 1;
+}
+
+.part-author-name {
+    font-weight: 600;
+    color: var(--zc-color-text);
+    letter-spacing: 0.01em;
+}
+
+:host([theme="dark"]) .part-author {
+    color: var(--zc-color-muted);
+}
+
+:host([theme="dark"]) .part-author-name {
+    color: var(--zc-color-text);
+}
+
 .error-banner {
     background: #fee2e2;
     color: #991b1b;

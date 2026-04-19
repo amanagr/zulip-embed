@@ -12,6 +12,7 @@ import type {
     ConfirmationMessagePart,
     Message,
     MessagePart,
+    MessagePartAuthor,
     Reaction,
     ZulipConfirmationResponseEventDetail,
 } from "./types.ts";
@@ -446,14 +447,22 @@ function renderContent(target: HTMLElement, message: Message, context: RenderCon
 
 function renderPart(part: MessagePart): HTMLElement {
     if (part.type === "text") {
-        const wrap = document.createElement("span");
-        wrap.classList.add("part-text");
-        renderPlainText(wrap, part.text);
+        // Text parts render into a .message-text-part <div> so the
+        // shared author-accent selector has something to hang off.
+        // When there's no author the <div> is effectively a thin
+        // wrapper around the same inline text we produced before.
+        const wrap = document.createElement("div");
+        wrap.classList.add("part-text", "message-text-part");
+        applyPartAuthor(wrap, part.author);
+        const inline = document.createElement("span");
+        renderPlainText(inline, part.text);
+        wrap.append(inline);
         return wrap;
     }
     if (part.type === "code") {
         const pre = document.createElement("pre");
         pre.classList.add("part-code");
+        applyPartAuthor(pre, part.author);
         const code = document.createElement("code");
         if (part.language !== undefined) {
             // Use the hljs-compatible convention so a future syntax
@@ -469,6 +478,7 @@ function renderPart(part: MessagePart): HTMLElement {
         box.classList.add("part-tool-call");
         box.dataset["toolCallId"] = part.id;
         if (part.status !== undefined) box.dataset["status"] = part.status;
+        applyPartAuthor(box, part.author);
         const header = document.createElement("div");
         header.classList.add("part-tool-call-header");
         header.textContent = `🔧 ${part.name}`;
@@ -484,6 +494,7 @@ function renderPart(part: MessagePart): HTMLElement {
         box.classList.add("part-tool-result");
         box.dataset["toolCallId"] = part.toolCallId;
         if (part.isError === true) box.dataset["error"] = "true";
+        applyPartAuthor(box, part.author);
         const output = document.createElement("pre");
         output.classList.add("part-tool-result-output");
         output.textContent = safeStringify(part.output);
@@ -494,12 +505,77 @@ function renderPart(part: MessagePart): HTMLElement {
     return renderConfirmationPart(part);
 }
 
+// Stamp a part's root element with the author id + color accent and
+// prepend the visible author badge, if any. Called by every part
+// renderer so the handling lives in one place. Invalid colors are
+// silently ignored — we don't want a rogue host string to smuggle
+// arbitrary CSS into the shadow root via `style=`.
+function applyPartAuthor(root: HTMLElement, author: MessagePartAuthor | undefined): void {
+    if (author === undefined) return;
+    root.dataset["authorId"] = author.id;
+    if (author.color !== undefined && isSafeHexColor(author.color)) {
+        root.style.setProperty("--part-author-color", author.color);
+    }
+    const badge = renderPartAuthorBadge(author);
+    if (badge !== null) root.prepend(badge);
+}
+
+// Visual chip rendered at the top of a part card: small avatar (or
+// initials) + author name. Color, when a safe hex, is mirrored onto
+// the chip itself so avatars/initials can reuse it.
+export function renderPartAuthorBadge(author: MessagePartAuthor): HTMLElement | null {
+    const chip = document.createElement("div");
+    chip.className = "part-author";
+    chip.dataset["authorId"] = author.id;
+    if (author.color !== undefined && isSafeHexColor(author.color)) {
+        chip.style.setProperty("--part-author-color", author.color);
+    }
+
+    // Avatar first — <img> when the URL is http(s), initials otherwise.
+    const safeAvatar =
+        author.avatarUrl !== undefined && author.avatarUrl !== ""
+            ? safeImageUrl(author.avatarUrl, undefined)
+            : undefined;
+    if (safeAvatar !== undefined) {
+        const img = document.createElement("img");
+        img.src = safeAvatar;
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.referrerPolicy = "no-referrer";
+        img.className = "part-author-avatar";
+        chip.append(img);
+    } else {
+        const initials = document.createElement("span");
+        initials.className = "part-author-initials";
+        initials.setAttribute("aria-hidden", "true");
+        initials.textContent = getInitials(author.name);
+        chip.append(initials);
+    }
+
+    const name = document.createElement("span");
+    name.className = "part-author-name";
+    name.textContent = author.name;
+    chip.append(name);
+
+    return chip;
+}
+
+// Mirrors the validator in channel-list.ts — bare hex colors only, so
+// we can safely pipe the value into an inline `style=` declaration
+// without risk of a crafted string like `red url(https://attacker/)`
+// triggering a network fetch or smuggling an @import.
+function isSafeHexColor(value: string): boolean {
+    return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
+}
+
 function renderConfirmationPart(part: ConfirmationMessagePart): HTMLElement {
     const card = document.createElement("div");
     card.classList.add("confirmation-card");
     card.dataset["confirmationId"] = part.id;
     card.setAttribute("role", "group");
     card.setAttribute("aria-label", "Confirm tool call");
+    applyPartAuthor(card, part.author);
 
     const prompt = document.createElement("div");
     prompt.classList.add("confirmation-prompt");

@@ -27,9 +27,33 @@ export type MessagePart =
     | ToolResultMessagePart
     | ConfirmationMessagePart;
 
+// Attribution for a single MessagePart. In multi-agent chats (a planner
+// agent + a research agent + a tool executor, all co-authoring one
+// Message bubble), each part can carry its own author so the renderer
+// can visually tag which agent produced which step. Optional everywhere
+// so existing single-sender messages and snapshots keep working.
+export interface MessagePartAuthor {
+    // Stable identifier within a session. Host apps use this to drive
+    // display (avatars, colors) and to correlate parts across messages
+    // with the same agent.
+    id: string;
+    // Human-readable name, e.g. "Planner", "Research agent".
+    name: string;
+    // Optional display color hint — when present, the renderer uses it
+    // as a thin left accent bar on the part card. Must be a CSS-safe
+    // hex color (#rgb/#rgba/#rrggbb/#rrggbbaa); anything else is
+    // ignored rather than applied, to keep untrusted host values from
+    // smuggling arbitrary CSS into the shadow tree.
+    color?: string | undefined;
+    // Optional avatar URL. Subject to the same http(s)-only validation
+    // as Message.avatarUrl — unsafe schemes fall back to initials.
+    avatarUrl?: string | undefined;
+}
+
 export interface TextMessagePart {
     type: "text";
     text: string;
+    author?: MessagePartAuthor | undefined;
 }
 
 export interface CodeMessagePart {
@@ -39,6 +63,7 @@ export interface CodeMessagePart {
     // Left undefined when the source didn't declare one — renderers
     // should fall back to a plain <pre> in that case.
     language?: string | undefined;
+    author?: MessagePartAuthor | undefined;
 }
 
 // A tool invocation issued by an agent. `status` tracks the lifecycle:
@@ -55,6 +80,7 @@ export interface ToolCallMessagePart {
     name: string;
     input: unknown;
     status?: "pending" | "streaming" | "complete" | "error" | undefined;
+    author?: MessagePartAuthor | undefined;
 }
 
 export interface ToolResultMessagePart {
@@ -62,6 +88,7 @@ export interface ToolResultMessagePart {
     toolCallId: string;
     output: unknown;
     isError?: boolean | undefined;
+    author?: MessagePartAuthor | undefined;
 }
 
 // Inline "run tool X?" prompt the agent emits to block on a human
@@ -78,6 +105,7 @@ export interface ConfirmationMessagePart {
     approveLabel?: string | undefined;
     denyLabel?: string | undefined;
     payloadSig: string;
+    author?: MessagePartAuthor | undefined;
 }
 
 interface MessageBase {

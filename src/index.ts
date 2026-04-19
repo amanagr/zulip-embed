@@ -26,6 +26,7 @@ export type {
     ErrorEvent,
     Message,
     MessagePart,
+    MessagePartAuthor,
     MessageType,
     Reaction,
     ReactionEvent,
