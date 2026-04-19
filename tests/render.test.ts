@@ -68,6 +68,23 @@ describe("sanitizeHtml", () => {
         expect(img?.getAttribute("loading")).toBe("lazy");
     });
 
+    test("preserves Pygments token classes on nested spans", () => {
+        // Zulip runs fenced code blocks through Pygments, which emits
+        // <span class="k"> / <span class="s"> / etc. under a
+        // .codehilite wrapper. The bundled syntax theme targets these
+        // classes, so they have to survive the sanitizer intact.
+        const fragment = sanitizeHtml(
+            `<div class="codehilite"><pre><code class="language-python"><span class="k">def</span> <span class="nf">f</span><span class="p">():</span> <span class="k">pass</span></code></pre></div>`,
+            "https://chat.example.com",
+        );
+        const host = document.createElement("div");
+        host.append(fragment);
+        expect(host.querySelector(".codehilite")).not.toBeNull();
+        expect(host.querySelector("span.k")?.textContent).toBe("def");
+        expect(host.querySelector("span.nf")?.textContent).toBe("f");
+        expect(host.querySelector("code.language-python")).not.toBeNull();
+    });
+
     test("anchor links get noopener + _blank", () => {
         const fragment = sanitizeHtml(
             `<a href="https://example.com">x</a>`,

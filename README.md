@@ -204,7 +204,7 @@ DOMPurify with a strict allow-list before it hits the DOM. See
 | Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup | ✅ |
 | Spoilers (click / keyboard reveal) | ✅ |
 | KaTeX math | 🚧 (markup passes through, no KaTeX stylesheet bundled) |
-| Code-block syntax highlighting (Pygments classes) | 🚧 (classes preserved, theme not bundled) |
+| Code-block syntax highlighting (Pygments classes) | ✅ |
 | Polls | ❌ |
 | Widgets / custom message extensions | ❌ |
 | File / image attachment previews beyond `<img>` | ❌ |
@@ -243,7 +243,7 @@ next" order.
 2. ✅ Live message edits, deletes, and reactions
 3. ✅ Rendering showcase + `#announce` read-only demo
 4. ✅ Spoiler reveal toggle
-5. Code-block syntax highlighting (bundle a Pygments-compatible theme)
+5. ✅ Code-block syntax highlighting (bundle a Pygments-compatible theme)
 6. KaTeX math rendering (opt-in, lazy-loaded)
 7. Unread separator + "new messages" indicator
 

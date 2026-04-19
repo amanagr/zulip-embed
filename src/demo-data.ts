@@ -298,10 +298,14 @@ Also a <a href="https://zulip.com">link</a> and an autolinked URL: <a href="http
             minutesAgo: 75,
             contentIsHtml: true,
             content: `
-<p>Code block with a language tag:</p>
-<pre><code class="language-typescript">export function greet(name: string): string {
-    return \`Hello, \${name}!\`;
-}</code></pre>
+<p>Code block with syntax highlighting:</p>
+<div class="codehilite"><pre><span></span><code class="language-python"><span class="k">def</span> <span class="nf">greet</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Return a friendly greeting.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Hello, </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">!&quot;</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">greet</span><span class="p">(</span><span class="s2">&quot;Zulip&quot;</span><span class="p">))</span>
+</code></pre></div>
 <p>Keyboard shortcut: <kbd>Ctrl</kbd> + <kbd>Enter</kbd>.</p>`,
         }),
         demoMessage({

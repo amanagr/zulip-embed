@@ -374,6 +374,143 @@ button {
     background: transparent;
 }
 
+/*
+ * Pygments-compatible syntax theme.
+ *
+ * Zulip runs fenced code blocks through Pygments on the server and emits
+ * class="k" / class="s" / class="c" etc. on nested <span>s, wrapped in
+ * either <div class="codehilite"> or <div class="highlight">. The classes
+ * pass through DOMPurify untouched; all we need is a theme to color them.
+ *
+ * The palette is token-grouped rather than one-rule-per-Pygments-class to
+ * keep the CSS small. Light-mode defaults live here; dark overrides follow
+ * in the :host([theme="dark"]) block at the top of the stylesheet via the
+ * color variables below — tokens reference --zc-syntax-* so themers can
+ * retint the whole palette with a few variable overrides.
+ */
+:host {
+    --zc-syntax-comment: #6a737d;
+    --zc-syntax-keyword: #d73a49;
+    --zc-syntax-string: #032f62;
+    --zc-syntax-number: #005cc5;
+    --zc-syntax-name: #6f42c1;
+    --zc-syntax-type: #22863a;
+    --zc-syntax-operator: #d73a49;
+    --zc-syntax-punctuation: var(--zc-color-text);
+    --zc-syntax-builtin: #005cc5;
+    --zc-syntax-error: #b31d28;
+}
+
+:host([theme="dark"]) {
+    --zc-syntax-comment: #8b949e;
+    --zc-syntax-keyword: #ff7b72;
+    --zc-syntax-string: #a5d6ff;
+    --zc-syntax-number: #79c0ff;
+    --zc-syntax-name: #d2a8ff;
+    --zc-syntax-type: #7ee787;
+    --zc-syntax-operator: #ff7b72;
+    --zc-syntax-punctuation: var(--zc-color-text);
+    --zc-syntax-builtin: #79c0ff;
+    --zc-syntax-error: #ffa198;
+}
+
+.message-content .codehilite,
+.message-content .highlight {
+    margin: 6px 0;
+    border-radius: var(--zc-radius-sm);
+    overflow: hidden;
+}
+
+.message-content .codehilite pre,
+.message-content .highlight pre {
+    margin: 0;
+}
+
+/* Comments */
+.message-content .c,
+.message-content .ch,
+.message-content .cm,
+.message-content .cp,
+.message-content .cpf,
+.message-content .c1,
+.message-content .cs { color: var(--zc-syntax-comment); font-style: italic; }
+
+/* Keywords + reserved words */
+.message-content .k,
+.message-content .kc,
+.message-content .kd,
+.message-content .kn,
+.message-content .kp,
+.message-content .kr { color: var(--zc-syntax-keyword); font-weight: 600; }
+
+/* Keyword.Type → distinct hue so class/type names stand out */
+.message-content .kt { color: var(--zc-syntax-type); font-weight: 600; }
+
+/* Strings (and the many Pygments string subclasses) */
+.message-content .s,
+.message-content .sa,
+.message-content .sb,
+.message-content .sc,
+.message-content .dl,
+.message-content .sd,
+.message-content .s2,
+.message-content .se,
+.message-content .sh,
+.message-content .si,
+.message-content .sx,
+.message-content .sr,
+.message-content .s1,
+.message-content .ss { color: var(--zc-syntax-string); }
+
+/* Numbers */
+.message-content .m,
+.message-content .mb,
+.message-content .mf,
+.message-content .mh,
+.message-content .mi,
+.message-content .il,
+.message-content .mo { color: var(--zc-syntax-number); }
+
+/* Operators */
+.message-content .o,
+.message-content .ow { color: var(--zc-syntax-operator); }
+
+/* Names */
+.message-content .na,
+.message-content .nb,
+.message-content .bp,
+.message-content .nc,
+.message-content .nd,
+.message-content .ni,
+.message-content .ne,
+.message-content .nf,
+.message-content .fm,
+.message-content .nl,
+.message-content .nn,
+.message-content .py,
+.message-content .nt,
+.message-content .nv,
+.message-content .vc,
+.message-content .vg,
+.message-content .vi,
+.message-content .vm,
+.message-content .nx { color: var(--zc-syntax-name); }
+
+/* Builtin pseudo-names like True/False/None */
+.message-content .kc,
+.message-content .nb { color: var(--zc-syntax-builtin); }
+
+/* Diagnostics */
+.message-content .err { color: var(--zc-syntax-error); }
+
+/* Generic diff/output tokens */
+.message-content .gd { color: var(--zc-syntax-error); }
+.message-content .gi { color: var(--zc-syntax-type); }
+.message-content .gu { color: var(--zc-syntax-name); font-weight: 600; }
+.message-content .gh { color: var(--zc-syntax-name); font-weight: 600; }
+.message-content .gs { font-weight: 600; }
+.message-content .ge { font-style: italic; }
+
 .message-content blockquote {
     margin: 6px 0;
     padding: 2px 0 2px 10px;
