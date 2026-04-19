@@ -1,10 +1,16 @@
 // Ambient types for zulip-embed's headless surface — enough for
-// the RN widgets to typecheck without compiling the core SDK. When
-// consumers install zulip-embed, the real .d.ts overrides these.
+// the RN widgets to typecheck without compiling the core SDK. Kept
+// in sync with the authoritative types that ship in the core
+// package's `dist/*.d.ts` so declarations merge cleanly instead of
+// introducing phantom fields (e.g. an older shape of `TypingEvent`).
 //
 // RN doesn't need the DOM-backed pieces (Web Components, render
 // pipeline, DOMPurify), so we only re-declare the transport + client
-// API.
+// API. When a consumer app installs zulip-embed and pulls in its
+// real `.d.ts`, TypeScript merges this declaration with the one in
+// node_modules — any drift here surfaces as a merge conflict at
+// compile time, so keep this file in lockstep with the core
+// package's exports.
 
 declare module "zulip-embed" {
     export interface Channel {
@@ -64,10 +70,27 @@ declare module "zulip-embed" {
 
     export type Message = ChannelMessage | DirectMessage;
 
-    export interface ScopeFilter {
+    // Scope discriminated union introduced in 0.8. The legacy flat
+    // shape is still accepted (normalizeScope widens it at the SDK
+    // boundary) so embeds from 0.7 don't need to migrate atomically.
+    export interface ChannelScope {
+        kind: "channel";
         channel: string;
         topic?: string;
     }
+
+    export interface DmScope {
+        kind: "dm";
+        userIds: number[];
+    }
+
+    export interface LegacyChannelScope {
+        channel: string;
+        topic?: string;
+    }
+
+    export type ScopeFilter = ChannelScope | DmScope | LegacyChannelScope;
+    export type NormalizedScope = ChannelScope | DmScope;
 
     export type ConnectionStatus =
         | "idle"
@@ -86,6 +109,11 @@ declare module "zulip-embed" {
         fullName: string;
     }
 
+    export interface TypingEvent {
+        type: "typing";
+        users: TypingUser[];
+    }
+
     export type TypingOp = "start" | "stop";
 
     export type ErrorCode =
@@ -96,18 +124,53 @@ declare module "zulip-embed" {
         | "jwt-not-configured"
         | "unknown";
 
+    export interface ConnectionEvent {
+        type: "connection";
+        status: ConnectionStatus;
+        attempt?: number;
+        delayMs?: number;
+        reason?: string;
+    }
+
+    export interface ErrorEvent {
+        type: "error";
+        code: ErrorCode;
+        error: string;
+        retryAfterMs?: number;
+    }
+
+    export interface MessageEvent {
+        type: "message";
+        message: Message;
+    }
+
+    export interface MessageUpdateEvent {
+        type: "message-update";
+        messageId: number;
+        content?: string;
+        contentIsHtml?: boolean;
+        topic?: string;
+    }
+
+    export interface MessageDeleteEvent {
+        type: "message-delete";
+        messageId: number;
+    }
+
+    export interface ReactionEvent {
+        type: "reaction";
+        messageId: number;
+        reactions: Reaction[];
+    }
+
     export type ZulipEvent =
-        | {
-              type: "connection";
-              status: ConnectionStatus;
-              attempt?: number;
-              delayMs?: number;
-              reason?: string;
-          }
-        | {type: "error"; code: ErrorCode; error: string; retryAfterMs?: number}
-        | {type: "message"; message: Message}
-        | {type: "typing"; op: TypingOp; user: TypingUser; scope: ScopeFilter}
-        | {type: string; [key: string]: unknown};
+        | ConnectionEvent
+        | MessageEvent
+        | MessageUpdateEvent
+        | MessageDeleteEvent
+        | ReactionEvent
+        | TypingEvent
+        | ErrorEvent;
 
     export type ZulipEventListener = (event: ZulipEvent) => void;
 
@@ -131,31 +194,54 @@ declare module "zulip-embed" {
         emoji: string;
     }
 
+    export interface DirectMessageConversation {
+        users: User[];
+        lastMessageId: number;
+        lastMessageTime: number;
+    }
+
     export interface Transport {
         connect(onEvent: ZulipEventListener): Promise<void>;
         close(): Promise<void>;
         getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
         sendMessage(params: SendMessageParams): Promise<void>;
-        editMessage?(params: EditMessageParams): Promise<void>;
-        deleteMessage?(messageId: number): Promise<void>;
-        addReaction?(params: ReactionParams): Promise<void>;
-        removeReaction?(params: ReactionParams): Promise<void>;
-        sendTyping?(op: TypingOp, scope: ScopeFilter): Promise<void>;
-        listChannels?(): Promise<Channel[]>;
-        listTopics?(channel: string): Promise<Topic[]>;
-        getCurrentUserId?(): number | undefined;
-        getCurrentUser?(): Promise<User>;
+        sendMessageWithId?(params: SendMessageParams): Promise<{messageId: number}>;
+        editMessage(params: EditMessageParams): Promise<void>;
+        deleteMessage(messageId: number): Promise<void>;
+        addReaction(params: ReactionParams): Promise<void>;
+        removeReaction(params: ReactionParams): Promise<void>;
+        sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
+        listChannels(): Promise<Channel[]>;
+        listTopics(channel: string): Promise<Topic[]>;
+        listDirectMessageConversations?(): Promise<DirectMessageConversation[]>;
+        fetchMessage?(messageId: number): Promise<Message | undefined>;
+        getCurrentUserId(): number | undefined;
+        getCurrentUser(): Promise<User>;
     }
 
     export class ZulipClient {
         constructor(options: {transport: Transport; scope: ScopeFilter});
         connect(): Promise<void>;
+        disconnect(): Promise<void>;
         close(): Promise<void>;
-        getState(): {messages: Message[]; status: ConnectionStatus};
-        subscribe(listener: () => void): () => void;
-        sendMessage(content: string): Promise<void>;
+        getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
         loadOlder(): Promise<void>;
+        sendMessage(content: string): Promise<void>;
+        sendMessage(params: SendMessageParams): Promise<void>;
+        editMessage(params: EditMessageParams): Promise<void>;
+        deleteMessage(messageId: number): Promise<void>;
+        addReaction(params: ReactionParams): Promise<void>;
+        removeReaction(params: ReactionParams): Promise<void>;
+        sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
+        listChannels(): Promise<Channel[]>;
+        listTopics(channel: string): Promise<Topic[]>;
+        listDirectMessageConversations(): Promise<DirectMessageConversation[]>;
+        fetchMessage(messageId: number): Promise<Message | undefined>;
+        getCurrentUserId(): number | undefined;
         readonly whenReady: Promise<User>;
+        getState(): {messages: Message[]; status: ConnectionStatus};
+        subscribe(listener: ZulipEventListener): () => void;
+        subscribeState(listener: () => void): () => void;
     }
 
     export class DemoTransport implements Transport {
@@ -164,18 +250,31 @@ declare module "zulip-embed" {
         close(): Promise<void>;
         getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
         sendMessage(params: SendMessageParams): Promise<void>;
+        editMessage(params: EditMessageParams): Promise<void>;
+        deleteMessage(messageId: number): Promise<void>;
+        addReaction(params: ReactionParams): Promise<void>;
+        removeReaction(params: ReactionParams): Promise<void>;
+        sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
+        listChannels(): Promise<Channel[]>;
+        listTopics(channel: string): Promise<Topic[]>;
+        getCurrentUserId(): number | undefined;
+        getCurrentUser(): Promise<User>;
     }
 
     export class ZulipTransport implements Transport {
-        constructor(options: {
-            server: string;
-            email: string;
-            apiKey: string;
-            scope: ScopeFilter;
-        });
+        constructor(options: {server: string; email: string; apiKey: string; scope: ScopeFilter});
         connect(onEvent: ZulipEventListener): Promise<void>;
         close(): Promise<void>;
         getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
         sendMessage(params: SendMessageParams): Promise<void>;
+        editMessage(params: EditMessageParams): Promise<void>;
+        deleteMessage(messageId: number): Promise<void>;
+        addReaction(params: ReactionParams): Promise<void>;
+        removeReaction(params: ReactionParams): Promise<void>;
+        sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
+        listChannels(): Promise<Channel[]>;
+        listTopics(channel: string): Promise<Topic[]>;
+        getCurrentUserId(): number | undefined;
+        getCurrentUser(): Promise<User>;
     }
 }
