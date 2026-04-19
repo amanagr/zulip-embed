@@ -323,6 +323,86 @@ button {
     display: flex;
     gap: var(--zc-spacing-md);
     padding: var(--zc-spacing-sm) 0;
+    position: relative;
+}
+
+.message-actions {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    display: none;
+    gap: 2px;
+    background: var(--zc-color-bg);
+    border: 1px solid var(--zc-color-border);
+    border-radius: var(--zc-radius-sm);
+    padding: 2px;
+    box-shadow: 0 2px 6px rgba(17, 24, 39, 0.08);
+    z-index: 1;
+}
+
+.message:hover .message-actions,
+.message:focus-within .message-actions {
+    display: inline-flex;
+}
+
+.message-action {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    color: var(--zc-color-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.message-action svg {
+    width: 14px;
+    height: 14px;
+}
+
+.message-action:hover,
+.message-action:focus-visible {
+    background: var(--zc-color-surface);
+    color: var(--zc-color-text);
+    outline: none;
+}
+
+.message-action-danger:hover,
+.message-action-danger:focus-visible {
+    color: var(--zc-color-error);
+}
+
+.message-editing {
+    background: color-mix(in srgb, var(--zc-color-accent) 10%, transparent);
+    border-radius: var(--zc-radius-sm);
+}
+
+.composer-edit-banner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--zc-color-muted);
+    padding: 2px 0;
+}
+
+.composer-edit-banner[hidden] {
+    display: none;
+}
+
+.composer-edit-banner .composer-edit-cancel {
+    background: transparent;
+    border: none;
+    color: var(--zc-color-accent);
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
 }
 
 .message + .message.same-sender {

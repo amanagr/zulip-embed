@@ -1,6 +1,7 @@
 import {z} from "zod";
 
 import type {
+    EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
     ReactionParams,
@@ -238,6 +239,47 @@ export class ZulipTransport implements Transport {
         });
     }
 
+    async editMessage(params: EditMessageParams): Promise<void> {
+        if (params.content === undefined && params.topic === undefined) {
+            // Nothing to change. Avoid sending an empty PATCH that the
+            // server would reject with BAD_REQUEST.
+            return;
+        }
+        const body: Record<string, string> = {};
+        if (params.content !== undefined) body["content"] = params.content;
+        if (params.topic !== undefined) body["topic"] = params.topic;
+        await this.request(
+            "PATCH",
+            `/api/v1/messages/${String(params.messageId)}`,
+            body,
+        );
+        // Optimistic local update: the server will also emit an
+        // update_message event through the event queue, but dispatching
+        // one here keeps the UI responsive even before the poll catches
+        // up. The component's updateMessage handler is idempotent so
+        // double-delivery is harmless.
+        if (!this.reactionState.has(params.messageId)) return;
+        this.onEvent?.({
+            type: "message-update",
+            messageId: params.messageId,
+            // `content` here is the raw markdown the viewer typed — the
+            // server will re-render and broadcast the HTML via the event
+            // queue. Flag as non-HTML so the sanitizer isn't invoked on
+            // user-typed markdown in the interim.
+            content: params.content,
+            contentIsHtml: params.content === undefined ? undefined : false,
+            topic: params.topic,
+        });
+    }
+
+    async deleteMessage(messageId: number): Promise<void> {
+        await this.request("DELETE", `/api/v1/messages/${String(messageId)}`);
+        // Optimistic local removal, same rationale as editMessage above.
+        if (!this.reactionState.has(messageId)) return;
+        this.reactionState.delete(messageId);
+        this.onEvent?.({type: "message-delete", messageId});
+    }
+
     async sendMessage(params: SendMessageParams): Promise<void> {
         const body: Record<string, string> = {content: params.content};
         if (params.type === "channel") {
@@ -465,7 +507,7 @@ export class ZulipTransport implements Transport {
     }
 
     private async request(
-        method: "GET" | "POST" | "DELETE",
+        method: "GET" | "POST" | "DELETE" | "PATCH",
         path: string,
         params: Record<string, string> | undefined = undefined,
         signal?: AbortSignal,

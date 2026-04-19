@@ -1,5 +1,6 @@
 import {DEMO_GUEST_USER, seedMessages} from "./demo-data.ts";
 import type {
+    EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
     ReactionParams,
@@ -145,6 +146,46 @@ export class DemoTransport implements Transport {
         if (this.autoReply) {
             this.scheduleAutoReply(message);
         }
+        return Promise.resolve();
+    }
+
+    async editMessage(params: EditMessageParams): Promise<void> {
+        if (this.closed) throw new Error("Transport is closed");
+        if (this.readOnly) throw new Error("This demo channel is read-only");
+        const target = this.messages.find((m) => m.id === params.messageId);
+        if (!target) throw new Error(`No such message: ${String(params.messageId)}`);
+        // Demo: restrict edits to the guest viewer's own messages, matching
+        // Zulip's default behavior. Bots/teammates rendered by the demo
+        // should be immutable from the composer.
+        if (target.senderId !== DEMO_GUEST_USER.userId) {
+            throw new Error("You can only edit your own messages");
+        }
+        if (params.content !== undefined) {
+            target.content = params.content;
+            target.contentIsHtml = false;
+        }
+        if (params.topic !== undefined) target.topic = params.topic;
+        this.onEvent?.({
+            type: "message-update",
+            messageId: params.messageId,
+            content: params.content,
+            contentIsHtml: params.content === undefined ? undefined : false,
+            topic: params.topic,
+        });
+        return Promise.resolve();
+    }
+
+    async deleteMessage(messageId: number): Promise<void> {
+        if (this.closed) throw new Error("Transport is closed");
+        if (this.readOnly) throw new Error("This demo channel is read-only");
+        const idx = this.messages.findIndex((m) => m.id === messageId);
+        if (idx < 0) throw new Error(`No such message: ${String(messageId)}`);
+        const target = this.messages[idx]!;
+        if (target.senderId !== DEMO_GUEST_USER.userId) {
+            throw new Error("You can only delete your own messages");
+        }
+        this.messages.splice(idx, 1);
+        this.onEvent?.({type: "message-delete", messageId});
         return Promise.resolve();
     }
 

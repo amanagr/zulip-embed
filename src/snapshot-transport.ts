@@ -1,6 +1,7 @@
 import {z} from "zod";
 
 import type {
+    EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
     ReactionParams,
@@ -115,6 +116,14 @@ export class SnapshotTransport implements Transport {
     }
 
     sendMessage(_params: SendMessageParams): Promise<void> {
+        return Promise.reject(new Error("Snapshot transport is read-only"));
+    }
+
+    editMessage(_params: EditMessageParams): Promise<void> {
+        return Promise.reject(new Error("Snapshot transport is read-only"));
+    }
+
+    deleteMessage(_messageId: number): Promise<void> {
         return Promise.reject(new Error("Snapshot transport is read-only"));
     }
 

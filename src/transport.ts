@@ -21,11 +21,26 @@ export interface GetMessagesResult {
 
 export type TypingOp = "start" | "stop";
 
+export interface EditMessageParams {
+    messageId: number;
+    // At least one of `content` or `topic` must be provided. The component
+    // currently only edits content from the composer, but the transport
+    // supports topic edits too for future UI.
+    content?: string | undefined;
+    topic?: string | undefined;
+}
+
 export interface Transport {
     connect(onEvent: ZulipEventListener): Promise<void>;
     close(): Promise<void>;
     getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
     sendMessage(params: SendMessageParams): Promise<void>;
+    // Edit the content (and/or topic) of a message the viewer authored.
+    // Transports without mutation support (snapshot) should reject.
+    editMessage(params: EditMessageParams): Promise<void>;
+    // Delete a message the viewer authored. Server-side permissions
+    // apply; a 403 surfaces as an error back to the caller.
+    deleteMessage(messageId: number): Promise<void>;
     addReaction(params: ReactionParams): Promise<void>;
     removeReaction(params: ReactionParams): Promise<void>;
     // Fire a typing notification for the current scope. Errors are the

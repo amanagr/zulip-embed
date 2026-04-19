@@ -63,6 +63,10 @@ interface ComponentState {
     // Users currently typing in this scope. Transport-reported; empty
     // when no one is typing.
     typingUsers: TypingUser[];
+    // Id of the message the composer is currently editing. When set,
+    // the Send button morphs into "Save" and emits an editMessage call
+    // instead of sendMessage. Cleared on save / cancel / navigation.
+    editingMessageId: number | undefined;
 }
 
 // Interval (ms) between "start" pings while the user is actively
@@ -87,6 +91,7 @@ export class ZulipChatElement extends HTMLElement {
         unreadAnchorId: undefined,
         unreadCount: 0,
         typingUsers: [],
+        editingMessageId: undefined,
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
@@ -99,6 +104,8 @@ export class ZulipChatElement extends HTMLElement {
     private statusDotEl: HTMLElement | undefined;
     private errorBannerEl: HTMLElement | undefined;
     private typingIndicatorEl: HTMLElement | undefined;
+    private editBannerEl: HTMLElement | undefined;
+    private editBannerLabelEl: HTMLElement | undefined;
     private attachedToDom = false;
     // Typing-send bookkeeping. `typingActive` tracks whether the most
     // recent ping we sent was a "start" (so we know to send "stop" on
@@ -345,6 +352,26 @@ export class ZulipChatElement extends HTMLElement {
         const composer = document.createElement("div");
         composer.className = "composer";
 
+        // "Editing: original message preview" banner with a Cancel link.
+        // Only visible while state.editingMessageId is set.
+        const editBanner = document.createElement("div");
+        editBanner.className = "composer-edit-banner";
+        editBanner.hidden = true;
+        const editLabel = document.createElement("span");
+        editLabel.textContent = "Editing message";
+        editBanner.append(editLabel);
+        this.editBannerLabelEl = editLabel;
+        const cancel = document.createElement("button");
+        cancel.className = "composer-edit-cancel";
+        cancel.type = "button";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => {
+            this.cancelEdit();
+        });
+        editBanner.append(cancel);
+        this.editBannerEl = editBanner;
+        composer.append(editBanner);
+
         // Typing indicator sits above the input row so it doesn't shift
         // the composer layout as users come and go.
         const typing = document.createElement("div");
@@ -371,6 +398,14 @@ export class ZulipChatElement extends HTMLElement {
             if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 void this.handleSend();
+                return;
+            }
+            if (event.key === "Escape" && this.state.editingMessageId !== undefined) {
+                // Stop the event before the root-level handler treats it
+                // as a "close floating panel" request — when editing, the
+                // user almost certainly means "abandon this edit".
+                event.stopPropagation();
+                this.cancelEdit();
             }
         });
         this.composerInputEl = input;
@@ -419,6 +454,8 @@ export class ZulipChatElement extends HTMLElement {
         const hasText = this.composerInputEl.value.trim().length > 0;
         const canSend = hasText && this.state.status === "connected";
         this.composerSendEl.disabled = !canSend;
+        this.composerSendEl.textContent =
+            this.state.editingMessageId !== undefined ? "Save" : "Send";
     }
 
     private async bootstrapClient(): Promise<void> {
@@ -438,6 +475,7 @@ export class ZulipChatElement extends HTMLElement {
             unreadAnchorId: undefined,
             unreadCount: 0,
             typingUsers: [],
+            editingMessageId: undefined,
         });
 
         let transport: Transport;
@@ -611,7 +649,22 @@ export class ZulipChatElement extends HTMLElement {
             unreadAnchorId = replacement?.id;
             unreadCount = replacement === undefined ? 0 : Math.max(0, unreadCount - 1);
         }
-        this.setState({messages: next, unreadAnchorId, unreadCount});
+        const patch: Partial<ComponentState> = {
+            messages: next,
+            unreadAnchorId,
+            unreadCount,
+        };
+        // If the message being edited was just deleted (locally or by
+        // another client), abandon the pending edit so the composer
+        // isn't pointed at a phantom id.
+        if (this.state.editingMessageId === id) {
+            patch.editingMessageId = undefined;
+            if (this.composerInputEl) {
+                this.composerInputEl.value = "";
+                this.autosize(this.composerInputEl);
+            }
+        }
+        this.setState(patch);
     }
 
     private updateReactions(id: number, reactions: Reaction[]): void {
@@ -661,13 +714,69 @@ export class ZulipChatElement extends HTMLElement {
             return context;
         }
         context.unreadAnchorId = this.state.unreadAnchorId;
+        context.editingMessageId = this.state.editingMessageId;
         context.onToggleReaction = (m, e) => {
             this.handleToggleReaction(m, e);
         };
         context.onAddReaction = (m, anchor) => {
             this.handleAddReaction(m, anchor);
         };
+        context.onEditMessage = (m) => {
+            this.startEdit(m);
+        };
+        context.onDeleteMessage = (m) => {
+            void this.handleDelete(m);
+        };
         return context;
+    }
+
+    private startEdit(message: Message): void {
+        // Only the message author can edit. Even though the renderer
+        // already gates the action menu on `senderId === currentUserId`,
+        // re-check here in case a caller invokes startEdit directly.
+        const uid = this.client?.getCurrentUserId();
+        if (uid === undefined || message.senderId !== uid) return;
+        // Editing server-rendered HTML would require de-rendering back to
+        // markdown, which we can't do reliably. For v0.1 we only support
+        // editing messages whose content we still have as plain text —
+        // messages the local viewer just sent (before the server echo
+        // replaces them with HTML). We optimistically prefill the HTML
+        // string; users can rewrite from scratch if they prefer.
+        if (!this.composerInputEl) return;
+        this.composerInputEl.value = message.contentIsHtml
+            ? stripHtmlToText(message.content)
+            : message.content;
+        this.autosize(this.composerInputEl);
+        this.setState({editingMessageId: message.id});
+        this.composerInputEl.focus();
+    }
+
+    private cancelEdit(): void {
+        if (this.state.editingMessageId === undefined) return;
+        if (this.composerInputEl) {
+            this.composerInputEl.value = "";
+            this.autosize(this.composerInputEl);
+        }
+        this.setState({editingMessageId: undefined});
+    }
+
+    private async handleDelete(message: Message): Promise<void> {
+        if (!this.client) return;
+        // Native confirm() is crude but adequate for v0.1 — a custom
+        // in-shadow dialog can replace it later without changing the
+        // transport plumbing. JSDOM stubs confirm to always return true,
+        // so component tests can still exercise the delete path.
+        const ok = window.confirm("Delete this message? This can't be undone.");
+        if (!ok) return;
+        // If the message being deleted is the one currently being
+        // edited, cancel the edit first so we don't leave the composer
+        // pointed at a nonexistent id.
+        if (this.state.editingMessageId === message.id) this.cancelEdit();
+        try {
+            await this.client.deleteMessage(message.id);
+        } catch (error) {
+            this.setState({error: describeError(error)});
+        }
     }
 
     private async handleSend(): Promise<void> {
@@ -677,21 +786,29 @@ export class ZulipChatElement extends HTMLElement {
         if (this.state.status !== "connected") return;
 
         const scope = this.readScope();
+        const editingId = this.state.editingMessageId;
         this.composerInputEl.value = "";
         this.autosize(this.composerInputEl);
-        this.refreshSendButton();
-        // Sending implicitly ends the typing session — tell the server
-        // before the message so teammates don't see a lingering "is
-        // typing" after the message lands.
+        // Stop typing before the network call so teammates don't see a
+        // lingering indicator after the new message lands.
         this.stopTyping();
+        if (editingId !== undefined) {
+            this.setState({editingMessageId: undefined});
+        } else {
+            this.refreshSendButton();
+        }
 
         try {
-            await this.client.sendMessage({
-                type: "channel",
-                channel: scope.channel,
-                topic: scope.topic,
-                content,
-            });
+            if (editingId !== undefined) {
+                await this.client.editMessage({messageId: editingId, content});
+            } else {
+                await this.client.sendMessage({
+                    type: "channel",
+                    channel: scope.channel,
+                    topic: scope.topic,
+                    content,
+                });
+            }
         } catch (error) {
             this.setState({error: describeError(error)});
         }
@@ -816,6 +933,17 @@ export class ZulipChatElement extends HTMLElement {
             }
         }
 
+        if (this.editBannerEl && this.editBannerLabelEl) {
+            const editingId = this.state.editingMessageId;
+            if (editingId === undefined) {
+                this.editBannerEl.hidden = true;
+                this.editBannerLabelEl.textContent = "Editing message";
+            } else {
+                this.editBannerEl.hidden = false;
+                this.editBannerLabelEl.textContent = `Editing message #${String(editingId)}`;
+            }
+        }
+
         if (this.typingIndicatorEl) {
             const label = formatTypingLabel(this.state.typingUsers);
             if (label === undefined) {
@@ -851,6 +979,17 @@ export class ZulipChatElement extends HTMLElement {
 function describeError(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
+}
+
+// Crude HTML→text coercion used to prefill the composer when the viewer
+// edits a message whose content we only have as server-rendered HTML.
+// We accept lossy round-tripping for v0.1; markdown-round-tripping would
+// require a markdown generator we don't yet ship. A throwaway template
+// parses the HTML safely (no script execution) and returns textContent.
+function stripHtmlToText(html: string): string {
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    return (template.content.textContent ?? "").trim();
 }
 
 // Build the "Alice is typing" / "Alice and Bob are typing" / "Several

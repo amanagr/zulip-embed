@@ -1,4 +1,5 @@
 import type {
+    EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
     ReactionParams,
@@ -43,6 +44,14 @@ export class ZulipClient {
 
     async sendMessage(params: SendMessageParams): Promise<void> {
         await this.transport.sendMessage(params);
+    }
+
+    async editMessage(params: EditMessageParams): Promise<void> {
+        await this.transport.editMessage(params);
+    }
+
+    async deleteMessage(messageId: number): Promise<void> {
+        await this.transport.deleteMessage(messageId);
     }
 
     async addReaction(params: ReactionParams): Promise<void> {

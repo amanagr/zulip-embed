@@ -16,10 +16,21 @@ export interface RenderContext {
     // The anchor element is the clicked button, used by the host to
     // position an emoji picker next to it.
     onAddReaction?: ((message: Message, anchor: HTMLElement) => void) | undefined;
+    // Emitted when the viewer picks "Edit" from a message's action menu.
+    // Only offered for messages the viewer authored (senderId matches
+    // currentUserId). Host prefills the composer in edit mode.
+    onEditMessage?: ((message: Message) => void) | undefined;
+    // Emitted when the viewer picks "Delete". Host is responsible for
+    // confirmation UX before actually calling the transport.
+    onDeleteMessage?: ((message: Message) => void) | undefined;
     // ID of the first message the viewer hasn't seen yet. When set, the
     // renderer inserts a horizontal "new messages" divider immediately
     // before the matching message.
     unreadAnchorId?: number | undefined;
+    // Id of a message currently being edited — the renderer tints the
+    // matching row so the viewer sees which message the composer is
+    // editing.
+    editingMessageId?: number | undefined;
 }
 
 // Per-DOM-node snapshot of what we last rendered for a given message, so
@@ -33,6 +44,8 @@ interface MessageSnapshot {
     reactionsKey: string;
     sameSender: boolean;
     currentUserId: number | undefined;
+    isEditing: boolean;
+    hasActions: boolean;
 }
 
 function snapshotFor(
@@ -44,12 +57,19 @@ function snapshotFor(
     const reactionsKey = message.reactions
         .map((r) => `${r.emoji}:${r.userIds.slice().sort().join(",")}`)
         .join("|");
+    const isMine =
+        context.currentUserId !== undefined && message.senderId === context.currentUserId;
     return {
         content: message.content,
         contentIsHtml: message.contentIsHtml,
         reactionsKey,
         sameSender,
         currentUserId: context.currentUserId,
+        isEditing: context.editingMessageId === message.id,
+        hasActions:
+            isMine &&
+            (context.onEditMessage !== undefined ||
+                context.onDeleteMessage !== undefined),
     };
 }
 
@@ -59,7 +79,9 @@ function snapshotsEqual(a: MessageSnapshot, b: MessageSnapshot): boolean {
         a.contentIsHtml === b.contentIsHtml &&
         a.reactionsKey === b.reactionsKey &&
         a.sameSender === b.sameSender &&
-        a.currentUserId === b.currentUserId
+        a.currentUserId === b.currentUserId &&
+        a.isEditing === b.isEditing &&
+        a.hasActions === b.hasActions
     );
 }
 
@@ -175,6 +197,9 @@ export function renderMessage(
     const wrapper = document.createElement("div");
     wrapper.className = sameSender ? "message same-sender" : "message";
     wrapper.dataset["messageId"] = String(message.id);
+    if (context.editingMessageId === message.id) {
+        wrapper.classList.add("message-editing");
+    }
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
@@ -223,7 +248,60 @@ export function renderMessage(
     }
 
     wrapper.append(body);
+
+    const actions = renderMessageActions(message, context);
+    if (actions !== undefined) wrapper.append(actions);
+
     return wrapper;
+}
+
+// Per-message action affordance shown on hover/focus for the viewer's
+// own messages. Returns undefined when the context has no handlers or
+// the viewer didn't author the message — we don't even attach the
+// element so a rogue CSS rule can't make it clickable.
+function renderMessageActions(
+    message: Message,
+    context: RenderContext,
+): HTMLElement | undefined {
+    const mine =
+        context.currentUserId !== undefined && message.senderId === context.currentUserId;
+    if (!mine) return undefined;
+    const canEdit = context.onEditMessage !== undefined;
+    const canDelete = context.onDeleteMessage !== undefined;
+    if (!canEdit && !canDelete) return undefined;
+
+    const bar = document.createElement("div");
+    bar.className = "message-actions";
+
+    if (canEdit) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "message-action";
+        edit.setAttribute("aria-label", "Edit message");
+        edit.title = "Edit";
+        edit.innerHTML =
+            '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l3.5-.7L17.2 5.6a1.5 1.5 0 0 0 0-2.1l-.7-.7a1.5 1.5 0 0 0-2.1 0L3.7 13.5 3 17z"/></svg>';
+        edit.addEventListener("click", () => {
+            context.onEditMessage?.(message);
+        });
+        bar.append(edit);
+    }
+
+    if (canDelete) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "message-action message-action-danger";
+        del.setAttribute("aria-label", "Delete message");
+        del.title = "Delete";
+        del.innerHTML =
+            '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2m1 0v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6h8z"/></svg>';
+        del.addEventListener("click", () => {
+            context.onDeleteMessage?.(message);
+        });
+        bar.append(del);
+    }
+
+    return bar;
 }
 
 function renderContent(target: HTMLElement, message: Message, context: RenderContext): void {
