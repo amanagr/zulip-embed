@@ -24,6 +24,25 @@ import {stripHtml} from "./strip-html.js";
 import type {Message, ScopeFilter, Transport, ZulipRNTheme} from "./types.js";
 import {ZulipClient, LIGHT_THEME} from "./types.js";
 
+// Alpha-preview notice: surfaces the 0.8.0-rc.0-alpha status of this
+// package to app authors who skipped the README. Fires exactly once
+// per bundle, in dev builds only (Metro defines __DEV__ === true in
+// development, false in production). Suppressed under tests where
+// __DEV__ is undefined.
+declare const __DEV__: boolean | undefined;
+let alphaNoticeShown = false;
+function showAlphaNoticeOnce(): void {
+    if (alphaNoticeShown) return;
+    alphaNoticeShown = true;
+    if (typeof __DEV__ !== "boolean" || !__DEV__) return;
+    // eslint-disable-next-line no-console
+    console.warn(
+        "[zulip-embed-react-native] 0.8.0-rc.0-alpha preview: plain-text " +
+            "rendering only, reactions/typing/message-action UI not yet wired. " +
+            "See https://github.com/amanagr/zulip-embed/tree/main/packages/react-native#readme",
+    );
+}
+
 export interface ZulipChatScreenProps {
     // Bring-your-own transport: caller wires ZulipTransport /
     // DemoTransport / SnapshotTransport and passes it in.
@@ -46,6 +65,7 @@ interface Snapshot {
 }
 
 export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement {
+    showAlphaNoticeOnce();
     const theme = props.theme ?? LIGHT_THEME;
     const styles = useMemo(() => makeStyles(theme), [theme]);
 
