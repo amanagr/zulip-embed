@@ -6,10 +6,14 @@ import {describe, expect, test} from "vitest";
 import {
     DemoTransport,
     SnapshotTransport,
+    ZulipChannelListElement,
     ZulipChatElement,
     ZulipClient,
+    ZulipTopicListElement,
     ZulipTransport,
+    registerZulipChannelListElement,
     registerZulipChatElement,
+    registerZulipTopicListElement,
 } from "../src/index.ts";
 
 describe("public API surface", () => {
@@ -35,6 +39,16 @@ describe("public API surface", () => {
         expect(Object.prototype.isPrototypeOf.call(HTMLElement, ZulipChatElement)).toBe(true);
     });
 
+    test("ZulipChannelListElement is an HTMLElement subclass", () => {
+        expect(typeof ZulipChannelListElement).toBe("function");
+        expect(Object.prototype.isPrototypeOf.call(HTMLElement, ZulipChannelListElement)).toBe(true);
+    });
+
+    test("ZulipTopicListElement is an HTMLElement subclass", () => {
+        expect(typeof ZulipTopicListElement).toBe("function");
+        expect(Object.prototype.isPrototypeOf.call(HTMLElement, ZulipTopicListElement)).toBe(true);
+    });
+
     test("registerZulipChatElement is exported and idempotent", () => {
         expect(typeof registerZulipChatElement).toBe("function");
         // index.ts already calls it once at import time; calling it
@@ -44,8 +58,26 @@ describe("public API surface", () => {
         expect(() => registerZulipChatElement()).not.toThrow();
     });
 
+    test("registerZulipChannelListElement is idempotent", () => {
+        expect(typeof registerZulipChannelListElement).toBe("function");
+        expect(() => registerZulipChannelListElement()).not.toThrow();
+    });
+
+    test("registerZulipTopicListElement is idempotent", () => {
+        expect(typeof registerZulipTopicListElement).toBe("function");
+        expect(() => registerZulipTopicListElement()).not.toThrow();
+    });
+
     test("<zulip-chat> is in the CustomElementRegistry after index import", () => {
         expect(customElements.get("zulip-chat")).toBe(ZulipChatElement);
+    });
+
+    test("<zulip-channel-list> is in the CustomElementRegistry after index import", () => {
+        expect(customElements.get("zulip-channel-list")).toBe(ZulipChannelListElement);
+    });
+
+    test("<zulip-topic-list> is in the CustomElementRegistry after index import", () => {
+        expect(customElements.get("zulip-topic-list")).toBe(ZulipTopicListElement);
     });
 
     test("ZulipClient can be constructed with a minimal transport stub", () => {
