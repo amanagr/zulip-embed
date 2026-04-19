@@ -35,6 +35,11 @@ class ZulipTransport implements Transport {
   int _lastEventId = -1;
   bool _closed = false;
 
+  // Per-message reaction state. Zulip's reaction events are per-user
+  // add/remove ops; we fold them into bucketed lists so consumers get
+  // the full reaction set on every event, matching the TS transport.
+  final Map<int, Map<String, Set<int>>> _reactionState = {};
+
   static Uri _normalize(Uri url) {
     // Reject anything that isn't http/https — file://, chrome-extension://,
     // relative URIs, and so on should never reach the Zulip REST calls,
@@ -93,7 +98,12 @@ class ZulipTransport implements Transport {
         if (scope.topic != null) ['topic', scope.topic!],
       ];
       final register = await _postForm('/api/v1/register', {
-        'event_types': jsonEncode(['message']),
+        'event_types': jsonEncode([
+          'message',
+          'update_message',
+          'delete_message',
+          'reaction',
+        ]),
         'narrow': jsonEncode(narrow),
         'apply_markdown': 'false',
         'client_gravatar': 'true',
@@ -128,10 +138,7 @@ class ZulipTransport implements Transport {
         for (final raw in events) {
           final evt = raw as Map<String, dynamic>;
           _lastEventId = (evt['id'] as num).toInt();
-          if (evt['type'] == 'message') {
-            final m = evt['message'] as Map<String, dynamic>;
-            onEvent(MessageEvent(_parseMessage(m)));
-          }
+          _dispatchEvent(evt, onEvent);
         }
       } catch (e) {
         if (_closed) return;
@@ -173,8 +180,19 @@ class ZulipTransport implements Transport {
       throw Exception('messages HTTP ${resp.statusCode}: ${resp.body}');
     }
     final body = jsonDecode(resp.body) as Map<String, dynamic>;
-    final messages = (body['messages'] as List).cast<Map<String, dynamic>>();
-    return messages.map(_parseMessage).toList(growable: false);
+    final raw = (body['messages'] as List).cast<Map<String, dynamic>>();
+    final parsed = <Message>[];
+    for (final m in raw) {
+      final message = _parseMessage(m);
+      // Prime reaction state so reaction events dispatched afterwards
+      // compose with the initial server-reported bucket contents.
+      _rememberReactions(
+        message.id,
+        (m['reactions'] as List?) ?? const [],
+      );
+      parsed.add(message);
+    }
+    return List.unmodifiable(parsed);
   }
 
   @override
@@ -197,6 +215,94 @@ class ZulipTransport implements Transport {
       content: params.content,
       timestamp: DateTime.now(),
     );
+  }
+
+  void _dispatchEvent(
+    Map<String, dynamic> evt,
+    ZulipEventListener onEvent,
+  ) {
+    switch (evt['type']) {
+      case 'message':
+        final m = evt['message'] as Map<String, dynamic>;
+        final message = _parseMessage(m);
+        _rememberReactions(message.id, (m['reactions'] as List?) ?? const []);
+        onEvent(MessageEvent(message));
+      case 'update_message':
+        final id = (evt['message_id'] as num?)?.toInt();
+        if (id == null) return;
+        // Scope guard: only forward edits for messages we've seen through
+        // this queue or a paginated fetch. Matches the TS transport so a
+        // compromised server can't mutate UI state for messages the
+        // caller never loaded.
+        if (!_reactionState.containsKey(id)) return;
+        final editedMs = (evt['edit_timestamp'] as num?)?.toInt();
+        final rendered = evt['rendered_content'] as String?;
+        onEvent(MessageUpdateEvent(
+          messageId: id,
+          // Absent when the edit only touched topic/channel. Stay null
+          // in that case so consumers can distinguish content edits from
+          // topic moves.
+          content: rendered == null ? null : _stripHtml(rendered),
+          topic: evt['subject'] as String?,
+          editedTimestamp: editedMs == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(editedMs * 1000),
+        ));
+      case 'delete_message':
+        final ids = <int>[];
+        final single = (evt['message_id'] as num?)?.toInt();
+        if (single != null) ids.add(single);
+        for (final raw in (evt['message_ids'] as List? ?? const [])) {
+          ids.add((raw as num).toInt());
+        }
+        for (final id in ids) {
+          if (!_reactionState.containsKey(id)) continue;
+          _reactionState.remove(id);
+          onEvent(MessageDeleteEvent(id));
+        }
+      case 'reaction':
+        final id = (evt['message_id'] as num?)?.toInt();
+        if (id == null || !_reactionState.containsKey(id)) return;
+        final reactions = _applyReactionOp(
+          messageId: id,
+          op: evt['op'] as String? ?? '',
+          emoji: evt['emoji_name'] as String? ?? '',
+          userId: (evt['user_id'] as num?)?.toInt() ?? 0,
+        );
+        onEvent(ReactionEvent(messageId: id, reactions: reactions));
+    }
+  }
+
+  void _rememberReactions(int messageId, List<dynamic> apiReactions) {
+    final buckets = <String, Set<int>>{};
+    for (final raw in apiReactions) {
+      final r = raw as Map<String, dynamic>;
+      final emoji = r['emoji_name'] as String? ?? '';
+      final userId = (r['user_id'] as num?)?.toInt();
+      if (emoji.isEmpty || userId == null) continue;
+      buckets.putIfAbsent(emoji, () => <int>{}).add(userId);
+    }
+    _reactionState[messageId] = buckets;
+  }
+
+  List<Reaction> _applyReactionOp({
+    required int messageId,
+    required String op,
+    required String emoji,
+    required int userId,
+  }) {
+    final buckets = _reactionState.putIfAbsent(messageId, () => {});
+    final users = buckets.putIfAbsent(emoji, () => <int>{});
+    if (op == 'add') {
+      users.add(userId);
+    } else if (op == 'remove') {
+      users.remove(userId);
+      if (users.isEmpty) buckets.remove(emoji);
+    }
+    return [
+      for (final entry in buckets.entries)
+        Reaction(emoji: entry.key, userIds: entry.value.toList()),
+    ];
   }
 
   Message _parseMessage(Map<String, dynamic> m) {
