@@ -47,7 +47,7 @@ jobs:
         if: ${{ secrets.GH_ACTIONS_BOT_API_KEY != '' }}
         continue-on-error: true
         env:
-          ZULIP_ANNOUNCE_EMAIL: ${{ vars.ZULIP_ANNOUNCE_EMAIL }}
+          ZULIP_ANNOUNCE_EMAIL: ${{ secrets.ZULIP_ANNOUNCE_EMAIL }}
           ZULIP_ANNOUNCE_API_KEY: ${{ secrets.GH_ACTIONS_BOT_API_KEY }}
           ZULIP_ANNOUNCE_SERVER: ${{ vars.ZULIP_ANNOUNCE_SERVER || 'https://chat.zulip.org' }}
         run: node scripts/fetch-announce-snapshot.mjs

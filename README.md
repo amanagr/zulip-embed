@@ -119,7 +119,7 @@ bakes the latest ~30 messages into the site. Required secrets on the
 
 - `GH_ACTIONS_BOT_API_KEY` (secret) — Zulip API key for a bot subscribed
   to the channel you want to snapshot.
-- `ZULIP_ANNOUNCE_EMAIL` (environment variable) — the bot's email.
+- `ZULIP_ANNOUNCE_EMAIL` (secret) — the bot's email.
 - `ZULIP_ANNOUNCE_SERVER` (environment variable, optional) — defaults to
   `https://chat.zulip.org`.
 
