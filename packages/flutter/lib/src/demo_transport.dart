@@ -167,6 +167,43 @@ class DemoTransport extends Transport {
     _listener?.call(MessageDeleteEvent(messageId));
   }
 
+  @override
+  Future<void> addReaction(ReactionParams params) async {
+    _toggleReaction(params, add: true);
+  }
+
+  @override
+  Future<void> removeReaction(ReactionParams params) async {
+    _toggleReaction(params, add: false);
+  }
+
+  void _toggleReaction(ReactionParams params, {required bool add}) {
+    final idx = _messages.indexWhere((m) => m.id == params.messageId);
+    if (idx < 0) {
+      throw StateError('Message ${params.messageId} not found');
+    }
+    final current = _messages[idx];
+    final buckets = <String, Set<int>>{
+      for (final r in current.reactions) r.emoji: r.userIds.toSet(),
+    };
+    final users = buckets.putIfAbsent(params.emoji, () => <int>{});
+    if (add) {
+      users.add(_viewerId);
+    } else {
+      users.remove(_viewerId);
+      if (users.isEmpty) buckets.remove(params.emoji);
+    }
+    final next = [
+      for (final entry in buckets.entries)
+        Reaction(emoji: entry.key, userIds: entry.value.toList()),
+    ];
+    _messages[idx] = current.copyWith(reactions: next);
+    _listener?.call(ReactionEvent(
+      messageId: params.messageId,
+      reactions: next,
+    ));
+  }
+
   void _scheduleEcho(Message prompt) {
     late Timer timer;
     timer = Timer(const Duration(milliseconds: 800), () {

@@ -199,6 +199,28 @@ class _ZulipChatState extends State<ZulipChat> {
     }
   }
 
+  Future<void> _onReactionToggle(Message message, String emoji) async {
+    final viewerId = _client.currentUserId;
+    final existing = message.reactions.firstWhere(
+      (r) => r.emoji == emoji,
+      orElse: () => const Reaction(emoji: '', userIds: []),
+    );
+    final selfReacted =
+        viewerId != null && existing.userIds.contains(viewerId);
+    try {
+      if (selfReacted) {
+        await _client.removeReaction(messageId: message.id, emoji: emoji);
+      } else {
+        await _client.addReaction(messageId: message.id, emoji: emoji);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      setState(() => _error = msg);
+      widget.onError?.call(msg);
+    }
+  }
+
   Future<void> _onDeleteMessage(Message message) async {
     final t = widget.theme;
     final confirmed = await showDialog<bool>(
@@ -273,6 +295,7 @@ class _ZulipChatState extends State<ZulipChat> {
                   _messages.isEmpty,
               onEdit: _onEditMessage,
               onDelete: _onDeleteMessage,
+              onReactionToggle: _onReactionToggle,
             ),
           ),
           if (_typingUsers.isNotEmpty)

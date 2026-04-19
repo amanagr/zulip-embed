@@ -237,6 +237,31 @@ class ZulipTransport implements Transport {
   }
 
   @override
+  Future<void> addReaction(ReactionParams params) async {
+    await _postForm(
+      '/api/v1/messages/${params.messageId}/reactions',
+      {'emoji_name': params.emoji},
+    );
+  }
+
+  @override
+  Future<void> removeReaction(ReactionParams params) async {
+    final resp = await _http.delete(
+      _endpoint(
+        '/api/v1/messages/${params.messageId}/reactions',
+        {'emoji_name': params.emoji},
+      ),
+      headers: _authHeaders,
+    );
+    if (resp.statusCode >= 400) {
+      throw Exception(
+        'DELETE /api/v1/messages/${params.messageId}/reactions '
+        'HTTP ${resp.statusCode}: ${resp.body}',
+      );
+    }
+  }
+
+  @override
   Future<void> editMessage(EditMessageParams params) async {
     if (params.content == null && params.topic == null) return;
     final body = <String, String>{};

@@ -64,6 +64,18 @@ class ZulipClient {
     return transport.deleteMessage(messageId);
   }
 
+  Future<void> addReaction({required int messageId, required String emoji}) {
+    return transport.addReaction(
+      ReactionParams(messageId: messageId, emoji: emoji),
+    );
+  }
+
+  Future<void> removeReaction({required int messageId, required String emoji}) {
+    return transport.removeReaction(
+      ReactionParams(messageId: messageId, emoji: emoji),
+    );
+  }
+
   Future<List<Channel>> listChannels() => transport.listChannels();
   Future<List<Topic>> listTopics(String channel) =>
       transport.listTopics(channel);

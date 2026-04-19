@@ -144,6 +144,13 @@ class EditMessageParams {
 }
 
 @immutable
+class ReactionParams {
+  const ReactionParams({required this.messageId, required this.emoji});
+  final int messageId;
+  final String emoji;
+}
+
+@immutable
 class SendMessageParams {
   const SendMessageParams({
     required this.channel,

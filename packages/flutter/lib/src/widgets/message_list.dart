@@ -16,6 +16,7 @@ class MessageList extends StatefulWidget {
     this.isLoading = false,
     this.onEdit,
     this.onDelete,
+    this.onReactionToggle,
   });
 
   final List<Message> messages;
@@ -24,6 +25,7 @@ class MessageList extends StatefulWidget {
   final bool isLoading;
   final void Function(Message message)? onEdit;
   final void Function(Message message)? onDelete;
+  final void Function(Message message, String emoji)? onReactionToggle;
 
   @override
   State<MessageList> createState() => _MessageListState();
@@ -89,8 +91,10 @@ class _MessageListState extends State<MessageList> {
           isSelf: isSelf,
           showHeader: showHeader,
           now: now,
+          viewerId: widget.currentUserId,
           onEdit: isSelf ? widget.onEdit : null,
           onDelete: isSelf ? widget.onDelete : null,
+          onReactionToggle: widget.onReactionToggle,
         );
       },
     );
@@ -104,8 +108,10 @@ class _MessageBubble extends StatelessWidget {
     required this.isSelf,
     required this.showHeader,
     required this.now,
+    this.viewerId,
     this.onEdit,
     this.onDelete,
+    this.onReactionToggle,
   });
 
   final Message message;
@@ -113,11 +119,23 @@ class _MessageBubble extends StatelessWidget {
   final bool isSelf;
   final bool showHeader;
   final DateTime now;
+  final int? viewerId;
   final void Function(Message message)? onEdit;
   final void Function(Message message)? onDelete;
+  final void Function(Message message, String emoji)? onReactionToggle;
+
+  static const _quickEmojis = <String>[
+    'thumbs_up',
+    'heart',
+    'joy',
+    'tada',
+    'eyes',
+    'pray',
+  ];
 
   void _showActions(BuildContext context) {
-    if (onEdit == null && onDelete == null) return;
+    final hasReactions = onReactionToggle != null;
+    if (onEdit == null && onDelete == null && !hasReactions) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: theme.surface,
@@ -126,6 +144,33 @@ class _MessageBubble extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (hasReactions)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      for (final emoji in _quickEmojis)
+                        InkWell(
+                          onTap: () {
+                            Navigator.of(sheetCtx).pop();
+                            onReactionToggle!(message, emoji);
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Text(
+                              _emojiGlyph(emoji),
+                              style: const TextStyle(fontSize: 22),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               if (onEdit != null)
                 ListTile(
                   leading: Icon(Icons.edit, color: theme.text),
@@ -203,7 +248,10 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 GestureDetector(
-                  onLongPress: (onEdit != null || onDelete != null)
+                  onLongPress:
+                      (onEdit != null ||
+                          onDelete != null ||
+                          onReactionToggle != null)
                       ? () => _showActions(context)
                       : null,
                   child: Container(
@@ -225,10 +273,111 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (message.reactions.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: _ReactionChips(
+                      message: message,
+                      theme: theme,
+                      viewerId: viewerId,
+                      onToggle: onReactionToggle,
+                    ),
+                  ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+String _emojiGlyph(String name) {
+  // Map a handful of Zulip emoji names to their Unicode glyphs. Unknown
+  // names fall back to the name itself so the chip stays meaningful.
+  const table = {
+    'thumbs_up': '👍',
+    'heart': '❤️',
+    'joy': '😂',
+    'tada': '🎉',
+    'eyes': '👀',
+    'pray': '🙏',
+    'rocket': '🚀',
+    'check': '✅',
+    'smile': '😄',
+  };
+  return table[name] ?? ':$name:';
+}
+
+class _ReactionChips extends StatelessWidget {
+  const _ReactionChips({
+    required this.message,
+    required this.theme,
+    required this.viewerId,
+    required this.onToggle,
+  });
+
+  final Message message;
+  final ZulipTheme theme;
+  final int? viewerId;
+  final void Function(Message message, String emoji)? onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        for (final r in message.reactions)
+          _ReactionChip(
+            emoji: r.emoji,
+            count: r.count,
+            selfReacted: viewerId != null && r.userIds.contains(viewerId),
+            theme: theme,
+            onTap: onToggle == null ? null : () => onToggle!(message, r.emoji),
+          ),
+      ],
+    );
+  }
+}
+
+class _ReactionChip extends StatelessWidget {
+  const _ReactionChip({
+    required this.emoji,
+    required this.count,
+    required this.selfReacted,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final int count;
+  final bool selfReacted;
+  final ZulipTheme theme;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selfReacted ? theme.primary.withValues(alpha: 0.12) : theme.background;
+    final border = selfReacted ? theme.primary : theme.border;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: bg,
+          border: Border.all(color: border, width: 1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '${_emojiGlyph(emoji)} $count',
+          style: TextStyle(
+            fontSize: 12,
+            color: selfReacted ? theme.primary : theme.text,
+            fontWeight: selfReacted ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
       ),
     );
   }

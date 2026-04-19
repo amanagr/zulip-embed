@@ -87,6 +87,16 @@ class SnapshotTransport extends Transport {
     return Future.error(StateError('Snapshot transport is read-only'));
   }
 
+  @override
+  Future<void> addReaction(ReactionParams params) {
+    return Future.error(StateError('Snapshot transport is read-only'));
+  }
+
+  @override
+  Future<void> removeReaction(ReactionParams params) {
+    return Future.error(StateError('Snapshot transport is read-only'));
+  }
+
   Future<Map<String, dynamic>> _fetchSnapshot() async {
     final resp = await _http.get(Uri.parse(_url));
     if (resp.statusCode >= 400) {

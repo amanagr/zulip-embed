@@ -29,6 +29,15 @@ abstract class Transport {
   /// throw `StateError`.
   Future<void> deleteMessage(int messageId);
 
+  /// Add [params.emoji] as the viewer's reaction to [params.messageId].
+  /// Idempotent on the server — double-adding is a no-op. Snapshot
+  /// transports should throw `StateError`.
+  Future<void> addReaction(ReactionParams params);
+
+  /// Remove the viewer's reaction with [params.emoji] from
+  /// [params.messageId]. Snapshot transports should throw `StateError`.
+  Future<void> removeReaction(ReactionParams params);
+
   /// Fire a typing ping for [scope]. Best-effort — transports without
   /// typing support (snapshot, demo) inherit the default no-op and the
   /// composer's debounced emitter doesn't need to feature-detect.
