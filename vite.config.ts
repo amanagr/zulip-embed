@@ -5,6 +5,31 @@ import dts from "vite-plugin-dts";
 const MODE_SITE = "site";
 const FORMAT_IIFE = "iife";
 
+// Matches the specifier in `from '…'`, `from "…"`, and `import('…')`
+// when the specifier starts with `./` or `../` and ends with `.ts`.
+// Captures:
+//   1: `from ` or `import(` prefix (incl. any whitespace)
+//   2: the opening quote character
+//   3: the specifier body (without the `.ts` suffix)
+// The trailing quote is matched via backreference to group 2.
+//
+// We rewrite `.ts` -> `.js` (not strip entirely) so the emitted
+// declarations resolve under `moduleResolution: "node16"` /
+// `"nodenext"`, which require explicit extensions on relative
+// imports in `.d.ts` files. TypeScript matches the `.js` specifier
+// to the colocated `.d.ts` — the physical `.js` need not exist at
+// that path. Under `"bundler"` resolution this also works fine.
+const TS_EXT_IN_RELATIVE_SPECIFIER =
+    /(\bfrom\s*|\bimport\s*\(\s*)(['"])(\.\.?\/[^'"]*?)\.ts\2/g;
+
+function rewriteTsExtensionsInDts(content: string): string {
+    return content.replace(
+        TS_EXT_IN_RELATIVE_SPECIFIER,
+        (_match, prefix: string, quote: string, specifier: string) =>
+            `${prefix}${quote}${specifier}.js${quote}`,
+    );
+}
+
 // Build layout:
 //   - Default invocation emits an ESM multi-entry bundle. The root
 //     `zulip-embed.js` is the back-compat "registers everything" shim
@@ -102,6 +127,19 @@ export default defineConfig(() => {
                 // cleanly via relative imports and the tree matches
                 // what tsc would produce standalone.
                 outDir: "dist",
+                // Rewrite `.ts` -> `.js` on relative import specifiers
+                // in emitted declarations. Source files use `.ts`
+                // extensions (allowImportingTsExtensions, required by
+                // moduleResolution: "bundler"), but the plugin passes
+                // those paths through verbatim — and downstream
+                // consumers on moduleResolution "node16" / "nodenext"
+                // reject `from './foo.ts'` in `.d.ts` inputs. See
+                // rewriteTsExtensionsInDts above for the rationale on
+                // the `.js` target.
+                beforeWriteFile: (filePath, content) =>
+                    filePath.endsWith(".d.ts")
+                        ? {content: rewriteTsExtensionsInDts(content)}
+                        : undefined,
             }),
         ],
         server: {
