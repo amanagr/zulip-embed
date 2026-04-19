@@ -160,4 +160,32 @@ describe("sanitizeHtml — hostile inputs", () => {
         );
         expect(host.innerHTML).not.toContain("onerror");
     });
+
+    test("strips style values that smuggle URLs via image-set / cross-fade / src / paint / element", () => {
+        // image-set, -webkit-image-set, cross-fade, src(), paint(), and
+        // element() can each reference a network resource without a
+        // literal url() token — without guarding them, a hostile span
+        // could exfiltrate reading activity on hover/scroll.
+        const payloads = [
+            `<span style='background: image-set("https://attacker.example/p.png" 1x)'>x</span>`,
+            `<span style='background: -webkit-image-set("https://attacker.example/p.png" 1x)'>x</span>`,
+            `<span style='background: cross-fade(url(a.png), url(b.png), 50%)'>x</span>`,
+            `<span style='background: src("https://attacker.example/p.png")'>x</span>`,
+            `<span style='background-image: paint(evil)'>x</span>`,
+            `<span style='background: element(#leaked)'>x</span>`,
+        ];
+        for (const payload of payloads) {
+            const host = render(payload);
+            const span = host.querySelector("span");
+            // The span may or may not survive — what matters is that
+            // the style attribute does not carry any of these
+            // URL-bearing functions into the rendered DOM.
+            const style = span?.getAttribute("style")?.toLowerCase() ?? "";
+            expect(style).not.toContain("image-set(");
+            expect(style).not.toContain("cross-fade(");
+            expect(style).not.toContain("src(");
+            expect(style).not.toContain("paint(");
+            expect(style).not.toContain("element(");
+        }
+    });
 });
