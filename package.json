@@ -76,8 +76,8 @@
     "@types/node": "^24.9.2",
     "cross-env": "^7.0.3",
     "jsdom": "^25.0.1",
-    "prettier": "~3.5.3",
-    "typescript": "~5.7.2",
+    "prettier": "~3.8.3",
+    "typescript": "~5.9.3",
     "vite": "^6.0.7",
     "vite-plugin-dts": "^4.4.0",
     "vitest": "^2.1.8"
