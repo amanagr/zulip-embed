@@ -1,0 +1,45 @@
+{
+  "name": "@zulip/react-native",
+  "version": "0.1.0",
+  "description": "React Native chat widgets + headless SDK for Zulip.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@zulip/embed": "^0.1.0",
+    "react": ">=17.0.0",
+    "react-native": ">=0.70.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@zulip/embed": "workspace:*",
+    "react": "^19.0.0",
+    "react-native": "^0.76.0",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "zulip",
+    "chat",
+    "react-native",
+    "mobile"
+  ]
+}
