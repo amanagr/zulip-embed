@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && cross-env VITE_FORMAT=iife vite build",
     "build:site": "tsc --noEmit && cross-env VITE_MODE=site vite build",
     "preview:site": "vite preview --outDir site --port 4173",
     "typecheck": "tsc --noEmit",
