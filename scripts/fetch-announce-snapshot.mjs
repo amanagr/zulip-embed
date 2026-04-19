@@ -22,17 +22,19 @@ import {fileURLToPath} from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function required(name) {
-    const value = process.env[name];
-    if (value === undefined || value === "") {
-        console.error(`[fetch-snapshot] missing required env var: ${name}`);
-        process.exit(1);
-    }
-    return value;
-}
+const email = process.env["ZULIP_ANNOUNCE_EMAIL"] ?? "";
+const apiKey = process.env["ZULIP_ANNOUNCE_API_KEY"] ?? "";
 
-const email = required("ZULIP_ANNOUNCE_EMAIL");
-const apiKey = required("ZULIP_ANNOUNCE_API_KEY");
+// CI runs this step unconditionally so the workflow file doesn't need a
+// secrets-guarded `if:` (which GitHub Actions rejects at validation
+// time). When credentials aren't configured we exit 0 and leave the
+// checked-in snapshot in place.
+if (email === "" || apiKey === "") {
+    console.log(
+        "[fetch-snapshot] ZULIP_ANNOUNCE_EMAIL / ZULIP_ANNOUNCE_API_KEY not set — leaving checked-in snapshot in place.",
+    );
+    process.exit(0);
+}
 const serverRaw = process.env["ZULIP_ANNOUNCE_SERVER"] ?? "https://chat.zulip.org";
 const channel = process.env["ZULIP_ANNOUNCE_CHANNEL"] ?? "announce";
 const topic = process.env["ZULIP_ANNOUNCE_TOPIC"] ?? "Zulip updates";

@@ -41,10 +41,9 @@ jobs:
       - run: pnpm test
 
       - name: Fetch chat.zulip.org announce snapshot
-        # Only runs when the bot key is configured on the github-pages
-        # environment. On failure we fall back to the checked-in snapshot
-        # so the site always deploys.
-        if: ${{ secrets.GH_ACTIONS_BOT_API_KEY != '' }}
+        # The script no-ops when credentials aren't configured, so it's
+        # safe to run unconditionally; continue-on-error protects deploys
+        # against transient chat.zulip.org failures.
         continue-on-error: true
         env:
           ZULIP_ANNOUNCE_EMAIL: ${{ secrets.ZULIP_ANNOUNCE_EMAIL }}
