@@ -88,9 +88,7 @@ describe("<zulip-topic-list>", () => {
     });
 
     test("click fires topic-selected with {topic}", async () => {
-        topicsByChannel.set("general", [
-            {name: "lunch plans", maxMessageId: 20},
-        ]);
+        topicsByChannel.set("general", [{name: "lunch plans", maxMessageId: 20}]);
 
         const el = document.createElement("zulip-topic-list");
         el.setAttribute("demo", "");
@@ -124,18 +122,14 @@ describe("<zulip-topic-list>", () => {
 
         for (let i = 0; i < 3; i++) await flush();
         expect(callLog).toEqual(["general"]);
-        let names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map(
-            (n) => n.textContent,
-        );
+        let names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map((n) => n.textContent);
         expect(names).toEqual(["intro"]);
 
         el.setAttribute("channel", "random");
         for (let i = 0; i < 3; i++) await flush();
 
         expect(callLog).toEqual(["general", "random"]);
-        names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map(
-            (n) => n.textContent,
-        );
+        names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map((n) => n.textContent);
         expect(names).toEqual(["memes", "gifs"]);
     });
 

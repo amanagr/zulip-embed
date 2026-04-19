@@ -166,11 +166,7 @@
             }
 
             code {
-                font-family:
-                    ui-monospace,
-                    SFMono-Regular,
-                    Menlo,
-                    monospace;
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
             }
 
             .footer-note {
@@ -182,6 +178,12 @@
 
             zulip-chat {
                 width: 100%;
+            }
+
+            zulip-channel-list,
+            zulip-topic-list {
+                width: 100%;
+                height: 280px;
             }
         </style>
     </head>
@@ -208,9 +210,9 @@
                         href="https://chat.zulip.org/#narrow/channel/1-announce/topic/Zulip.20updates/"
                         >#announce &gt; Zulip updates</a
                     >
-                    on chat.zulip.org, fetched at deploy time by a scheduled GitHub Action
-                    and baked into a JSON snapshot the demo loads. Read-only; no API key
-                    ever reaches your browser.
+                    on chat.zulip.org, fetched at deploy time by a scheduled GitHub Action and baked
+                    into a JSON snapshot the demo loads. Read-only; no API key ever reaches your
+                    browser.
                 </p>
                 <div class="panel">
                     <h3>#announce &gt; Zulip updates</h3>
@@ -233,8 +235,8 @@
             <section>
                 <h2>Rendering showcase</h2>
                 <p style="color: var(--page-muted); margin-top: 0">
-                    Every message element the embed supports, rendered in one topic. Use this
-                    as a visual regression surface for the sanitizer + CSS.
+                    Every message element the embed supports, rendered in one topic. Use this as a
+                    visual regression surface for the sanitizer + CSS.
                 </p>
                 <div class="panel">
                     <h3>#showcase &gt; rendering</h3>
@@ -274,7 +276,10 @@
 
                     <div class="panel">
                         <h3>Inline · dark theme</h3>
-                        <p>Only the <code>theme</code> attribute changed — every other token adapts.</p>
+                        <p>
+                            Only the <code>theme</code> attribute changed — every other token
+                            adapts.
+                        </p>
                         <div class="chat-slot">
                             <zulip-chat
                                 demo
@@ -283,6 +288,35 @@
                                 theme="dark"
                                 mode="inline"
                             ></zulip-chat>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Channel &amp; topic pickers</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Standalone list components you can compose into your own navigation. Each fires
+                    a <code>channel-selected</code> / <code>topic-selected</code>
+                    CustomEvent on click.
+                </p>
+                <div class="grid">
+                    <div class="panel">
+                        <h3>&lt;zulip-channel-list&gt;</h3>
+                        <p>Subscribed channels with color dot, pin, mute, and unread badge.</p>
+                        <div class="chat-slot">
+                            <zulip-channel-list demo theme="light"></zulip-channel-list>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h3>&lt;zulip-topic-list channel="general"&gt;</h3>
+                        <p>Topics inside a channel, newest-first, with resolved markers.</p>
+                        <div class="chat-slot">
+                            <zulip-topic-list
+                                demo
+                                channel="general"
+                                theme="light"
+                            ></zulip-topic-list>
                         </div>
                     </div>
                 </div>
@@ -346,7 +380,7 @@
                 <div class="grid">
                     <div class="panel">
                         <h3>One-line script tag</h3>
-<pre><code>&lt;script type="module"
+                        <pre><code>&lt;script type="module"
   src="https://unpkg.com/@zulip/embed"&gt;&lt;/script&gt;
 
 &lt;zulip-chat
@@ -358,7 +392,7 @@
 
                     <div class="panel">
                         <h3>npm package</h3>
-<pre><code>pnpm add @zulip/embed
+                        <pre><code>pnpm add @zulip/embed
 
 // Registers &lt;zulip-chat&gt; on import.
 import "@zulip/embed";
@@ -372,15 +406,15 @@ import {ZulipClient, ZulipTransport} from "@zulip/embed";</code></pre>
             <section>
                 <h2>Native mobile &amp; desktop</h2>
                 <p style="color: var(--page-muted); margin-top: 0">
-                    First-class Flutter widgets — no WebView, no JS bridge. Same Zulip
-                    REST API, native rendering on iOS, Android, macOS, Windows, Linux, and web.
+                    First-class Flutter widgets — no WebView, no JS bridge. Same Zulip REST API,
+                    native rendering on iOS, Android, macOS, Windows, Linux, and web.
                 </p>
                 <div class="panel" style="margin-top: 16px">
                     <h3>Flutter demo</h3>
                     <p>
                         The same example app compiled for Flutter web. It ships in the repo at
-                        <code>packages/flutter/example/</code> and runs unmodified on every
-                        Flutter target.
+                        <code>packages/flutter/example/</code> and runs unmodified on every Flutter
+                        target.
                     </p>
                     <p>
                         <a
@@ -398,7 +432,7 @@ import {ZulipClient, ZulipTransport} from "@zulip/embed";</code></pre>
                             >Open the Flutter demo →</a
                         >
                     </p>
-<pre><code>flutter pub add zulip_embed
+                    <pre><code>flutter pub add zulip_embed
 
 ZulipChat(
   transport: ZulipTransport(

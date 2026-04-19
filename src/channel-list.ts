@@ -189,7 +189,6 @@ export class ZulipChannelListElement extends HTMLElement {
     static readonly observedAttributes = OBSERVED_ATTRIBUTES;
 
     private readonly shadow: ShadowRoot;
-    private rootEl: HTMLElement | undefined;
     private listEl: HTMLElement | undefined;
     private statusEl: HTMLElement | undefined;
     private errorEl: HTMLElement | undefined;
@@ -253,7 +252,6 @@ export class ZulipChannelListElement extends HTMLElement {
         this.listEl = list;
         root.append(list);
 
-        this.rootEl = root;
         this.shadow.replaceChildren(style, root);
     }
 

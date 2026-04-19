@@ -106,9 +106,7 @@ describe("<zulip-channel-list>", () => {
     });
 
     test("click fires channel-selected with {channelId, name}", async () => {
-        fakeChannels = [
-            {channelId: 42, name: "general", description: "Main discussion"},
-        ];
+        fakeChannels = [{channelId: 42, name: "general", description: "Main discussion"}];
 
         const el = document.createElement("zulip-channel-list");
         el.setAttribute("demo", "");
@@ -128,9 +126,7 @@ describe("<zulip-channel-list>", () => {
     });
 
     test("sets description as title attribute on the channel name", async () => {
-        fakeChannels = [
-            {channelId: 1, name: "support", description: "Customer questions"},
-        ];
+        fakeChannels = [{channelId: 1, name: "support", description: "Customer questions"}];
 
         const el = document.createElement("zulip-channel-list");
         el.setAttribute("demo", "");
@@ -151,9 +147,7 @@ describe("<zulip-channel-list>", () => {
         document.body.append(el);
 
         for (let i = 0; i < 3; i++) await flush();
-        let names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map(
-            (n) => n.textContent,
-        );
+        let names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map((n) => n.textContent);
         expect(names).toEqual(["first"]);
 
         fakeChannels = [
@@ -163,9 +157,7 @@ describe("<zulip-channel-list>", () => {
         await el.refresh();
         for (let i = 0; i < 2; i++) await flush();
 
-        names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map(
-            (n) => n.textContent,
-        );
+        names = [...(el.shadowRoot?.querySelectorAll(".name") ?? [])].map((n) => n.textContent);
         expect(names).toEqual(["first", "second"]);
     });
 

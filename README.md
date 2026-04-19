@@ -68,18 +68,18 @@ local development.
 
 ## Attributes
 
-| Attribute | Required | Description |
-| --- | --- | --- |
-| `demo` | — | Use an in-memory transport instead of a real Zulip server. |
-| `snapshot-url` | — | Load a pre-fetched JSON snapshot of messages instead of opening a live event queue. Implies read-only; no credentials in the browser. See [Snapshot mode](#snapshot-mode). |
-| `server` | live mode | Base URL of the Zulip server (e.g. `https://chat.zulip.org`). |
-| `email` | live mode | Account email or bot email. |
-| `api-key` | live mode | API key for that account. |
-| `channel` | yes | Stream/channel name to scope the feed. Defaults to `general`. |
-| `topic` | no | Topic inside the channel. Omit for a channel-wide view. |
-| `theme` | no | `light` (default) or `dark`. |
-| `mode` | no | `inline` (default) or `floating` (bottom-right messenger). |
-| `read-only` | no | Hide the composer and disable reaction toggles. Useful for web-public channels. |
+| Attribute      | Required  | Description                                                                                                                                                                |
+| -------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `demo`         | —         | Use an in-memory transport instead of a real Zulip server.                                                                                                                 |
+| `snapshot-url` | —         | Load a pre-fetched JSON snapshot of messages instead of opening a live event queue. Implies read-only; no credentials in the browser. See [Snapshot mode](#snapshot-mode). |
+| `server`       | live mode | Base URL of the Zulip server (e.g. `https://chat.zulip.org`).                                                                                                              |
+| `email`        | live mode | Account email or bot email.                                                                                                                                                |
+| `api-key`      | live mode | API key for that account.                                                                                                                                                  |
+| `channel`      | yes       | Stream/channel name to scope the feed. Defaults to `general`.                                                                                                              |
+| `topic`        | no        | Topic inside the channel. Omit for a channel-wide view.                                                                                                                    |
+| `theme`        | no        | `light` (default) or `dark`.                                                                                                                                               |
+| `mode`         | no        | `inline` (default) or `floating` (bottom-right messenger).                                                                                                                 |
+| `read-only`    | no        | Hide the composer and disable reaction toggles. Useful for web-public channels.                                                                                            |
 
 ## Theming
 
@@ -187,94 +187,95 @@ Rich HTML returned by Zulip's server-side markdown renderer is run through
 DOMPurify with a strict allow-list before it hits the DOM. See
 [`SECURITY.md`](./SECURITY.md) for the threat model.
 
-| Element | Status |
-| --- | --- |
-| Paragraphs, headings (`h1`–`h6`), horizontal rules | ✅ |
-| Bold, italic, strikethrough, underline | ✅ |
-| Inline code, fenced code blocks | ✅ |
-| Ordered + unordered lists (incl. nesting) | ✅ |
-| Blockquotes (incl. nested) | ✅ |
-| Tables with header row | ✅ |
-| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`) | ✅ |
-| Autolinked plain-text URLs | ✅ |
-| Inline images (relative paths resolved against `server`) | ✅ |
-| Unicode emoji | ✅ |
-| Custom Zulip emoji (`<img class="emoji">`) | ✅ |
-| `@user` mentions, `#channel` references, `#channel > topic` links | ✅ |
-| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup | ✅ |
-| Spoilers (click / keyboard reveal) | ✅ |
-| KaTeX math | 🚧 (markup passes through, no KaTeX stylesheet bundled) |
-| Code-block syntax highlighting (Pygments classes) | ✅ |
-| Polls | ❌ |
-| Widgets / custom message extensions | ❌ |
-| File / image attachment previews beyond `<img>` | ❌ |
+| Element                                                                  | Status                                                  |
+| ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Paragraphs, headings (`h1`–`h6`), horizontal rules                       | ✅                                                      |
+| Bold, italic, strikethrough, underline                                   | ✅                                                      |
+| Inline code, fenced code blocks                                          | ✅                                                      |
+| Ordered + unordered lists (incl. nesting)                                | ✅                                                      |
+| Blockquotes (incl. nested)                                               | ✅                                                      |
+| Tables with header row                                                   | ✅                                                      |
+| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`) | ✅                                                      |
+| Autolinked plain-text URLs                                               | ✅                                                      |
+| Inline images (relative paths resolved against `server`)                 | ✅                                                      |
+| Unicode emoji                                                            | ✅                                                      |
+| Custom Zulip emoji (`<img class="emoji">`)                               | ✅                                                      |
+| `@user` mentions, `#channel` references, `#channel > topic` links        | ✅                                                      |
+| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup                     | ✅                                                      |
+| Spoilers (click / keyboard reveal)                                       | ✅                                                      |
+| KaTeX math                                                               | 🚧 (markup passes through, no KaTeX stylesheet bundled) |
+| Code-block syntax highlighting (Pygments classes)                        | ✅                                                      |
+| Polls                                                                    | ❌                                                      |
+| Widgets / custom message extensions                                      | ❌                                                      |
+| File / image attachment previews beyond `<img>`                          | ❌                                                      |
 
 ### Live data & interaction
 
-| Feature | Status |
-| --- | --- |
-| Channel + topic scoped narrow | ✅ |
-| Long-poll event queue via `/register` + `/events` | ✅ |
-| Send messages to channel | ✅ |
-| Message edits (live, incremental DOM update) | ✅ |
-| Message deletes (live) | ✅ |
-| Emoji reactions — read, add, remove (live) | ✅ |
-| Avatar images (with initials fallback) | ✅ |
-| Rich showcase + read-only `#announce` demos | ✅ |
-| Floating-messenger mode | ✅ |
-| Light + dark themes | ✅ |
-| Typing indicators (send + receive, per-scope filtered) | ✅ |
-| Unread separator + "new messages" jump-to-bottom pill | ✅ |
-| Curated emoji reaction picker | ✅ |
-| Message pagination (scroll-up loads older) | ✅ |
-| KaTeX math (lazy-loaded) | ✅ |
-| Channel + topic enumeration (`listChannels`, `listTopics`) | ✅ |
-| Direct messages | ❌ (v0.5) |
-| Presence (online/offline dots) | ❌ |
-| File uploads from the composer | ❌ |
-| Message search | ❌ |
-| Unread counters, read receipts | ❌ |
-| Draft persistence | ❌ |
+| Feature                                                    | Status    |
+| ---------------------------------------------------------- | --------- |
+| Channel + topic scoped narrow                              | ✅        |
+| Long-poll event queue via `/register` + `/events`          | ✅        |
+| Send messages to channel                                   | ✅        |
+| Message edits (live, incremental DOM update)               | ✅        |
+| Message deletes (live)                                     | ✅        |
+| Emoji reactions — read, add, remove (live)                 | ✅        |
+| Avatar images (with initials fallback)                     | ✅        |
+| Rich showcase + read-only `#announce` demos                | ✅        |
+| Floating-messenger mode                                    | ✅        |
+| Light + dark themes                                        | ✅        |
+| Typing indicators (send + receive, per-scope filtered)     | ✅        |
+| Unread separator + "new messages" jump-to-bottom pill      | ✅        |
+| Curated emoji reaction picker                              | ✅        |
+| Message pagination (scroll-up loads older)                 | ✅        |
+| KaTeX math (lazy-loaded)                                   | ✅        |
+| Channel + topic enumeration (`listChannels`, `listTopics`) | ✅        |
+| Direct messages                                            | ❌ (v0.5) |
+| Presence (online/offline dots)                             | ❌        |
+| File uploads from the composer                             | ❌        |
+| Message search                                             | ❌        |
+| Unread counters, read receipts                             | ❌        |
+| Draft persistence                                          | ❌        |
 
 ## Plug-and-play components
 
 v1 ships a catalog of composable custom elements so you can drop any
 subset of the Zulip web app's UI into your own product:
 
-| Component | Status | Description |
-| --- | --- | --- |
-| `<zulip-chat>` | ✅ | Full channel/topic feed + composer + reactions + typing + edit/delete |
-| `<zulip-channel-list>` | 🚧 | Subscribed channels with unread / pin / color / mute |
-| `<zulip-topic-list>` | 🚧 | Topics inside a channel, resolved markers |
-| `<zulip-compose>` | ⏳ | Standalone composer (drafts, scheduled send, file upload) |
-| `<zulip-inbox>` | ⏳ | Unreads grouped by channel > topic |
-| `<zulip-recent>` | ⏳ | Recent conversations view |
-| `<zulip-dm-list>` | ⏳ | Direct-message pane |
-| `<zulip-user-list>` | ⏳ | Presence sidebar |
-| `<zulip-user-card>` | ⏳ | Hover / click profile popover |
-| `<zulip-search>` | ⏳ | Advanced-filter search box + results |
-| `<zulip-message>` | ⏳ | Single-message embed for quote-of-the-day widgets |
+| Component              | Status | Description                                                                      |
+| ---------------------- | ------ | -------------------------------------------------------------------------------- |
+| `<zulip-chat>`         | ✅     | Full channel/topic feed + composer + reactions + typing + edit/delete            |
+| `<zulip-channel-list>` | ✅     | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
+| `<zulip-topic-list>`   | ✅     | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
+| `<zulip-compose>`      | ⏳     | Standalone composer (drafts, scheduled send, file upload)                        |
+| `<zulip-inbox>`        | ⏳     | Unreads grouped by channel > topic                                               |
+| `<zulip-recent>`       | ⏳     | Recent conversations view                                                        |
+| `<zulip-dm-list>`      | ⏳     | Direct-message pane                                                              |
+| `<zulip-user-list>`    | ⏳     | Presence sidebar                                                                 |
+| `<zulip-user-card>`    | ⏳     | Hover / click profile popover                                                    |
+| `<zulip-search>`       | ⏳     | Advanced-filter search box + results                                             |
+| `<zulip-message>`      | ⏳     | Single-message embed for quote-of-the-day widgets                                |
 
 ## Frameworks
 
-| Framework | Status | Path |
-| --- | --- | --- |
-| Web Components (framework-agnostic) | ✅ | this repo root |
-| Flutter | ✅ | [`packages/flutter/`](./packages/flutter/) |
-| React (thin wrapper over WCs) | 🚧 | `packages/react/` |
-| React Native | ⏳ | `packages/react-native/` |
-| SwiftUI (iOS) | ⏳ planned | `packages/swiftui/` |
-| Jetpack Compose (Android) | ⏳ planned | `packages/compose/` |
+| Framework                           | Status     | Path                                       |
+| ----------------------------------- | ---------- | ------------------------------------------ |
+| Web Components (framework-agnostic) | ✅         | this repo root                             |
+| Flutter                             | ✅         | [`packages/flutter/`](./packages/flutter/) |
+| React (thin wrapper over WCs)       | 🚧         | `packages/react/`                          |
+| React Native                        | ⏳         | `packages/react-native/`                   |
+| SwiftUI (iOS)                       | ⏳ planned | `packages/swiftui/`                        |
+| Jetpack Compose (Android)           | ⏳ planned | `packages/compose/`                        |
 
 ## Roadmap
 
 **v1.0 — Component + framework parity**
+
 1. ✅ Sanitized HTML rendering (DOMPurify) + KaTeX math
 2. ✅ Live message edits, deletes, reactions, typing
 3. ✅ Message pagination + unread separator
 4. ✅ Flutter parity (live chat, edit/delete, typing, snapshot)
 5. ✅ `Transport.listChannels()` + `listTopics()` primitives
-6. 🚧 `<zulip-channel-list>` + `<zulip-topic-list>` components
+6. ✅ `<zulip-channel-list>` + `<zulip-topic-list>` components
 7. 🚧 React wrapper package
 8. ⏳ React Native package
 9. ⏳ Composer file / image upload (multipart to `/user_uploads`)
