@@ -1140,7 +1140,13 @@ button {
     display: flex;
     flex-direction: column;
     gap: var(--zc-spacing-sm);
-    background: var(--zc-color-bg);
+    /* Subtly shaded wrapper so the textarea below can sit on
+     * --zc-color-bg and visually "pop" against it — matches the
+     * Slack/Discord/Zulip-web idiom. Prior to 0.6 the composer used
+     * --zc-color-bg and the textarea used --zc-color-surface, which
+     * on the light theme gave a textarea that was almost invisible
+     * in its resting state (reported by a user). */
+    background: var(--zc-color-surface);
 }
 
 .typing-indicator {
@@ -1258,7 +1264,11 @@ button {
     padding: var(--zc-spacing-sm) var(--zc-spacing-md);
     font: inherit;
     color: inherit;
-    background: var(--zc-color-surface);
+    /* Pure bg (white on light / deep-navy on dark) so the input
+     * contrasts with the surface composer wrapper around it. Keeping
+     * both at surface rendered the textarea invisible against a
+     * same-colored toolbar on the light theme. */
+    background: var(--zc-color-bg);
     min-height: 40px;
     max-height: 160px;
     outline: none;
