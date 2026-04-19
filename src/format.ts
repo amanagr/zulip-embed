@@ -30,18 +30,18 @@ export function getInitials(fullName: string): string {
     return (first + last).toUpperCase();
 }
 
-const AVATAR_PALETTE = [
-    "#3b82f6",
-    "#10b981",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#ec4899",
-    "#14b8a6",
-    "#f97316",
-];
+const AVATAR_HUE_COUNT = 12;
+const AVATAR_HUE_STEP = 360 / AVATAR_HUE_COUNT;
+const AVATAR_HUE_OFFSET = 40;
+const AVATAR_SATURATION = 68;
+const AVATAR_LIGHTNESS_START = 55;
+const AVATAR_LIGHTNESS_END = 42;
 
 export function avatarColor(seed: number): string {
-    const index = Math.abs(seed) % AVATAR_PALETTE.length;
-    return AVATAR_PALETTE[index] ?? "#3b82f6";
+    const bucket = Math.abs(seed) % AVATAR_HUE_COUNT;
+    const h1 = Math.round(bucket * AVATAR_HUE_STEP);
+    const h2 = (h1 + AVATAR_HUE_OFFSET) % 360;
+    const start = `hsl(${String(h1)}, ${String(AVATAR_SATURATION)}%, ${String(AVATAR_LIGHTNESS_START)}%)`;
+    const end = `hsl(${String(h2)}, ${String(AVATAR_SATURATION)}%, ${String(AVATAR_LIGHTNESS_END)}%)`;
+    return `linear-gradient(135deg, ${start} 0%, ${end} 100%)`;
 }

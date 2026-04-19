@@ -51,7 +51,19 @@ export interface RenderContext {
     // These bypass the id allow-list on the attribute — hosts inject them
     // via the `messageActions` JS property.
     messageActionsExtra?: readonly MessageActionDescriptor[] | undefined;
+    // Starter prompts rendered as clickable chips in the empty-state
+    // view. Clicking one fires `onStarterChipClick` with the prompt
+    // text so the host can push it into the composer.
+    starterPrompts?: readonly string[] | undefined;
+    onStarterChipClick?: ((prompt: string) => void) | undefined;
 }
+
+const DEFAULT_STARTER_PROMPTS: readonly string[] = [
+    "Say hi to the team",
+    "Share a quick update",
+    "Ask a question",
+    "Drop a link or screenshot",
+];
 
 // Per-DOM-node snapshot of what we last rendered for a given message, so
 // we can skip re-rendering when the message is structurally unchanged.
@@ -119,10 +131,7 @@ export function renderMessages(
     context: RenderContext = {},
 ): void {
     if (messages.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "feed-empty";
-        empty.textContent = "No messages yet — say hello.";
-        container.replaceChildren(empty);
+        container.replaceChildren(buildEmptyState(context));
         return;
     }
 
@@ -172,6 +181,7 @@ export function renderMessages(
         let node = existing.get(key);
         if (node === undefined) {
             node = renderMessage(message, sameSender, context);
+            node.classList.add("message-enter");
             renderedSnapshot.set(node, snapshotFor(message, sameSender, context));
         } else {
             const prev = renderedSnapshot.get(node);
@@ -197,6 +207,47 @@ export function renderMessages(
     // Anything left over is a message that was deleted or moved out of
     // view — drop it.
     for (const leftover of existing.values()) leftover.remove();
+}
+
+function buildEmptyState(context: RenderContext): HTMLElement {
+    const empty = document.createElement("div");
+    empty.className = "feed-empty";
+
+    const illustration = document.createElement("div");
+    illustration.className = "feed-empty-illustration";
+    illustration.setAttribute("aria-hidden", "true");
+    illustration.textContent = "👋";
+    empty.append(illustration);
+
+    const title = document.createElement("div");
+    title.className = "feed-empty-title";
+    title.textContent = "It's quiet in here — kick things off.";
+    empty.append(title);
+
+    const subtitle = document.createElement("div");
+    subtitle.className = "feed-empty-subtitle";
+    subtitle.textContent = "Pick a starter or type anything below.";
+    empty.append(subtitle);
+
+    if (context.onStarterChipClick !== undefined) {
+        const chips = document.createElement("div");
+        chips.className = "feed-empty-chips";
+        const prompts = context.starterPrompts ?? DEFAULT_STARTER_PROMPTS;
+        for (const [index, prompt] of prompts.entries()) {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = index === 0 ? "starter-chip starter-chip-primary" : "starter-chip";
+            chip.dataset["starterPrompt"] = prompt;
+            chip.textContent = prompt;
+            chip.addEventListener("click", () => {
+                context.onStarterChipClick?.(prompt);
+            });
+            chips.append(chip);
+        }
+        empty.append(chips);
+    }
+
+    return empty;
 }
 
 function buildUnreadSeparator(): HTMLElement {

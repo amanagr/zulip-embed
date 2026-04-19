@@ -1076,6 +1076,9 @@ export class ZulipChatElement extends HTMLElement {
         context.onAddReaction = (m, anchor) => {
             this.handleAddReaction(m, anchor);
         };
+        context.onStarterChipClick = (prompt) => {
+            this.handleStarterChipClick(prompt);
+        };
 
         const hostContext: MessageActionHostContext = {
             serverOrigin,
@@ -1172,6 +1175,13 @@ export class ZulipChatElement extends HTMLElement {
             this.autosize(this.composerInputEl);
         }
         this.setState({editingMessageId: undefined});
+    }
+
+    private handleStarterChipClick(prompt: string): void {
+        const input = this.composerInputEl;
+        if (input === undefined) return;
+        insertAtCursor(input, prompt);
+        this.autosize(input);
     }
 
     private async handleDelete(message: Message): Promise<void> {

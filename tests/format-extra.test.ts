@@ -74,24 +74,24 @@ describe("getInitials — edge cases", () => {
 });
 
 describe("avatarColor — edge cases", () => {
-    test("returns a color for negative seed (Math.abs guard)", () => {
-        expect(avatarColor(-5)).toMatch(/^#[0-9a-f]{6}$/i);
+    test("returns a gradient for negative seed (Math.abs guard)", () => {
+        expect(avatarColor(-5)).toMatch(/^linear-gradient\(/);
     });
 
-    test("returns a color for zero", () => {
-        expect(avatarColor(0)).toMatch(/^#[0-9a-f]{6}$/i);
+    test("returns a gradient for zero", () => {
+        expect(avatarColor(0)).toMatch(/^linear-gradient\(/);
     });
 
-    test("returns a color for very large seed", () => {
-        expect(avatarColor(Number.MAX_SAFE_INTEGER)).toMatch(/^#[0-9a-f]{6}$/i);
+    test("returns a gradient for very large seed", () => {
+        expect(avatarColor(Number.MAX_SAFE_INTEGER)).toMatch(/^linear-gradient\(/);
     });
 
-    test("color palette wraps modulo palette length", () => {
-        // seeds n and n+palette_size should yield identical colors;
-        // pin by sampling 16 seeds and confirming at most 8 distinct
+    test("hue palette wraps modulo the bucket count", () => {
+        // seeds n and n+buckets should yield identical gradients;
+        // pin by sampling 36 seeds and confirming at most 12 distinct
         // values.
         const colors = new Set<string>();
-        for (let i = 0; i < 32; i++) colors.add(avatarColor(i));
-        expect(colors.size).toBeLessThanOrEqual(8);
+        for (let i = 0; i < 36; i++) colors.add(avatarColor(i));
+        expect(colors.size).toBeLessThanOrEqual(12);
     });
 });

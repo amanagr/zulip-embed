@@ -108,6 +108,9 @@ export function seedMessages(channel: string, topic: string | undefined): Channe
     if (channel === "showcase") {
         return showcaseSeed(topic ?? "rendering");
     }
+    if (channel === "kickoff") {
+        return [];
+    }
     return generalSeed(channel, topic ?? "welcome");
 }
 

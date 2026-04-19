@@ -261,6 +261,73 @@ button {
     font-size: 13px;
 }
 
+.feed-empty {
+    flex-direction: column;
+    gap: 10px;
+    padding: var(--zc-spacing-lg);
+    text-align: center;
+}
+
+.feed-empty-illustration {
+    font-size: 36px;
+    line-height: 1;
+}
+
+.feed-empty-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--zc-color-text);
+}
+
+.feed-empty-subtitle {
+    font-size: 12px;
+    color: var(--zc-color-muted);
+    margin-bottom: 4px;
+}
+
+.feed-empty-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    max-width: 320px;
+}
+
+.starter-chip {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--zc-color-border);
+    background: var(--zc-color-surface);
+    color: var(--zc-color-text);
+    cursor: pointer;
+    transition:
+        transform 120ms ease,
+        background 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease;
+}
+
+.starter-chip:hover,
+.starter-chip:focus-visible {
+    background: color-mix(in srgb, var(--zc-color-accent) 14%, var(--zc-color-surface));
+    border-color: var(--zc-color-accent);
+    color: var(--zc-color-text);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+.starter-chip-primary {
+    animation: zulip-chip-pulse 1s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .starter-chip-primary {
+        animation: none;
+    }
+}
+
 .feed-top-banner {
     text-align: center;
     font-size: 11px;
@@ -505,6 +572,39 @@ button {
     50.01%,
     100% {
         opacity: 0;
+    }
+}
+
+@keyframes zulip-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes zulip-chip-pulse {
+    0% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--zc-color-accent) 45%, transparent);
+    }
+    70% {
+        box-shadow: 0 0 0 8px color-mix(in srgb, var(--zc-color-accent) 0%, transparent);
+    }
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--zc-color-accent) 0%, transparent);
+    }
+}
+
+.message.message-enter {
+    animation: zulip-fade-in 200ms cubic-bezier(0.2, 0.7, 0.2, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .message.message-enter {
+        animation: none;
     }
 }
 

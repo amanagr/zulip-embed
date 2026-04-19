@@ -213,6 +213,74 @@ describe("renderMessage", () => {
         expect(container.querySelector(".unread-separator")).toBeNull();
     });
 
+    test("empty state renders starter chips and fires onStarterChipClick", () => {
+        const container = document.createElement("div");
+        const clicks: string[] = [];
+        renderMessages(container, [], {
+            onStarterChipClick: (prompt) => {
+                clicks.push(prompt);
+            },
+        });
+        const empty = container.querySelector(".feed-empty");
+        expect(empty).not.toBeNull();
+        expect(empty?.querySelector(".feed-empty-title")?.textContent ?? "").not.toBe("");
+        const chips = container.querySelectorAll<HTMLButtonElement>(".starter-chip");
+        expect(chips.length).toBeGreaterThanOrEqual(2);
+        expect(chips[0]?.classList.contains("starter-chip-primary")).toBe(true);
+        chips[0]?.click();
+        expect(clicks.length).toBe(1);
+        expect(clicks[0]?.length).toBeGreaterThan(0);
+    });
+
+    test("empty state uses host-provided starter prompts", () => {
+        const container = document.createElement("div");
+        const clicks: string[] = [];
+        renderMessages(container, [], {
+            starterPrompts: ["alpha", "beta"],
+            onStarterChipClick: (p) => {
+                clicks.push(p);
+            },
+        });
+        const chips = container.querySelectorAll<HTMLButtonElement>(".starter-chip");
+        expect(chips.length).toBe(2);
+        expect(chips[0]?.textContent).toBe("alpha");
+        chips[1]?.click();
+        expect(clicks).toEqual(["beta"]);
+    });
+
+    test("empty state omits chips when no callback is provided", () => {
+        const container = document.createElement("div");
+        renderMessages(container, [], {});
+        expect(container.querySelector(".feed-empty")).not.toBeNull();
+        expect(container.querySelector(".starter-chip")).toBeNull();
+    });
+
+    test("newly appended messages get the fade-in class on first render", () => {
+        const container = document.createElement("div");
+        const messages: Message[] = [
+            {...htmlMessage("<p>a</p>"), id: 1},
+            {...htmlMessage("<p>b</p>"), id: 2},
+        ];
+        renderMessages(container, messages, {});
+        const rows = container.querySelectorAll(".message");
+        expect(rows.length).toBe(2);
+        for (const row of rows) {
+            expect(row.classList.contains("message-enter")).toBe(true);
+        }
+    });
+
+    test("existing messages do not re-receive the fade-in class on re-render", () => {
+        const container = document.createElement("div");
+        const first: Message[] = [{...htmlMessage("<p>a</p>"), id: 1}];
+        renderMessages(container, first, {});
+        const firstNode = container.querySelector<HTMLElement>('[data-message-id="1"]');
+        expect(firstNode?.classList.contains("message-enter")).toBe(true);
+        firstNode?.classList.remove("message-enter");
+        renderMessages(container, first, {});
+        const afterNode = container.querySelector<HTMLElement>('[data-message-id="1"]');
+        expect(afterNode?.classList.contains("message-enter")).toBe(false);
+    });
+
     test("shows reaction pills and calls onToggleReaction", () => {
         let called: {emoji: string; id: number} | undefined;
         const message: Message = {

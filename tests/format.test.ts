@@ -54,4 +54,18 @@ describe("avatarColor", () => {
         for (let i = 0; i < 8; i++) seen.add(avatarColor(i));
         expect(seen.size).toBeGreaterThan(1);
     });
+
+    test("returns a linear-gradient with two hsl stops", () => {
+        const value = avatarColor(7);
+        expect(value.startsWith("linear-gradient(")).toBe(true);
+        expect(value).toContain("0%");
+        expect(value).toContain("100%");
+        const stops = value.match(/hsl\([^)]+\)/g) ?? [];
+        expect(stops.length).toBe(2);
+    });
+
+    test("different seeds produce different gradients", () => {
+        expect(avatarColor(1)).not.toBe(avatarColor(2));
+        expect(avatarColor(3)).not.toBe(avatarColor(9));
+    });
 });
