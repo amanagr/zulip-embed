@@ -248,7 +248,16 @@ button {
     flex: 1;
     overflow-y: auto;
     padding: var(--zc-spacing-md) var(--zc-spacing-lg);
-    scroll-behavior: smooth;
+    /* Programmatic pin-to-bottom must land instantly. "smooth" animates
+       every scrollTop assignment, and intermediate frames trip the
+       "near top" threshold in handleFeedScroll, which then fires
+       loadOlderMessages unprompted on a cold cache. */
+    scroll-behavior: auto;
+    /* Disable browser scroll anchoring. When avatars and fonts settle
+       after the initial paint they push content downward; anchoring
+       would silently shift scrollTop to keep the visible frame stable,
+       defeating the repin-on-resize loop in scrollToBottom. */
+    overflow-anchor: none;
 }
 
 .feed-empty,

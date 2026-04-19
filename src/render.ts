@@ -1071,6 +1071,13 @@ function resolveUrl(url: string, serverOrigin: string | undefined): string | und
 }
 
 export function scrollToBottom(feed: HTMLElement): void {
+    // The feed's own CSS sets `scroll-behavior: auto`, so this pin is
+    // always instant. A page-level `scroll-behavior: smooth` inherits
+    // into Shadow DOM on some engines, which would animate intermediate
+    // scroll events through the "near top" threshold in
+    // handleFeedScroll on cold-cache refreshes — keep the feed's own
+    // style specific rather than relying on `behavior: "instant"` on
+    // each call, which isn't polyfilled by jsdom for tests.
     feed.scrollTop = feed.scrollHeight;
 
     // Content grows for a short while after the initial pin —
@@ -1080,7 +1087,9 @@ export function scrollToBottom(feed: HTMLElement): void {
     // checking `isNearBottom` inside the callback is too strict: the
     // scrollTop we just set is no longer near bottom against the new
     // scrollHeight. Instead, track the exact scrollTop we pinned to
-    // and treat any mismatch as a user scroll.
+    // and treat any mismatch as a user scroll. (CSS
+    // `overflow-anchor: none` on the feed keeps scrollTop from being
+    // silently nudged by browser scroll anchoring during that growth.)
     let pinnedTop = feed.scrollTop;
     const repin = (): void => {
         if (feed.scrollTop !== pinnedTop) return;

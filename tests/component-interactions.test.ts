@@ -60,6 +60,11 @@ describe("<zulip-chat> interactions", () => {
         Object.defineProperty(feed!, "scrollHeight", {value: 1000, configurable: true});
         Object.defineProperty(feed!, "clientHeight", {value: 400, configurable: true});
 
+        // Skip past the post-init pin window — handleFeedScroll suppresses
+        // loadOlderMessages for 2s after the initial scrollToBottom so a
+        // cold-cache avatar/font settle can't trip the "near top" check.
+        vi.advanceTimersByTime(2001);
+
         feed!.dispatchEvent(new Event("scroll"));
         for (let i = 0; i < 6; i++) await flush();
 

@@ -150,6 +150,12 @@ export class ZulipChatElement extends HTMLElement {
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
+    // Timestamp at which the initial scrollToBottom pin releases. While
+    // active, scroll events suppress the "load older" trigger — a late-
+    // firing scroll (from avatar/font settle or residual smooth-scroll
+    // frames) reaching scrollTop < 80 before the pin finishes is never
+    // a user paging up, so we never want to respond to it.
+    private pinUntil = 0;
     private emojiPicker: EmojiPickerHandle | undefined;
     private emojiPickerRoot: HTMLElement | undefined;
     private emojiPickerPromise: Promise<EmojiPickerHandle> | undefined;
@@ -370,7 +376,7 @@ export class ZulipChatElement extends HTMLElement {
         pill.textContent = "New messages";
         pill.addEventListener("click", () => {
             this.markAllRead();
-            if (this.feedEl) scrollToBottom(this.feedEl);
+            this.pinFeedToBottom();
         });
         this.newMessagesPillEl = pill;
         wrap.append(pill);
@@ -388,8 +394,12 @@ export class ZulipChatElement extends HTMLElement {
         // the spurious "at top" signal that programmatic
         // scrollToBottom emits when the seeded page of messages is
         // shorter than the widget viewport (clamped scrollTop = 0 ≠ a
-        // user request for history).
+        // user request for history). The `pinUntil` gate suppresses
+        // scroll events fired during the post-load pinning window, so
+        // a cold-cache refresh can't trigger loadOlderMessages before
+        // avatars/fonts settle.
         if (
+            Date.now() >= this.pinUntil &&
             feed.scrollTop < 80 &&
             feed.scrollHeight > feed.clientHeight + 80 &&
             this.state.hasMore &&
@@ -404,6 +414,16 @@ export class ZulipChatElement extends HTMLElement {
         if (this.state.unreadAnchorId !== undefined && isNearBottom(feed)) {
             this.markAllRead();
         }
+    }
+
+    private pinFeedToBottom(): void {
+        const feed = this.feedEl;
+        if (!feed) return;
+        // Match the 2s settle window scrollToBottom's ResizeObserver
+        // repin loop uses. handleFeedScroll checks `pinUntil` to
+        // suppress loadOlderMessages while the pin is active.
+        this.pinUntil = Date.now() + 2000;
+        scrollToBottom(feed);
     }
 
     private markAllRead(): void {
@@ -771,7 +791,7 @@ export class ZulipChatElement extends HTMLElement {
                 hasMore: page.hasMore,
             });
             requestAnimationFrame(() => {
-                if (this.feedEl) scrollToBottom(this.feedEl);
+                this.pinFeedToBottom();
             });
         } catch (error) {
             if (token !== this.initToken) return;
@@ -911,7 +931,7 @@ export class ZulipChatElement extends HTMLElement {
             this.setState({messages, unreadAnchorId: undefined, unreadCount: 0});
             if (this.feedEl) {
                 requestAnimationFrame(() => {
-                    if (this.feedEl) scrollToBottom(this.feedEl);
+                    this.pinFeedToBottom();
                 });
             }
             return;
