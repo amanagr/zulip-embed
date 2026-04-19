@@ -1,5 +1,6 @@
 import {ZulipClient} from "./client.ts";
 import {DemoTransport} from "./demo-transport.ts";
+import {createEmojiPicker, type EmojiPickerHandle} from "./emoji-picker.ts";
 import {enhanceKatex} from "./katex.ts";
 import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
 import {SnapshotTransport} from "./snapshot-transport.ts";
@@ -73,6 +74,7 @@ export class ZulipChatElement extends HTMLElement {
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
+    private emojiPicker: EmojiPickerHandle | undefined;
     private newMessagesPillEl: HTMLButtonElement | undefined;
     private composerInputEl: HTMLTextAreaElement | undefined;
     private composerSendEl: HTMLButtonElement | undefined;
@@ -139,6 +141,10 @@ export class ZulipChatElement extends HTMLElement {
                 this.close();
             }
         });
+
+        // The picker lives inside .root (a positioned container) so it
+        // can float above messages without escaping the rounded border.
+        this.emojiPicker = createEmojiPicker(this.shadow, root);
 
         this.shadow.replaceChildren(style, launcher, root);
     }
@@ -583,13 +589,17 @@ export class ZulipChatElement extends HTMLElement {
         });
     }
 
-    private handleAddReaction(message: Message): void {
-        // v0.1: simple prompt-based picker. A real emoji picker is roadmap.
-        const emoji = window.prompt("Reaction emoji name (e.g. tada, +1, heart):");
-        if (emoji === null) return;
-        const trimmed = emoji.trim();
-        if (trimmed === "") return;
-        this.handleToggleReaction(message, trimmed);
+    private handleAddReaction(message: Message, anchor: HTMLElement): void {
+        // v0.1 picker: curated emoji grid anchored to the "+" button.
+        // Re-opening on the same anchor toggles the panel closed.
+        if (this.emojiPicker === undefined) return;
+        if (this.emojiPicker.isOpen()) {
+            this.emojiPicker.close();
+            return;
+        }
+        this.emojiPicker.open(anchor, (emojiName) => {
+            this.handleToggleReaction(message, emojiName);
+        });
     }
 
     private renderContext(): RenderContext {
@@ -606,8 +616,8 @@ export class ZulipChatElement extends HTMLElement {
         context.onToggleReaction = (m, e) => {
             this.handleToggleReaction(m, e);
         };
-        context.onAddReaction = (m) => {
-            this.handleAddReaction(m);
+        context.onAddReaction = (m, anchor) => {
+            this.handleAddReaction(m, anchor);
         };
         return context;
     }

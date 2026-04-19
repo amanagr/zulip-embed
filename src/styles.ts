@@ -54,6 +54,7 @@ button {
 }
 
 .root {
+    position: relative;
     display: flex;
     flex-direction: column;
     background: var(--zc-color-bg);
@@ -822,6 +823,47 @@ button {
 .reaction-add svg {
     width: 14px;
     height: 14px;
+}
+
+.emoji-picker {
+    position: absolute;
+    z-index: 10;
+    background: var(--zc-color-bg);
+    border: 1px solid var(--zc-color-border);
+    border-radius: var(--zc-radius-sm);
+    box-shadow: 0 10px 24px rgba(17, 24, 39, 0.18);
+    padding: 6px;
+}
+
+.emoji-picker[hidden] {
+    display: none;
+}
+
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 28px);
+    gap: 2px;
+}
+
+.emoji-picker-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.emoji-picker-btn:hover,
+.emoji-picker-btn:focus-visible {
+    background: var(--zc-color-surface);
+    outline: none;
 }
 
 .composer {

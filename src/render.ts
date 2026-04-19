@@ -13,7 +13,9 @@ export interface RenderContext {
     // Emitted when the viewer clicks a reaction pill.
     onToggleReaction?: ((message: Message, emoji: string) => void) | undefined;
     // Emitted when the viewer clicks the "add reaction" affordance.
-    onAddReaction?: ((message: Message) => void) | undefined;
+    // The anchor element is the clicked button, used by the host to
+    // position an emoji picker next to it.
+    onAddReaction?: ((message: Message, anchor: HTMLElement) => void) | undefined;
     // ID of the first message the viewer hasn't seen yet. When set, the
     // renderer inserts a horizontal "new messages" divider immediately
     // before the matching message.
@@ -458,7 +460,7 @@ function renderReactions(message: Message, context: RenderContext): HTMLElement 
         add.innerHTML =
             '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10" cy="10" r="7.5"/><path d="M7 8.5v.01M13 8.5v.01M7 12c.8.9 1.8 1.5 3 1.5s2.2-.6 3-1.5"/></svg>';
         add.addEventListener("click", () => {
-            context.onAddReaction?.(message);
+            context.onAddReaction?.(message, add);
         });
         row.append(add);
     }
@@ -503,7 +505,7 @@ function renderReactionPill(
 // the emoji via the message HTML (as <span class="emoji emoji-…">), so
 // this path only fires for plain-text demo reactions. We render the name
 // verbatim if unknown.
-const EMOJI_GLYPHS: Record<string, string> = {
+export const EMOJI_GLYPHS: Record<string, string> = {
     "+1": "👍",
     thumbs_up: "👍",
     "-1": "👎",
