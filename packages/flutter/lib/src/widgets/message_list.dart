@@ -14,12 +14,16 @@ class MessageList extends StatefulWidget {
     required this.theme,
     this.currentUserId,
     this.isLoading = false,
+    this.onEdit,
+    this.onDelete,
   });
 
   final List<Message> messages;
   final ZulipTheme theme;
   final int? currentUserId;
   final bool isLoading;
+  final void Function(Message message)? onEdit;
+  final void Function(Message message)? onDelete;
 
   @override
   State<MessageList> createState() => _MessageListState();
@@ -85,6 +89,8 @@ class _MessageListState extends State<MessageList> {
           isSelf: isSelf,
           showHeader: showHeader,
           now: now,
+          onEdit: isSelf ? widget.onEdit : null,
+          onDelete: isSelf ? widget.onDelete : null,
         );
       },
     );
@@ -98,6 +104,8 @@ class _MessageBubble extends StatelessWidget {
     required this.isSelf,
     required this.showHeader,
     required this.now,
+    this.onEdit,
+    this.onDelete,
   });
 
   final Message message;
@@ -105,6 +113,49 @@ class _MessageBubble extends StatelessWidget {
   final bool isSelf;
   final bool showHeader;
   final DateTime now;
+  final void Function(Message message)? onEdit;
+  final void Function(Message message)? onDelete;
+
+  void _showActions(BuildContext context) {
+    if (onEdit == null && onDelete == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: theme.surface,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (onEdit != null)
+                ListTile(
+                  leading: Icon(Icons.edit, color: theme.text),
+                  title: Text(
+                    'Edit message',
+                    style: TextStyle(color: theme.text),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    onEdit!(message);
+                  },
+                ),
+              if (onDelete != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Color(0xFFEF4444)),
+                  title: const Text(
+                    'Delete message',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    onDelete!(message);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,18 +202,27 @@ class _MessageBubble extends StatelessWidget {
                       ],
                     ),
                   ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: SelectableText(
-                    message.content,
-                    style: TextStyle(color: textColor, fontSize: 14, height: 1.35),
+                GestureDetector(
+                  onLongPress: (onEdit != null || onDelete != null)
+                      ? () => _showActions(context)
+                      : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: SelectableText(
+                      message.content,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 14,
+                        height: 1.35,
+                      ),
+                    ),
                   ),
                 ),
               ],

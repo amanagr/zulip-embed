@@ -48,6 +48,30 @@ class ZulipClient {
     );
   }
 
+  Future<void> editMessage({
+    required int messageId,
+    String? content,
+    String? topic,
+  }) {
+    return transport.editMessage(EditMessageParams(
+      messageId: messageId,
+      content: content,
+      topic: topic,
+    ));
+  }
+
+  Future<void> deleteMessage(int messageId) {
+    return transport.deleteMessage(messageId);
+  }
+
+  /// Fire a typing start/stop ping for the current scope. Best-effort —
+  /// failures are swallowed by the transport.
+  Future<void> sendTyping(TypingOp op) async {
+    final s = _scope;
+    if (s == null) return;
+    await transport.sendTyping(op: op, scope: s);
+  }
+
   Future<void> dispose() async {
     await transport.close();
     await _controller.close();

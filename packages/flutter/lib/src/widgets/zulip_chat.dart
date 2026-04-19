@@ -157,6 +157,87 @@ class _ZulipChatState extends State<ZulipChat> {
     }
   }
 
+  Future<void> _onEditMessage(Message message) async {
+    final controller = TextEditingController(text: message.content);
+    final t = widget.theme;
+    final updated = await showDialog<String>(
+      context: context,
+      builder: (dctx) {
+        return AlertDialog(
+          backgroundColor: t.surface,
+          title: Text('Edit message', style: TextStyle(color: t.text)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 5,
+            minLines: 1,
+            style: TextStyle(color: t.text),
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (updated == null || updated.isEmpty || updated == message.content) return;
+    try {
+      await _client.editMessage(messageId: message.id, content: updated);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      setState(() => _error = msg);
+      widget.onError?.call(msg);
+    }
+  }
+
+  Future<void> _onDeleteMessage(Message message) async {
+    final t = widget.theme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dctx) {
+        return AlertDialog(
+          backgroundColor: t.surface,
+          title: Text('Delete message?', style: TextStyle(color: t.text)),
+          content: Text(
+            'This cannot be undone.',
+            style: TextStyle(color: t.muted),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dctx).pop(true),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Color(0xFFEF4444)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    try {
+      await _client.deleteMessage(message.id);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      setState(() => _error = msg);
+      widget.onError?.call(msg);
+    }
+  }
+
   @override
   void dispose() {
     unawaited(_teardown());
@@ -190,6 +271,8 @@ class _ZulipChatState extends State<ZulipChat> {
               currentUserId: _client.currentUserId,
               isLoading: _status == ConnectionStatus.connecting &&
                   _messages.isEmpty,
+              onEdit: _onEditMessage,
+              onDelete: _onDeleteMessage,
             ),
           ),
           if (_typingUsers.isNotEmpty)

@@ -34,6 +34,7 @@ class ZulipTransport implements Transport {
   String? _queueId;
   int _lastEventId = -1;
   bool _closed = false;
+  ZulipEventListener? _onEvent;
 
   // Per-message reaction state. Zulip's reaction events are per-user
   // add/remove ops; we fold them into bucketed lists so consumers get
@@ -98,6 +99,7 @@ class ZulipTransport implements Transport {
     required ScopeFilter scope,
     required ZulipEventListener onEvent,
   }) async {
+    _onEvent = onEvent;
     onEvent(const ConnectionEvent(ConnectionStatus.connecting));
     try {
       final me = await _getJson('/api/v1/users/me');
@@ -169,6 +171,7 @@ class ZulipTransport implements Transport {
     if (_closed) return;
     _closed = true;
     _queueId = null;
+    _onEvent = null;
     if (_ownsHttp) _http.close();
   }
 
@@ -231,6 +234,51 @@ class ZulipTransport implements Transport {
       content: params.content,
       timestamp: DateTime.now(),
     );
+  }
+
+  @override
+  Future<void> editMessage(EditMessageParams params) async {
+    if (params.content == null && params.topic == null) return;
+    final body = <String, String>{};
+    if (params.content != null) body['content'] = params.content!;
+    if (params.topic != null) body['topic'] = params.topic!;
+    final resp = await _http.patch(
+      _endpoint('/api/v1/messages/${params.messageId}'),
+      headers: _authHeaders,
+      body: body,
+    );
+    if (resp.statusCode >= 400) {
+      throw Exception(
+        'PATCH /api/v1/messages/${params.messageId} HTTP ${resp.statusCode}: '
+        '${resp.body}',
+      );
+    }
+    // Optimistic local update — server will broadcast the same event via
+    // /events, but firing one now keeps the UI responsive. Handler in
+    // ZulipChat is idempotent so double-delivery is harmless.
+    if (!_reactionState.containsKey(params.messageId)) return;
+    _onEvent?.call(MessageUpdateEvent(
+      messageId: params.messageId,
+      content: params.content,
+      topic: params.topic,
+    ));
+  }
+
+  @override
+  Future<void> deleteMessage(int messageId) async {
+    final resp = await _http.delete(
+      _endpoint('/api/v1/messages/$messageId'),
+      headers: _authHeaders,
+    );
+    if (resp.statusCode >= 400) {
+      throw Exception(
+        'DELETE /api/v1/messages/$messageId HTTP ${resp.statusCode}: '
+        '${resp.body}',
+      );
+    }
+    if (!_reactionState.containsKey(messageId)) return;
+    _reactionState.remove(messageId);
+    _onEvent?.call(MessageDeleteEvent(messageId));
   }
 
   void _dispatchEvent(

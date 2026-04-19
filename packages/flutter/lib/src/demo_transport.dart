@@ -97,6 +97,41 @@ class DemoTransport extends Transport {
     return msg;
   }
 
+  @override
+  Future<void> editMessage(EditMessageParams params) async {
+    final idx = _messages.indexWhere((m) => m.id == params.messageId);
+    if (idx < 0) {
+      throw StateError('Message ${params.messageId} not found');
+    }
+    final current = _messages[idx];
+    if (current.senderId != _viewerId) {
+      throw StateError('Only the author can edit this message');
+    }
+    _messages[idx] = current.copyWith(
+      content: params.content,
+      topic: params.topic,
+    );
+    _listener?.call(MessageUpdateEvent(
+      messageId: params.messageId,
+      content: params.content,
+      topic: params.topic,
+      editedTimestamp: DateTime.now(),
+    ));
+  }
+
+  @override
+  Future<void> deleteMessage(int messageId) async {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) {
+      throw StateError('Message $messageId not found');
+    }
+    if (_messages[idx].senderId != _viewerId) {
+      throw StateError('Only the author can delete this message');
+    }
+    _messages.removeAt(idx);
+    _listener?.call(MessageDeleteEvent(messageId));
+  }
+
   void _scheduleEcho(Message prompt) {
     late Timer timer;
     timer = Timer(const Duration(milliseconds: 800), () {

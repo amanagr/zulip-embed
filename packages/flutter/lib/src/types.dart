@@ -100,6 +100,14 @@ class ScopeFilter {
 }
 
 @immutable
+class EditMessageParams {
+  const EditMessageParams({required this.messageId, this.content, this.topic});
+  final int messageId;
+  final String? content;
+  final String? topic;
+}
+
+@immutable
 class SendMessageParams {
   const SendMessageParams({
     required this.channel,

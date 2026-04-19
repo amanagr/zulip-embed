@@ -21,6 +21,14 @@ abstract class Transport {
 
   Future<Message> sendMessage(SendMessageParams params);
 
+  /// Edit a message's content, topic, or both. Transports that cannot
+  /// mutate (snapshot) should throw `StateError`.
+  Future<void> editMessage(EditMessageParams params);
+
+  /// Delete a message. Transports that cannot mutate (snapshot) should
+  /// throw `StateError`.
+  Future<void> deleteMessage(int messageId);
+
   /// Fire a typing ping for [scope]. Best-effort — transports without
   /// typing support (snapshot, demo) inherit the default no-op and the
   /// composer's debounced emitter doesn't need to feature-detect.
