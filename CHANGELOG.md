@@ -4,6 +4,78 @@ All notable changes to `zulip-embed` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to semantic versioning.
 
+## 0.8.0 — 2026-04-19
+
+Sprint 5 release: pinned banners, React Native alpha, signed releases,
+and a rewritten developer-documentation surface. Additive over
+`0.8.0-rc.0` — no breaking changes. See
+[`MIGRATION.md`](./MIGRATION.md) for the 0.7 → 0.8 upgrade walkthrough
+and [`docs/RELEASING.md`](./docs/RELEASING.md) for the release
+playbook.
+
+### Added
+
+- **`<zulip-announcement>`** — pinned-banner custom element that
+  fetches a single message by id and renders it as a dismissible
+  banner at the top of the embed. Emits a `announcement-dismissed`
+  `CustomEvent` on the host when the viewer closes it. Ships with
+  Flutter parity as the `ZulipAnnouncement` widget.
+- **New subpath entry `zulip-embed/announcement`** — registers only
+  `<zulip-announcement>`, ~18 KB gzipped. Added alongside the
+  existing `/chat`, `/channel-list`, `/topic-list`, `/agent`, and
+  `/demo` subpaths.
+- **React Native alpha package** (`zulip-embed-react-native@0.8.0-rc.0-alpha`)
+  — plain-text `<ZulipChatScreen>`, bundled `ZulipClient` /
+  `ZulipTransport` / `DemoTransport`. Ships a one-time
+  `console.warn` in `__DEV__` to flag alpha status. See
+  [`packages/react-native/README.md`](./packages/react-native/README.md)
+  for the per-feature status matrix and headless-client fallback.
+- **Signed release manifest** — `scripts/release.mjs` produces
+  `dist/INTEGRITY.json` (machine-readable sha256 + gzipped sizes per
+  artifact) and `dist/INTEGRITY.md` (ready-to-paste SRI table) after
+  every `pnpm build`. README gains a "Verified releases" section
+  documenting how to pin bundles with `<script integrity="...">`.
+- **CI-spliced SRI hashes** — `.github/workflows/release.yml` runs
+  `scripts/splice-sri.mjs` on tag push, replacing the README's
+  `<!-- sri:start --> … <!-- sri:end -->` block with the real hashes
+  for the tag and committing the update back to `main`.
+- **npm provenance** — every publishable workspace now carries
+  `publishConfig: {access: "public", provenance: true}`, so
+  Sigstore provenance is enforced even when an operator publishes
+  manually. The release workflow runs with `NPM_CONFIG_PROVENANCE=true`.
+- **Developer documentation** — new
+  [`docs/ONBOARDING.md`](./docs/ONBOARDING.md) (zero-to-live-embed
+  walkthrough) and [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
+  (transport / scope / event / bundle deep dive). README rewritten
+  into four quickstart tracks (vanilla HTML, React, React Native
+  alpha, Flutter) with links out to both new docs.
+
+### Changed
+
+- **README** — rewritten to reflect the v0.8 surface (the
+  `<zulip-announcement>` element, RN alpha status, subpath entries,
+  the "Verified releases" table, and links to the new onboarding +
+  architecture docs).
+- **Bundle-size gates** — `scripts/bundle-check.mjs` now also
+  enforces the `entries/announcement.js` budget (20 KB gz).
+
+### Fixed
+
+- No user-visible bug fixes since `0.8.0-rc.0`. Fixes that landed
+  earlier in the 0.8 cycle are listed in that entry.
+
+### Dependencies
+
+- No dependency changes.
+
+### Package versions
+
+- `zulip-embed` → `0.8.0`
+- `zulip-embed-react` → `0.8.0`
+- `zulip-embed-react-native` → `0.8.0-alpha` (narrower surface; API
+  may still move before 1.0 without a major-version bump)
+- `zulip_embed` (Flutter) → `0.8.0`
+
 ## 0.8.0-rc.0 — 2026-04-19
 
 Sprint 4 release: surface area + distribution. First release candidate;
