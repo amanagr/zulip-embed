@@ -1,0 +1,22 @@
+{
+    "name": "zulip-embed-example-svelte",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+        "preview": "vite preview",
+        "check": "svelte-check --tsconfig ./tsconfig.json"
+    },
+    "dependencies": {
+        "svelte": "^5.0.0",
+        "zulip-embed": "^0.8.0-rc.0"
+    },
+    "devDependencies": {
+        "@sveltejs/vite-plugin-svelte": "^4.0.0",
+        "svelte-check": "^4.0.0",
+        "typescript": "~5.7.2",
+        "vite": "^5.4.0"
+    }
+}

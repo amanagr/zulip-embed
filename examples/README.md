@@ -18,6 +18,8 @@ to point it at a real server.
 | [`vanilla-esm/`](./vanilla-esm/) | Plain HTML file using an ESM import map → `zulip-embed/chat`. Right choice if you want per-entry imports without a bundler. |
 | [`react/`](./react/)             | React + Vite minimal app wiring `<ZulipChat>` from `zulip-embed-react`.                                                     |
 | [`nextjs/`](./nextjs/)           | Next.js App Router app that mounts the component inside a `"use client"` wrapper (SSR-safe).                                |
+| [`vue/`](./vue/)                 | Vue 3 + Vite app; shows how to keep the dev console clean with `isCustomElement`.                                           |
+| [`svelte/`](./svelte/)           | Svelte 5 + Vite app; shows native Web Component support with no config.                                                     |
 
 ## Demo mode — how it works
 
