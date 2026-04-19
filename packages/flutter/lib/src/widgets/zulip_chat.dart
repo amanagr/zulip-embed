@@ -111,6 +111,28 @@ class _ZulipChatState extends State<ZulipChat> {
             _messages.add(message);
           }
         });
+      case MessageUpdateEvent(:final messageId, :final content, :final topic):
+        setState(() {
+          for (var i = 0; i < _messages.length; i++) {
+            if (_messages[i].id != messageId) continue;
+            _messages[i] = _messages[i].copyWith(
+              content: content,
+              contentIsHtml: content != null ? true : null,
+              topic: topic,
+            );
+            break;
+          }
+        });
+      case MessageDeleteEvent(:final messageId):
+        setState(() => _messages.removeWhere((m) => m.id == messageId));
+      case ReactionEvent(:final messageId, :final reactions):
+        setState(() {
+          for (var i = 0; i < _messages.length; i++) {
+            if (_messages[i].id != messageId) continue;
+            _messages[i] = _messages[i].copyWith(reactions: reactions);
+            break;
+          }
+        });
       case ErrorEvent(:final message):
         setState(() => _error = message);
         widget.onError?.call(message);
