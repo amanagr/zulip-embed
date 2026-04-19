@@ -1,0 +1,42 @@
+/* Site-wide accent color overrides for Starlight so the docs pages look
+   like they belong to the same product as the embedded <zulip-chat>
+   widget (the widget's default --zc-color-accent is #6172f3). */
+:root {
+    --sl-color-accent-low: #e0e4fb;
+    --sl-color-accent: #6172f3;
+    --sl-color-accent-high: #3e4ecb;
+}
+:root[data-theme="dark"] {
+    --sl-color-accent-low: #1e2344;
+    --sl-color-accent: #818cf8;
+    --sl-color-accent-high: #c3cbff;
+}
+
+/* Landing-page hero: the embed widget sits inline alongside the pitch,
+   so we need a constrained shell that still grows on wider viewports. */
+.zc-hero {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-block: 2rem;
+}
+@media (min-width: 56rem) {
+    .zc-hero {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+    }
+}
+.zc-hero-copy h1 {
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.1;
+    margin-block-end: 1rem;
+}
+.zc-hero-copy p.tagline {
+    font-size: 1.15rem;
+    color: var(--sl-color-text-accent);
+}
+.zc-hero-widget {
+    display: block;
+    --zc-height: 440px;
+    --zc-radius: 14px;
+}

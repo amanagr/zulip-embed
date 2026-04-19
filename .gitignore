@@ -8,6 +8,17 @@ coverage
 .env
 .env.local
 
+# Astro / Starlight docs site
+site-src/.astro
+site-src/dist
+# Bundle mirror populated by scripts/sync-bundle-to-site.mjs — the
+# .gitkeep anchors the directory so the `public/` path exists before
+# the first build.
+site-src/public/zulip-embed.js
+site-src/public/zulip-embed.js.map
+site-src/public/chunks
+site-src/public/entries
+
 # Dart / Flutter
 .dart_tool/
 .flutter-plugins

@@ -59,8 +59,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && cross-env VITE_FORMAT=iife vite build",
-    "build:site": "tsc --noEmit && cross-env VITE_MODE=site vite build",
-    "preview:site": "vite preview --outDir site --port 4173",
+    "build:site": "node scripts/sync-bundle-to-site.mjs && pnpm --filter zulip-embed-site run build",
+    "build:demo": "tsc --noEmit && cross-env VITE_MODE=site vite build",
+    "preview:site": "pnpm --filter zulip-embed-site run preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -94,5 +95,8 @@
     "access": "public",
     "provenance": true
   },
-  "packageManager": "pnpm@10.0.0"
+  "packageManager": "pnpm@10.0.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp"]
+  }
 }

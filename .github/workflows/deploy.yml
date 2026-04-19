@@ -85,7 +85,9 @@ jobs:
 
       - name: Build static site
         env:
-          VITE_BASE: /${{ github.event.repository.name }}/
+          # Astro needs the base as a pathname with a trailing slash;
+          # matches what GitHub Pages serves the repo under.
+          SITE_BASE: /${{ github.event.repository.name }}/
         run: pnpm build:site
 
       - uses: subosito/flutter-action@v2

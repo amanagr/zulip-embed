@@ -1,0 +1,63 @@
+---
+title: Quickstart
+description: Drop a <zulip-chat> widget into any HTML page in under a minute.
+---
+
+import {Tabs, TabItem, Code} from "@astrojs/starlight/components";
+
+The fastest way to embed Zulip chat. Copy-paste the snippet below, point
+`server` at your instance, and paste a short-lived JWT into `auth-token`.
+
+<Tabs>
+  <TabItem label="HTML / CDN">
+    ```html
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+
+    <zulip-chat
+      server="https://chat.example.com"
+      auth-token="<short-lived JWT from your backend>"
+      channel="general"
+      topic="welcome"
+      theme="light"
+    ></zulip-chat>
+    ```
+  </TabItem>
+  <TabItem label="React">
+    ```tsx
+    import {ZulipChat} from "zulip-embed-react";
+
+    export function App() {
+      return (
+        <ZulipChat
+          server="https://chat.example.com"
+          authToken={authToken}
+          channel="general"
+          topic="welcome"
+          theme="light"
+        />
+      );
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Live preview
+
+Here's the same widget in demo mode — no backend, no credentials, driven
+by a seeded transport:
+
+<zulip-chat
+  demo
+  channel="general"
+  topic="welcome"
+  theme="light"
+  style="--zc-height: 460px; --zc-radius: 12px; display: block;"
+></zulip-chat>
+
+## Next steps
+
+Wire up auth with a short-lived JWT handoff, then theme the widget to
+match your product. (Full guides land in Phase 1.)

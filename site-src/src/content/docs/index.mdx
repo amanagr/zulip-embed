@@ -1,0 +1,58 @@
+---
+title: zulip-embed
+description: Embed Zulip chat as a framework-agnostic Web Component or headless SDK.
+template: splash
+hero:
+  tagline: A drop-in Zulip chat widget. One &lt;script&gt; tag, any framework, any theme.
+  actions:
+    - text: Quickstart
+      link: /guides/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/amanagr/zulip-embed
+      icon: external
+---
+
+import {Card, CardGrid} from "@astrojs/starlight/components";
+
+<div class="zc-hero">
+  <div class="zc-hero-copy">
+    <h2>Live, right here.</h2>
+    <p class="tagline">
+      This is the same <code>&lt;zulip-chat&gt;</code> component you'd ship —
+      running in demo mode against a seeded transport so you can click,
+      type, react, and scroll without any backend.
+    </p>
+    <p>
+      Swap <code>demo</code> for <code>server</code> + <code>auth-token</code>
+      and it connects to your own Zulip instance in seconds.
+    </p>
+  </div>
+  <zulip-chat
+    class="zc-hero-widget"
+    demo
+    channel="general"
+    topic="welcome"
+    theme="light"
+  ></zulip-chat>
+</div>
+
+<CardGrid>
+  <Card title="Web Component" icon="seti:html">
+    `<zulip-chat>` works in plain HTML, any SSR framework, or anywhere the
+    DOM runs. No bundler required.
+  </Card>
+  <Card title="React / React Native" icon="seti:react">
+    First-party wrappers: `zulip-embed-react` for the web, `zulip-embed-react-native`
+    for mobile, both built on the same core.
+  </Card>
+  <Card title="Flutter" icon="seti:dart">
+    `zulip_embed` Dart package mirrors the TypeScript domain model so your
+    Flutter app gets the same widget surface and event model.
+  </Card>
+  <Card title="Headless SDK" icon="seti:typescript">
+    Skip the widget entirely and drive the transport yourself — useful for
+    agent integrations, custom UIs, or analytics dashboards.
+  </Card>
+</CardGrid>
