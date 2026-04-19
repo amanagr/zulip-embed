@@ -15,8 +15,7 @@ export interface ChannelSelectedDetail {
 
 export interface ZulipChannelListProps {
     server?: string;
-    email?: string;
-    apiKey?: string;
+    authToken?: string;
     demo?: boolean;
     snapshotUrl?: string;
     theme?: "light" | "dark";
@@ -41,15 +40,13 @@ export const ZulipChannelList = forwardRef<ZulipChannelListElement, ZulipChannel
             const el = innerRef.current;
             if (!el) return;
             applyAttr(el, "server", props.server);
-            applyAttr(el, "email", props.email);
-            applyAttr(el, "api-key", props.apiKey);
+            applyAttr(el, "auth-token", props.authToken);
             applyAttr(el, "snapshot-url", props.snapshotUrl);
             applyAttr(el, "theme", props.theme);
             applyBool(el, "demo", props.demo);
         }, [
             props.server,
-            props.email,
-            props.apiKey,
+            props.authToken,
             props.demo,
             props.snapshotUrl,
             props.theme,

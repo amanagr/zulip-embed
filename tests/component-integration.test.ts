@@ -275,11 +275,10 @@ describe("<zulip-chat> — integration", () => {
     });
 
     test("auth-token attribute alone passes live-mode preflight", async () => {
-        // When auth-token is set we skip the "requires email + api-key"
-        // error and defer to the ZulipTransport JWT exchange. We stub the
-        // JWT endpoint to return immediately so connect() can proceed;
-        // the important thing for this test is that the config banner
-        // doesn't fire for a missing email/api-key.
+        // With auth-token set, live mode defers to the ZulipTransport JWT
+        // exchange. We stub the JWT endpoint to return immediately so
+        // connect() can proceed; the important thing for this test is that
+        // the config-error banner doesn't fire.
         const originalFetch = globalThis.fetch;
         globalThis.fetch = (async (url: string) => {
             if (url.includes("/api/internal/jwt/fetch_api_key")) {

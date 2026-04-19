@@ -39,13 +39,13 @@ seeded messages + an echo bot. That means:
   `pnpm dev` (React / Next.js examples).
 
 To switch to a real server, drop the `demo` attribute and add
-`server`, `email`, and `api-key` (or `auth-token`):
+`server` plus an `auth-token` JWT minted by your backend (see
+[`docs/jwt.md`](../docs/jwt.md)):
 
 ```html
 <zulip-chat
     server="https://chat.example.com"
-    email="you@example.com"
-    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    auth-token="{{ JWT from your backend }}"
     channel="general"
     topic="welcome"
 ></zulip-chat>

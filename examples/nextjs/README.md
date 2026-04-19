@@ -49,27 +49,20 @@ The wrapper serves two purposes:
 
 ## Connect to a real server
 
-Keys must not travel from the server component into the browser
-bundle. Either:
-
-- **Recommended:** exchange a short-lived JWT on the server and pass
-  it as `authToken` to the client. `authToken` accepts a JWT minted
-  against a Zulip account your server owns.
-- **Quick prototype:** expose a prefixed env var
-  (`NEXT_PUBLIC_ZULIP_KEY`) and wire it into the client component.
-  Note this ships the key to every visitor.
+Exchange a short-lived JWT on the server and pass it as `authToken`
+to the client — no long-lived credentials travel to the browser. See
+[`docs/jwt.md`](../../docs/jwt.md) for the exchange details.
 
 ```tsx
 // app/ZulipClient.tsx
 "use client";
 import {ZulipChat} from "zulip-embed-react";
 
-export function ZulipClient() {
+export function ZulipClient({authToken}: {authToken: string}) {
     return (
         <ZulipChat
             server="https://chat.example.com"
-            email="bot@example.com"
-            apiKey={process.env.NEXT_PUBLIC_ZULIP_KEY}
+            authToken={authToken}
             channel="general"
             topic="welcome"
             theme="light"

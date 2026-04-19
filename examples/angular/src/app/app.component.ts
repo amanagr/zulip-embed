@@ -33,8 +33,8 @@ import {Component, CUSTOM_ELEMENTS_SCHEMA} from "@angular/core";
             ></zulip-chat>
 
             <footer>
-                Drop <code>demo</code> and add <code>server</code>, <code>email</code>, and
-                <code>api-key</code> for live mode.
+                Drop <code>demo</code> and add <code>server</code> and
+                <code>auth-token</code> for live mode.
             </footer>
         </main>
     `,

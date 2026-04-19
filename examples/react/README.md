@@ -39,9 +39,8 @@ Then open the URL Vite prints (usually
 
 ## Connect to a real server
 
-Drop `demo` and pass the live credentials. Read `apiKey` from
-`import.meta.env.VITE_ZULIP_KEY` (or your preferred secret channel)
-so you don't check it in:
+Drop `demo` and pass a short-lived JWT minted by your backend (see
+[`docs/jwt.md`](../../docs/jwt.md)):
 
 ```tsx
 import {ZulipChat} from "zulip-embed-react";
@@ -50,8 +49,7 @@ export function App() {
     return (
         <ZulipChat
             server="https://chat.example.com"
-            email="you@example.com"
-            apiKey={import.meta.env.VITE_ZULIP_KEY}
+            authToken={import.meta.env.VITE_ZULIP_AUTH_TOKEN}
             channel="general"
             topic="welcome"
             theme="light"
@@ -62,9 +60,9 @@ export function App() {
 }
 ```
 
-For production, prefer exchanging a short-lived JWT server-side and
-passing it as `authToken` — that way no long-lived `apiKey` reaches
-the browser.
+`authToken` is a JWT your backend signs with the shared secret
+provisioned in the Zulip org's `JWT_AUTH_KEYS`. The SDK exchanges it
+once for a scoped API key — no long-lived credentials touch the page.
 
 ## Headless alternative
 

@@ -4,8 +4,8 @@ This walkthrough gets you from "no Zulip server" to a live embed in
 your product, end-to-end. It targets a developer who has never
 provisioned a Zulip account before.
 
-If you already have a running server and an account you can get an
-API key for, skip to [step 4](#4-first-live-embed).
+If you already have a running server and admin access to configure
+`JWT_AUTH_KEYS`, skip to [step 3](#3-configure-the-jwt-handoff).
 
 ## 1. Pick a Zulip server
 
@@ -55,75 +55,13 @@ to — you will get an `error / channel-not-subscribed` event.
 4. Subscribe the bot to each channel: **Settings → Organization →
    Streams → [channel] → Subscribers → add**.
 
-## 3. Get credentials out of Zulip
+## 3. Configure the JWT handoff
 
-You need a `server`, an `email`, and an `api-key`. For the account
-you created in step 2:
+The embed authenticates via a short-lived JWT that your backend mints
+per-viewer. The SDK exchanges the JWT once for a scoped API key that
+stays inside the SDK; the host page never sees a long-lived credential.
 
-- **Server URL.** Your org URL, including scheme, no trailing slash.
-  Example: `https://acme.zulipchat.com`.
-- **Email.** The bot email or account email.
-- **API key.** For a bot, it's on the bot-details page. For a human
-  account, **Settings → Account & privacy → Show API key**.
-
-Treat the API key like a password. Don't commit it to Git.
-
-## 4. First live embed
-
-Create an HTML file anywhere you can serve static assets:
-
-```html
-<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8" />
-        <title>My Zulip embed</title>
-    </head>
-    <body>
-        <h1>My product</h1>
-        <script type="module" src="https://unpkg.com/zulip-embed"></script>
-        <zulip-chat
-            server="https://acme.zulipchat.com"
-            email="embed-bot@acme.zulipchat.com"
-            api-key="YOUR_API_KEY_HERE"
-            channel="general"
-            topic="welcome"
-            theme="light"
-            brand-name="Acme"
-        ></zulip-chat>
-    </body>
-</html>
-```
-
-Load it in a browser. You should see the chat with live messages in
-10–15 seconds; the composer sends messages to the `welcome` topic in
-`#general` under the bot's name.
-
-**If nothing shows up**, open DevTools → Console. The embed logs a
-`zulip-error` `CustomEvent` with a machine-readable `code`:
-
-- `unauthorized` — the email + api-key pair is wrong, or the account
-  doesn't exist.
-- `channel-not-subscribed` — subscribe the account to the channel.
-- `network` — the browser can't reach `server`. Check CORS, ad
-  blockers, and corporate proxies.
-- `rate-limited` — you hit Zulip's rate limits; the embed will back
-  off automatically.
-- `jwt-not-configured` — only happens if you're using `auth-token` on
-  a server that doesn't have `JWT_AUTH_KEYS` set.
-
-## 5. Graduate from `api-key` to `auth-token` for production
-
-Shipping an `api-key` attribute in production HTML is a foot-gun —
-anything on the page (analytics pixels, browser extensions, an XSS bug)
-can read it and call the Zulip API with the full account's scope.
-
-For production deployments, use the `auth-token` attribute instead.
-Your backend mints a short-lived JWT per-viewer that the embed
-exchanges once for a scoped API key. The key stays inside the SDK;
-the host page never sees it.
-
-Requirements:
+Two pieces to wire up:
 
 1. **Zulip side.** An admin adds a shared secret to
    `/etc/zulip/settings.py`:
@@ -141,23 +79,78 @@ Requirements:
     support.) Full server-side config lives in [`jwt.md`](./jwt.md).
 
 2. **Your backend.** Mint an HS256 JWT claiming `{email, realm, exp}`
-   and hand it to the page. Examples in [`jwt.md`](./jwt.md) for Node
-   (`jose`) and Python (`pyjwt`).
+   (5–10 minutes out) with the shared key, and hand it to the page.
+   Examples in [`jwt.md`](./jwt.md) for Node (`jose`) and Python
+   (`pyjwt`).
 
-3. **Your page.** Replace `email` + `api-key` with `auth-token`:
+Also grab your **server URL** (your org URL, including scheme, no
+trailing slash, e.g. `https://acme.zulipchat.com`).
 
-    ```html
-    <zulip-chat
-        server="https://acme.zulipchat.com"
-        auth-token="<short-lived JWT you served with the page>"
-        channel="general"
-    ></zulip-chat>
-    ```
+## 4. First live embed
 
-The embed POSTs the JWT once to `/api/internal/jwt/fetch_api_key`,
-caches the returned key in closure, and uses it for subsequent calls.
-Refresh-on-401 is wired through `refreshAuthToken` on the headless
-client — see [`jwt.md`](./jwt.md#refresh-before-expiry).
+Create an HTML file anywhere you can serve static assets. Your
+backend should splice a freshly-minted JWT into `auth-token` on
+each page load:
+
+```html
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>My Zulip embed</title>
+    </head>
+    <body>
+        <h1>My product</h1>
+        <script type="module" src="https://unpkg.com/zulip-embed"></script>
+        <zulip-chat
+            server="https://acme.zulipchat.com"
+            auth-token="<short-lived JWT from your backend>"
+            channel="general"
+            topic="welcome"
+            theme="light"
+            brand-name="Acme"
+        ></zulip-chat>
+    </body>
+</html>
+```
+
+Load it in a browser. You should see the chat with live messages in
+10–15 seconds; the composer sends messages to the `welcome` topic in
+`#general` as the viewer the JWT's `email` claim resolves to.
+
+**If nothing shows up**, open DevTools → Console. The embed logs a
+`zulip-error` `CustomEvent` with a machine-readable `code`:
+
+- `unauthorized` — the JWT signature didn't verify, or its `email`
+  claim resolves to an account that doesn't exist.
+- `channel-not-subscribed` — subscribe the account to the channel.
+- `network` — the browser can't reach `server`. Check CORS, ad
+  blockers, and corporate proxies.
+- `rate-limited` — you hit Zulip's rate limits; the embed will back
+  off automatically.
+- `jwt-not-configured` — the Zulip server doesn't have `JWT_AUTH_KEYS`
+  set (or the realm in the token doesn't match). Re-check step 3.
+
+## 5. Local development without a backend
+
+If you don't have a backend to mint JWTs yet (or you're poking at
+the SDK from a Node / React Native script), `ZulipTransport` also
+accepts `{email, apiKey}` as a programmatic constructor option:
+
+```ts
+import {ZulipTransport} from "zulip-embed";
+const transport = new ZulipTransport({
+    serverUrl: "https://acme.zulipchat.com",
+    email: "embed-bot@acme.zulipchat.com",
+    apiKey: "YOUR_API_KEY_HERE",
+    scope: {channel: "general"},
+});
+```
+
+This path is **not** exposed as an HTML attribute — it only works
+when you construct the transport yourself. Use it for local scripts,
+tests, and React Native prototypes; never embed an `apiKey` into
+HTML you serve to browsers.
 
 ## 6. Check your work
 
@@ -165,8 +158,8 @@ For a typical production integration, you should be able to tick each
 of these:
 
 - [ ] The embed loads without hitting `api-key` in public HTML.
-- [ ] The account is a generic bot or a service account, not a real
-      human with broad channel access.
+- [ ] The account the JWT claims for is a generic bot or service
+      account, not a real human with broad channel access.
 - [ ] The bot is subscribed only to channels the embed should surface.
 - [ ] The host page renders with `Content-Security-Policy`
       compatible with unpkg (or a self-hosted copy of the module).

@@ -69,8 +69,7 @@ element into any HTML page.
 
 <zulip-chat
     server="https://chat.example.com"
-    email="you@example.com"
-    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    auth-token="{{ JWT from your backend — see docs/jwt.md }}"
     channel="general"
     topic="intros"
     theme="dark"
@@ -102,8 +101,7 @@ export function SupportPage() {
     return (
         <ZulipChat
             server="https://chat.example.com"
-            email="you@example.com"
-            apiKey={process.env.NEXT_PUBLIC_ZULIP_KEY!}
+            authToken={await fetchZulipAuthToken()}
             channel="general"
             theme="dark"
             brandName="Acme Support"
@@ -126,8 +124,7 @@ export function InboxPane() {
         () =>
             new ZulipTransport({
                 serverUrl: "https://chat.example.com",
-                email: "bot@example.com",
-                apiKey: process.env.NEXT_PUBLIC_ZULIP_KEY!,
+                authToken: await fetchZulipAuthToken(),
                 scope: {channel: "general"},
             }),
         [],
@@ -170,9 +167,8 @@ npm i zulip-embed zulip-embed-react-native
 import {ZulipChatScreen, ZulipTransport, DARK_THEME} from "zulip-embed-react-native";
 
 const transport = new ZulipTransport({
-    server: "https://chat.example.com",
-    email: "you@example.com",
-    apiKey: process.env.ZULIP_KEY!,
+    serverUrl: "https://chat.example.com",
+    authToken: process.env.ZULIP_AUTH_TOKEN!,
     scope: {channel: "general"},
 });
 
@@ -300,9 +296,7 @@ import "zulip-embed/channel-list";
 | `demo`         | —         | Use an in-memory transport instead of a real Zulip server.                                                                                                                 |
 | `snapshot-url` | —         | Load a pre-fetched JSON snapshot of messages instead of opening a live event queue. Implies read-only; no credentials in the browser. See [Snapshot mode](#snapshot-mode). |
 | `server`       | live mode | Base URL of the Zulip server (e.g. `https://chat.zulip.org`).                                                                                                              |
-| `email`        | live mode | Account email or bot email.                                                                                                                                                |
-| `api-key`      | live mode | API key for that account. Prefer `auth-token` in production — see [`docs/jwt.md`](./docs/jwt.md).                                                                          |
-| `auth-token`   | live mode | Short-lived JWT the SDK exchanges once for a scoped API key. Host page never sees the key.                                                                                 |
+| `auth-token`   | live mode | Short-lived JWT the SDK exchanges once for a scoped API key. Host page never sees the key. See [`docs/jwt.md`](./docs/jwt.md) for the exchange.                            |
 | `channel`      | yes       | Channel name to scope the feed. Defaults to `general`.                                                                                                                     |
 | `topic`        | no        | Topic inside the channel. Omit for a channel-wide view.                                                                                                                    |
 | `theme`        | no        | `light` (default) or `dark`.                                                                                                                                               |

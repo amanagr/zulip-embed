@@ -66,9 +66,8 @@ Peer deps: `react >= 17`, `react-native >= 0.70`, `zulip-embed >= 0.8.0`.
 import {ZulipChatScreen, ZulipTransport, DARK_THEME} from "zulip-embed-react-native";
 
 const transport = new ZulipTransport({
-    server: "https://chat.example.com",
-    email: "you@example.com",
-    apiKey: process.env.ZULIP_KEY!,
+    serverUrl: "https://chat.example.com",
+    authToken: process.env.ZULIP_AUTH_TOKEN!,
     scope: {channel: "general"},
 });
 

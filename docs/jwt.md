@@ -89,5 +89,5 @@ keeps the tab open past the token lifetime.
   server matches the `key` in `JWT_AUTH_KEYS`, and that the `realm`
   claim is present.
 - **No network call to `/api/internal/jwt/fetch_api_key`.** The embed
-  only hits it when `auth-token` is non-empty and `api-key` is unset.
-  Remove the legacy `api-key` attribute if both are present.
+  only hits it when `auth-token` is non-empty. Check that the
+  attribute is set and the JWT is not empty.

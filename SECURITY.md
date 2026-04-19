@@ -168,13 +168,16 @@ embed assumes nothing about the trustworthiness of the HTML it receives.
 
 ## Credential handling
 
-The Web Component exposes API credentials as HTML attributes
-(`server`, `email`, `api-key`). This is convenient for low-privilege
-bot-account integrations, but it means:
+The Web Component accepts a short-lived JWT via the `auth-token`
+attribute (`server`, `auth-token`). The token is exchanged in the
+browser for a per-user Zulip API key through
+`/api/internal/jwt/fetch_api_key` and held in memory for the life of
+the page. This means:
 
-- **Any script on the host page can read them.** Do not pass personal
-  Zulip credentials — provision a dedicated bot account per embed with
-  access only to the channels it needs.
+- **Any script on the host page can read the JWT while it is on the
+  DOM.** Mint tokens with a short expiry and only hand them to first-
+  party pages you trust; rotate the `JWT_AUTH_KEYS` signing secret if a
+  page compromise is suspected.
 - **Credentials leave your page only in the Authorization header on
   requests to `serverUrl`.** We refuse to ship them to anything other than
   `http(s)://` (Flutter package enforces the same rule) and warn when the
@@ -183,9 +186,10 @@ bot-account integrations, but it means:
   never serialized back into DOM.**
 
 The headless SDK (`new ZulipClient({transport: new ZulipTransport(...)})`)
-lets integrators keep the API key in memory only and pass it in via JS,
-avoiding the DOM-attribute exposure entirely. Prefer that route for any
-deployment where the host page runs untrusted third-party script.
+lets integrators keep the API key (or JWT) in memory only and pass it
+in via JS, avoiding the DOM-attribute exposure entirely. Prefer that
+route for any deployment where the host page runs untrusted third-party
+script.
 
 ## Snapshot mode
 

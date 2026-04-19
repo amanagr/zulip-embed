@@ -40,9 +40,9 @@ org's `JWT_AUTH_KEYS` setting. Sign an HS256 JWT with
 return it to the browser on page load or through a `/session` endpoint.
 See [Zulip JWT docs](https://zulip.com/api/) for key provisioning.
 
-The `api-key` attribute still works for local development but logs a
-deprecation warning at mount. It is scheduled for removal in
-`zulip-embed@1.0.0`.
+The `api-key` attribute was removed in `zulip-embed@1.0.0` — consumers
+on 0.x that were still using it must migrate before upgrading. See the
+0.x → 1.0 migration guide for the one-file change.
 
 ## 2. Narrow on `Message.type` before accessing channel fields
 

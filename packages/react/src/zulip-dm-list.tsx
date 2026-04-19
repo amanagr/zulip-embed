@@ -16,8 +16,6 @@ export interface DmSelectedDetail {
 
 export interface ZulipDmListProps {
     server?: string;
-    email?: string;
-    apiKey?: string;
     authToken?: string;
     demo?: boolean;
     snapshotUrl?: string;
@@ -40,16 +38,12 @@ export const ZulipDmList = forwardRef<ZulipDmListElement, ZulipDmListProps>(
             const el = innerRef.current;
             if (!el) return;
             applyAttr(el, "server", props.server);
-            applyAttr(el, "email", props.email);
-            applyAttr(el, "api-key", props.apiKey);
             applyAttr(el, "auth-token", props.authToken);
             applyAttr(el, "snapshot-url", props.snapshotUrl);
             applyAttr(el, "theme", props.theme);
             applyBool(el, "demo", props.demo);
         }, [
             props.server,
-            props.email,
-            props.apiKey,
             props.authToken,
             props.demo,
             props.snapshotUrl,

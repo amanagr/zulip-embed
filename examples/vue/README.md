@@ -58,8 +58,7 @@ Swap the attributes in `src/App.vue`:
 ```vue
 <zulip-chat
     server="https://chat.example.com"
-    email="you@example.com"
-    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    auth-token="{{ JWT from your backend }}"
     channel="general"
     topic="welcome"
     theme="light"
@@ -68,9 +67,8 @@ Swap the attributes in `src/App.vue`:
 ></zulip-chat>
 ```
 
-For production, prefer exchanging a short-lived JWT server-side and
-passing it as `auth-token` — that way no long-lived `api-key` reaches
-the browser.
+`auth-token` is a JWT minted by your backend — see
+[`docs/jwt.md`](../../docs/jwt.md) for the exchange.
 
 ## Learn more
 

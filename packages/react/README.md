@@ -24,8 +24,7 @@ export function SupportPage() {
   return (
     <ZulipChat
       server="https://chat.example.com"
-      email="you@example.com"
-      apiKey={import.meta.env.VITE_ZULIP_KEY}
+      authToken={import.meta.env.VITE_ZULIP_AUTH_TOKEN}
       channel="general"
       topic="welcome"
       theme="light"

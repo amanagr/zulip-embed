@@ -249,10 +249,12 @@ most load-bearing invariants:
   `javascript:` / `data:` / protocol-relative schemes, with explicit
   handling for the CSS `url(...)` smuggling vectors (`image-set`,
   `cross-fade`, `src`, `paint`, `element`).
-- The `api-key` attribute is **still** accepted on `<zulip-chat>` for
-  dev workflows but a deprecation warning fires on mount and it is
-  scheduled for removal in 1.0. Production deployments should migrate
-  to `auth-token` — see [`jwt.md`](./jwt.md).
+- `<zulip-chat>` only accepts `auth-token` for live mode — the
+  legacy `email` + `api-key` attributes were removed in 1.0.0.
+  Programmatic `ZulipTransport` consumers can still pass
+  `{email, apiKey}` (handy for Node / React Native / Flutter tests
+  and local dev); only the HTML-attribute surface was trimmed. See
+  [`jwt.md`](./jwt.md) for the server-side setup.
 
 ## 8. Flutter parity
 

@@ -15,13 +15,13 @@ nothing leaves your machine.
 
 ## Connect to a real server
 
-Remove `demo` and supply the live-mode attributes:
+Remove `demo` and supply a `server` plus an `auth-token` JWT minted
+by your backend (see [`docs/jwt.md`](../../docs/jwt.md)):
 
 ```html
 <zulip-chat
     server="https://chat.example.com"
-    email="you@example.com"
-    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    auth-token="{{ JWT from your backend }}"
     channel="general"
     topic="welcome"
     theme="light"
@@ -30,9 +30,8 @@ Remove `demo` and supply the live-mode attributes:
 ></zulip-chat>
 ```
 
-`server`, `email`, and `api-key` are all required in live mode. Prefer
-a JWT-based `auth-token` if you can exchange one server-side —
-shipping a long-lived `api-key` to anonymous browsers is risky.
+The SDK exchanges the JWT once for a scoped API key — no long-lived
+credentials touch the page.
 
 ## Production: pin and verify the script
 

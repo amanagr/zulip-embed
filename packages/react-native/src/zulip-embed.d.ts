@@ -261,8 +261,17 @@ declare module "zulip-embed" {
         getCurrentUser(): Promise<User>;
     }
 
+    export interface ZulipTransportOptions {
+        serverUrl: string;
+        scope: ScopeFilter;
+        historyLimit?: number;
+        email?: string;
+        apiKey?: string;
+        authToken?: string;
+    }
+
     export class ZulipTransport implements Transport {
-        constructor(options: {server: string; email: string; apiKey: string; scope: ScopeFilter});
+        constructor(options: ZulipTransportOptions);
         connect(onEvent: ZulipEventListener): Promise<void>;
         close(): Promise<void>;
         getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;

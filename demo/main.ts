@@ -13,30 +13,26 @@ function requireElement<T extends HTMLElement>(selector: string): T {
 const live = requireElement<ZulipChatElement>("#live-chat");
 const connectButton = requireElement<HTMLButtonElement>("#connect");
 const serverInput = requireElement<HTMLInputElement>("#server");
-const emailInput = requireElement<HTMLInputElement>("#email");
-const apiKeyInput = requireElement<HTMLInputElement>("#api-key");
+const authTokenInput = requireElement<HTMLInputElement>("#auth-token");
 const channelInput = requireElement<HTMLInputElement>("#channel");
 const topicInput = requireElement<HTMLInputElement>("#topic");
 const themeSelect = requireElement<HTMLSelectElement>("#theme");
 
 connectButton.addEventListener("click", () => {
     const server = serverInput.value.trim();
-    const email = emailInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
+    const authToken = authTokenInput.value.trim();
     const channel = channelInput.value.trim() || "general";
     const topic = topicInput.value.trim();
     const theme = themeSelect.value;
 
-    if (server === "" || email === "" || apiKey === "") {
+    if (server === "" || authToken === "") {
         live.setAttribute("demo", "");
         live.removeAttribute("server");
-        live.removeAttribute("email");
-        live.removeAttribute("api-key");
+        live.removeAttribute("auth-token");
     } else {
         live.removeAttribute("demo");
         live.setAttribute("server", server);
-        live.setAttribute("email", email);
-        live.setAttribute("api-key", apiKey);
+        live.setAttribute("auth-token", authToken);
     }
     live.setAttribute("channel", channel);
     if (topic === "") {
@@ -176,8 +172,7 @@ if (pgChat) {
             `<zulip-chat`,
             `  ${attrs.join("\n  ")}`,
             `  server="https://chat.example.com"`,
-            `  email="you@example.com"`,
-            `  api-key="..."`,
+            `  auth-token="<short-lived JWT from your backend>"`,
             `  style="`,
             styleLines,
             `  "`,

@@ -6,8 +6,6 @@ const OBSERVED_ATTRIBUTES = [
     "demo",
     "snapshot-url",
     "server",
-    "email",
-    "api-key",
     "auth-token",
     "message-id",
     "dismissible",
@@ -18,8 +16,6 @@ const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "demo",
     "snapshot-url",
     "server",
-    "email",
-    "api-key",
     "auth-token",
     "message-id",
 ]);
@@ -312,8 +308,6 @@ export class ZulipAnnouncementElement extends HTMLElement {
         }
         const server = this.getAttribute("server");
         const authToken = this.getAttribute("auth-token");
-        const email = this.getAttribute("email");
-        const apiKey = this.getAttribute("api-key");
         if (!server) {
             throw new Error(
                 'Live mode requires a "server" attribute. Add the "demo" attribute to preview without a server.',
@@ -323,14 +317,8 @@ export class ZulipAnnouncementElement extends HTMLElement {
         if (authToken && authToken !== "") {
             return new ZulipTransport({serverUrl: server, authToken, scope});
         }
-        if (email && apiKey) {
-            console.warn(
-                "[zulip-announcement] api-key auth ships a long-lived credential to the browser. Prefer auth-token (JWT) for production.",
-            );
-            return new ZulipTransport({serverUrl: server, email, apiKey, scope});
-        }
         throw new Error(
-            'Live mode requires an "auth-token" attribute (preferred) or "email" + "api-key". Add the "demo" attribute to preview without a server.',
+            'Live mode requires an "auth-token" attribute. Add the "demo" attribute to preview without a server. See docs/jwt.md for the auth-token flow.',
         );
     }
 

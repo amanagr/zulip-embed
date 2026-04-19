@@ -43,13 +43,13 @@ ESM scripting).
 
 ## Connect to a real server
 
-Remove `demo` and supply live-mode attributes:
+Remove `demo` and supply a `server` plus an `auth-token` JWT minted
+by your backend (see [`docs/jwt.md`](../../docs/jwt.md)):
 
 ```html
 <zulip-chat
     server="https://chat.example.com"
-    email="you@example.com"
-    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    auth-token="{{ JWT from your backend }}"
     channel="general"
     topic="welcome"
     theme="dark"

@@ -5,7 +5,7 @@
 //
 // `demo` disables every network path and routes through an in-memory
 // seeded transport with an echo bot. Remove it and pass
-// `server` / `email` / `apiKey` for a live connection.
+// `server` / `authToken` for a live connection (see docs/jwt.md).
 
 import {ZulipChat} from "zulip-embed-react";
 
@@ -66,8 +66,8 @@ export function App() {
                     color: "#6b7280",
                 }}
             >
-                Drop <code>demo</code> and add <code>server</code>,{" "}
-                <code>email</code>, and <code>apiKey</code> for live mode.
+                Drop <code>demo</code> and add <code>server</code> and{" "}
+                <code>authToken</code> for live mode.
             </p>
         </main>
     );

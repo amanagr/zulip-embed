@@ -4,6 +4,9 @@ Per-release upgrade notes for `zulip-embed` and its sibling packages.
 Each section covers the change, the before/after shape, and any host
 code you'll need to touch.
 
+Current release: [`0.9 → 1.0`](#09--10) — the `api-key` attribute is
+removed from every custom element in favor of `auth-token` JWTs.
+
 Older per-release migrations:
 
 - [`docs/migration-0.2.md`](./docs/migration-0.2.md) — 0.1 → 0.2:
@@ -13,6 +16,72 @@ Older per-release migrations:
 
 See [`CHANGELOG.md`](./CHANGELOG.md) for the full release log and
 [`docs/RELEASING.md`](./docs/RELEASING.md) for the release workflow.
+
+## 0.9 → 1.0
+
+**One breaking change: the legacy `email` + `api-key` attributes are
+removed from every custom element.** The `auth-token` JWT handoff
+(shipped in 0.2, recommended since) is now the only supported way to
+authenticate from an HTML attribute. Programmatic `ZulipTransport`
+consumers are **not** affected — the `{email, apiKey}` constructor
+option stays as a headless/local-dev path.
+
+### What to change
+
+**Before (0.9).**
+
+```html
+<zulip-chat
+    server="https://chat.example.com"
+    email="bot@example.com"
+    api-key="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    channel="general"
+></zulip-chat>
+```
+
+**After (1.0).** Your backend mints a short-lived JWT per viewer; the
+SDK exchanges it for a scoped API key behind the scenes.
+
+```html
+<zulip-chat
+    server="https://chat.example.com"
+    auth-token="<short-lived JWT>"
+    channel="general"
+></zulip-chat>
+```
+
+The same removal applies to every custom element that takes live-mode
+credentials: `<zulip-channel-list>`, `<zulip-topic-list>`,
+`<zulip-dm-list>`, `<zulip-announcement>`. The React wrappers
+(`zulip-embed-react`) drop the matching `email` / `apiKey` props too —
+replace them with `authToken`.
+
+See [`docs/jwt.md`](./docs/jwt.md) for the server-side exchange
+(Zulip `JWT_AUTH_KEYS` config + Node/Python signing snippets) and
+[`docs/ONBOARDING.md`](./docs/ONBOARDING.md) for the full zero-to-live
+walkthrough.
+
+### Programmatic `ZulipTransport` is unchanged
+
+The TS `ZulipTransport` constructor still accepts both credential
+paths — useful for Node scripts, tests, React Native prototypes, and
+any other surface where you're not shipping HTML to an anonymous
+browser:
+
+```ts
+new ZulipTransport({
+    serverUrl: "https://chat.example.com",
+    email: "bot@example.com",
+    apiKey: process.env.ZULIP_KEY!,
+    scope: {channel: "general"},
+});
+```
+
+### Nothing else changed
+
+No type changes, no event changes, no transport-method signature
+changes. If you were already on `auth-token` in 0.9, upgrading to 1.0
+is a no-op.
 
 ## 0.7 → 0.8
 

@@ -4,6 +4,48 @@ All notable changes to `zulip-embed` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to semantic versioning.
 
+## 1.0.0 — 2026-04-19
+
+First stable release. The API surface is frozen: the attribute set on
+every custom element, the `Transport` / `ZulipClient` types, the event
+taxonomy, and the React / React Native / Flutter bindings are all under
+semver from here on. The only behavior change vs. 0.9 is the removal
+of a legacy auth path; see below.
+
+### Breaking
+
+- **`email` and `api-key` attributes removed from every custom element.**
+  `<zulip-chat>`, `<zulip-channel-list>`, `<zulip-topic-list>`,
+  `<zulip-dm-list>`, and `<zulip-announcement>` no longer observe
+  `email` or `api-key`. Live mode now requires `auth-token`
+  (shipped in 0.2, recommended since). The React wrappers
+  (`zulip-embed-react`) drop the matching `email` / `apiKey` props.
+  Programmatic `ZulipTransport` construction is **unaffected** —
+  `{email, apiKey}` and `{authToken}` are both still valid
+  `ZulipTransportOptions`. See
+  [`MIGRATION.md`](./MIGRATION.md#09--10) for the one-file change.
+
+### Changed
+
+- **Onboarding + docs repointed at `auth-token`.** The root README,
+  every `examples/*/README.md`, the React / Next.js / Angular / Vue /
+  Svelte / vanilla example source, and `docs/ONBOARDING.md` now show
+  the JWT handoff as the primary live-mode snippet. The legacy
+  `api-key` attribute is no longer documented anywhere on the
+  attribute surface.
+
+### Package versions
+
+- `zulip-embed` → `1.0.0`
+- `zulip-embed-react` → `1.0.0`
+- `zulip-embed-react-native` → `1.0.0-alpha` (RN package stays on
+  the alpha track until native feature parity ships; see
+  [`packages/react-native/README.md`](./packages/react-native/README.md))
+- `zulip_embed` (Flutter) → unchanged (still on its own pre-`1.0`
+  pub.dev track; no source changes, since Flutter's programmatic
+  `apiKey` constructor arg mirrors the retained TS programmatic
+  option)
+
 ## 0.9.0 — 2026-04-19
 
 Sprint 5 release. Unblocks two 1.0-track surfaces: `startAgentReply`

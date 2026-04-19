@@ -1,6 +1,6 @@
 {
   "name": "zulip-embed-react",
-  "version": "0.8.0",
+  "version": "1.0.0",
   "description": "React wrapper for the Zulip Embed Web Component.",
   "license": "Apache-2.0",
   "type": "module",
@@ -24,7 +24,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "zulip-embed": ">=0.8.0",
+    "zulip-embed": ">=1.0.0",
     "react": ">=17.0.0"
   },
   "devDependencies": {

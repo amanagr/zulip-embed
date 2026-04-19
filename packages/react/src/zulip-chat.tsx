@@ -24,13 +24,10 @@ import type {
 } from "zulip-embed";
 
 export interface ZulipChatProps {
-    // Live-connection credentials. Leave server/email/apiKey undefined
-    // and pass `demo` or `snapshotUrl` to run offline.
+    // Live-connection config. Leave server/authToken undefined and pass
+    // `demo` or `snapshotUrl` to run offline. See docs/jwt.md for the
+    // auth-token exchange details.
     server?: string;
-    email?: string;
-    apiKey?: string;
-    // JWT for server-side handoff. Preferred over api-key for live mode;
-    // see docs/jwt.md for the exchange details.
     authToken?: string;
 
     // Scope: channel is required for live mode; topic is optional —
@@ -88,8 +85,6 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             const el = innerRef.current;
             if (!el) return;
             applyAttr(el, "server", props.server);
-            applyAttr(el, "email", props.email);
-            applyAttr(el, "api-key", props.apiKey);
             applyAttr(el, "auth-token", props.authToken);
             applyAttr(el, "channel", props.channel);
             applyAttr(el, "topic", props.topic);
@@ -116,8 +111,6 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             applyBool(el, "read-only", props.readOnly);
         }, [
             props.server,
-            props.email,
-            props.apiKey,
             props.authToken,
             props.channel,
             props.topic,

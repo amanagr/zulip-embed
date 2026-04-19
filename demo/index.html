@@ -1432,8 +1432,7 @@
 
 <span class="tag">&lt;zulip-chat</span>
   <span class="attr">server</span>=<span class="str">"https://chat.example.com"</span>
-  <span class="attr">email</span>=<span class="str">"you@example.com"</span>
-  <span class="attr">api-key</span>=<span class="str">"..."</span>
+  <span class="attr">auth-token</span>=<span class="str">"&lt;short-lived JWT from your backend&gt;"</span>
   <span class="attr">channel</span>=<span class="str">"general"</span>
   <span class="attr">topic</span>=<span class="str">"welcome"</span>
   <span class="attr">theme</span>=<span class="str">"dark"</span>
@@ -1448,8 +1447,7 @@
   <span class="kw">return</span> (
     <span class="tag">&lt;ZulipChat</span>
       <span class="attr">server</span>=<span class="str">"https://chat.example.com"</span>
-      <span class="attr">email</span>=<span class="str">"you@example.com"</span>
-      <span class="attr">apiKey</span>={<span class="attr">import</span>.meta.env.VITE_ZULIP_KEY}
+      <span class="attr">authToken</span>={<span class="attr">await</span> fetchZulipAuthToken()}
       <span class="attr">channel</span>=<span class="str">"general"</span>
       <span class="attr">theme</span>=<span class="str">"dark"</span>
       <span class="attr">brandName</span>=<span class="str">"Acme Support"</span>
@@ -1464,9 +1462,8 @@
 } <span class="kw">from</span> <span class="str">"zulip-embed-react-native"</span>;
 
 <span class="kw">const</span> transport = <span class="kw">new</span> <span class="attr">ZulipTransport</span>({
-  server: <span class="str">"https://chat.example.com"</span>,
-  email: <span class="str">"you@example.com"</span>,
-  apiKey: process.env.ZULIP_KEY!,
+  serverUrl: <span class="str">"https://chat.example.com"</span>,
+  authToken: process.env.ZULIP_AUTH_TOKEN!,
   scope: { channel: <span class="str">"general"</span> },
 });
 
@@ -1503,9 +1500,8 @@ ZulipChat(
                     ><code id="snippet-headless"><span class="kw">import</span> {ZulipClient, ZulipTransport} <span class="kw">from</span> <span class="str">"zulip-embed"</span>;
 
 <span class="kw">const</span> transport = <span class="kw">new</span> <span class="attr">ZulipTransport</span>({
-  server: <span class="str">"https://chat.example.com"</span>,
-  email: <span class="str">"you@example.com"</span>,
-  apiKey: process.env.ZULIP_KEY!,
+  serverUrl: <span class="str">"https://chat.example.com"</span>,
+  authToken: <span class="kw">await</span> fetchZulipAuthToken(),
   scope: { channel: <span class="str">"general"</span> },
 });
 
@@ -1654,12 +1650,8 @@ client.subscribe(() =&gt; render(client.getState().messages));
                         <input id="server" type="url" placeholder="https://chat.example.com" />
                     </div>
                     <div class="field">
-                        <label for="email">Email</label>
-                        <input id="email" type="email" placeholder="you@example.com" />
-                    </div>
-                    <div class="field">
-                        <label for="api-key">API key</label>
-                        <input id="api-key" type="password" placeholder="zulip API key" />
+                        <label for="auth-token">Auth token (JWT)</label>
+                        <input id="auth-token" type="password" placeholder="short-lived JWT from your backend" />
                     </div>
                     <div class="field">
                         <label for="channel">Channel</label>
@@ -1715,7 +1707,7 @@ client.subscribe(() =&gt; render(client.getState().messages));
                 <div class="snippet" data-install-panel="script"
                     ><button class="copy-btn" data-copy-target="install-script">Copy</button
                     ><code id="install-script"><span class="tag">&lt;script</span> <span class="attr">type</span>=<span class="str">"module"</span> <span class="attr">src</span>=<span class="str">"https://unpkg.com/zulip-embed"</span><span class="tag">&gt;&lt;/script&gt;</span>
-<span class="tag">&lt;zulip-chat</span> <span class="attr">server</span>=<span class="str">"..."</span> <span class="attr">email</span>=<span class="str">"..."</span> <span class="attr">api-key</span>=<span class="str">"..."</span> <span class="attr">channel</span>=<span class="str">"general"</span><span class="tag">&gt;&lt;/zulip-chat&gt;</span></code></div
+<span class="tag">&lt;zulip-chat</span> <span class="attr">server</span>=<span class="str">"..."</span> <span class="attr">auth-token</span>=<span class="str">"..."</span> <span class="attr">channel</span>=<span class="str">"general"</span><span class="tag">&gt;&lt;/zulip-chat&gt;</span></code></div
                 >
                 <div class="snippet" data-install-panel="npm" hidden
                     ><button class="copy-btn" data-copy-target="install-npm">Copy</button
