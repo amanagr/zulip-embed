@@ -45,15 +45,15 @@ import "zulip-embed/channel-list"; // registers <zulip-channel-list>
 
 Subpaths wired in `package.json` `exports`:
 
-| Subpath                    | Registers                                |
-| -------------------------- | ---------------------------------------- |
-| `zulip-embed/chat`         | `<zulip-chat>`                           |
-| `zulip-embed/channel-list` | `<zulip-channel-list>`                   |
-| `zulip-embed/topic-list`   | `<zulip-topic-list>`                     |
-| `zulip-embed/announcement` | `<zulip-announcement>` (new in 0.8)      |
-| `zulip-embed/agent`        | `startAgentReply` + `AgentReplyHandle`   |
-| `zulip-embed/demo`         | `DemoTransport`, `SnapshotTransport`     |
-| `zulip-embed/all`          | register-everything shim (same as `.`)   |
+| Subpath                    | Registers                              |
+| -------------------------- | -------------------------------------- |
+| `zulip-embed/chat`         | `<zulip-chat>`                         |
+| `zulip-embed/channel-list` | `<zulip-channel-list>`                 |
+| `zulip-embed/topic-list`   | `<zulip-topic-list>`                   |
+| `zulip-embed/announcement` | `<zulip-announcement>` (new in 0.8)    |
+| `zulip-embed/agent`        | `startAgentReply` + `AgentReplyHandle` |
+| `zulip-embed/demo`         | `DemoTransport`, `SnapshotTransport`   |
+| `zulip-embed/all`          | register-everything shim (same as `.`) |
 
 Per-subpath gzip budgets are documented in
 [`README.md#bundle-subpaths`](./README.md#bundle-subpaths) and
@@ -74,10 +74,7 @@ Opt in by importing the subpath entry and dropping the tag onto the
 page:
 
 ```html
-<script
-    type="module"
-    src="./node_modules/zulip-embed/dist/entries/announcement.js"
-></script>
+<script type="module" src="./node_modules/zulip-embed/dist/entries/announcement.js"></script>
 
 <zulip-announcement
     server="https://chat.example.com"
@@ -91,21 +88,19 @@ page:
 Attributes mirror the credential attributes on `<zulip-chat>`
 (`server`, `email`, `api-key`, or `auth-token` in production) plus:
 
-| Attribute    | Required | Description                                                                  |
-| ------------ | -------- | ---------------------------------------------------------------------------- |
-| `message-id` | yes      | Zulip message id to fetch and render.                                        |
-| `dismissible`| no       | `true` (default) or `false`. When `false`, the close button is not rendered. |
-| `theme`      | no       | `light` (default) or `dark`.                                                 |
+| Attribute     | Required | Description                                                                  |
+| ------------- | -------- | ---------------------------------------------------------------------------- |
+| `message-id`  | yes      | Zulip message id to fetch and render.                                        |
+| `dismissible` | no       | `true` (default) or `false`. When `false`, the close button is not rendered. |
+| `theme`       | no       | `light` (default) or `dark`.                                                 |
 
 Listen for dismissal on the host:
 
 ```js
-document
-    .querySelector("zulip-announcement")
-    .addEventListener("announcement-dismissed", (event) => {
-        // event.detail.messageId — the id that was dismissed.
-        localStorage.setItem(`ann-dismissed-${event.detail.messageId}`, "1");
-    });
+document.querySelector("zulip-announcement").addEventListener("announcement-dismissed", (event) => {
+    // event.detail.messageId — the id that was dismissed.
+    localStorage.setItem(`ann-dismissed-${event.detail.messageId}`, "1");
+});
 ```
 
 Flutter gets the same widget as `ZulipAnnouncement` in

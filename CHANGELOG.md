@@ -185,8 +185,8 @@ Sprint 1 release: auth + types foundation.
 - **`ErrorEvent.code: ErrorCode` is now required.** Listeners that only
   read `event.error` keep working, but anyone routing on the event shape
   should switch on `event.code`. Codes: `"unauthorized" |
-  "channel-not-subscribed" | "network" | "rate-limited" |
-  "jwt-not-configured" | "unknown"`.
+"channel-not-subscribed" | "network" | "rate-limited" |
+"jwt-not-configured" | "unknown"`.
 
 ### Added
 
@@ -204,7 +204,7 @@ Sprint 1 release: auth + types foundation.
   implement it; `SnapshotTransport` rejects (anonymous reads have no
   viewer).
 - **`ConnectionEvent.status === "reconnecting"`** with `{attempt,
-  delayMs, reason}`. Emitted by `ZulipTransport.pollLoop` with
+delayMs, reason}`. Emitted by `ZulipTransport.pollLoop` with
   decorrelated-jitter backoff (1s base, 30s cap). Once the event queue
   recovers a `"connected"` event is dispatched so UI banners can clear.
 - **HTTP error classification.** 401 → `unauthorized`; 403 + "Not

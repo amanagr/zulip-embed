@@ -12,12 +12,12 @@ to point it at a real server.
 
 ## Examples
 
-| Folder                                 | What it shows                                                                                    |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [`vanilla-cdn/`](./vanilla-cdn/)       | Plain HTML file that loads `zulip-embed.iife.js` from unpkg. No build step, no npm install.      |
-| [`vanilla-esm/`](./vanilla-esm/)       | Plain HTML file using an ESM import map → `zulip-embed/chat`. Right choice if you want per-entry imports without a bundler. |
-| [`react/`](./react/)                   | React + Vite minimal app wiring `<ZulipChat>` from `zulip-embed-react`.                         |
-| [`nextjs/`](./nextjs/)                 | Next.js App Router app that mounts the component inside a `"use client"` wrapper (SSR-safe).     |
+| Folder                           | What it shows                                                                                                               |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| [`vanilla-cdn/`](./vanilla-cdn/) | Plain HTML file that loads `zulip-embed.iife.js` from unpkg. No build step, no npm install.                                 |
+| [`vanilla-esm/`](./vanilla-esm/) | Plain HTML file using an ESM import map → `zulip-embed/chat`. Right choice if you want per-entry imports without a bundler. |
+| [`react/`](./react/)             | React + Vite minimal app wiring `<ZulipChat>` from `zulip-embed-react`.                                                     |
+| [`nextjs/`](./nextjs/)           | Next.js App Router app that mounts the component inside a `"use client"` wrapper (SSR-safe).                                |
 
 ## Demo mode — how it works
 

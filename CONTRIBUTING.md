@@ -15,17 +15,17 @@ pnpm dev              # live demo at http://localhost:5173
 
 Where things live:
 
-| Path                      | What it is                                                    |
-| ------------------------- | ------------------------------------------------------------- |
-| `src/`                    | `zulip-embed` — the Web Components and headless TypeScript SDK |
-| `src/entries/`            | Subpath-entry files (`chat`, `channel-list`, `topic-list`, …) |
-| `tests/`                  | Vitest suite for the root SDK                                 |
-| `packages/react/`         | `zulip-embed-react` — JSX wrappers + `useZulipChat` hook      |
-| `packages/react-native/`  | `zulip-embed-react-native` — RN alpha preview                 |
-| `packages/flutter/`       | `zulip_embed` — Flutter widgets + transport                   |
-| `demo/`                   | Landing page + playground (what ships to GitHub Pages)        |
-| `scripts/`                | CI helpers (bundle-size checker, snapshot fetchers, release)  |
-| `docs/`                   | Long-form docs: onboarding, architecture, JWT, migrations     |
+| Path                     | What it is                                                     |
+| ------------------------ | -------------------------------------------------------------- |
+| `src/`                   | `zulip-embed` — the Web Components and headless TypeScript SDK |
+| `src/entries/`           | Subpath-entry files (`chat`, `channel-list`, `topic-list`, …)  |
+| `tests/`                 | Vitest suite for the root SDK                                  |
+| `packages/react/`        | `zulip-embed-react` — JSX wrappers + `useZulipChat` hook       |
+| `packages/react-native/` | `zulip-embed-react-native` — RN alpha preview                  |
+| `packages/flutter/`      | `zulip_embed` — Flutter widgets + transport                    |
+| `demo/`                  | Landing page + playground (what ships to GitHub Pages)         |
+| `scripts/`               | CI helpers (bundle-size checker, snapshot fetchers, release)   |
+| `docs/`                  | Long-form docs: onboarding, architecture, JWT, migrations      |
 
 If you're touching the transport layer, the render pipeline, or the
 event loop, read [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)

@@ -15,12 +15,12 @@ import maps). That's all.
 `zulip-embed` is published as an ESM package with several entry
 points:
 
-| Entry                    | Registers                         |
-| ------------------------ | --------------------------------- |
-| `zulip-embed`            | (index) — all custom elements     |
-| `zulip-embed/chat`       | `<zulip-chat>`                    |
-| `zulip-embed/channel-list` | `<zulip-channel-list>`          |
-| `zulip-embed/topic-list` | `<zulip-topic-list>`              |
+| Entry                      | Registers                     |
+| -------------------------- | ----------------------------- |
+| `zulip-embed`              | (index) — all custom elements |
+| `zulip-embed/chat`         | `<zulip-chat>`                |
+| `zulip-embed/channel-list` | `<zulip-channel-list>`        |
+| `zulip-embed/topic-list`   | `<zulip-topic-list>`          |
 
 With an import map, your HTML can say `import "zulip-embed/chat"`
 exactly the way a bundled app would — but the browser resolves each

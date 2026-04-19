@@ -1,0 +1,8 @@
+node_modules
+dist
+site
+coverage
+.vite
+.claude
+packages/*/node_modules
+packages/*/dist

@@ -24,12 +24,12 @@ When you file a report, please include:
 
 ### Response expectations
 
-| Stage                             | Target                                    |
-| --------------------------------- | ----------------------------------------- |
-| Acknowledge receipt               | within **72 hours**                       |
-| Initial triage + severity call    | within **7 days**                         |
-| Patch shipped — critical severity | within **30 days** of acknowledgement     |
-| Patch shipped — other severities  | within **90 days** of acknowledgement     |
+| Stage                             | Target                                |
+| --------------------------------- | ------------------------------------- |
+| Acknowledge receipt               | within **72 hours**                   |
+| Initial triage + severity call    | within **7 days**                     |
+| Patch shipped — critical severity | within **30 days** of acknowledgement |
+| Patch shipped — other severities  | within **90 days** of acknowledgement |
 
 "Critical" means something like unauthenticated XSS from default
 Zulip-rendered content, credential exfiltration, or a sanitizer bypass
@@ -110,11 +110,11 @@ security patches, and the **previous minor** with security patches
 only for 90 days after a new minor ships. Anything older is
 unsupported — please upgrade.
 
-| Version line       | Status                                        | Security patches |
-| ------------------ | --------------------------------------------- | ---------------- |
-| `1.x` (latest)     | Supported — features, fixes, security patches | Yes              |
-| `0.8.x` (previous) | Security patches only, until 90 days after `1.0`'s GA | Yes      |
-| `< 0.8`            | Unsupported                                   | No               |
+| Version line       | Status                                                | Security patches |
+| ------------------ | ----------------------------------------------------- | ---------------- |
+| `1.x` (latest)     | Supported — features, fixes, security patches         | Yes              |
+| `0.8.x` (previous) | Security patches only, until 90 days after `1.0`'s GA | Yes              |
+| `< 0.8`            | Unsupported                                           | No               |
 
 Until `1.0` ships, `0.8.x` is the "latest" line and the pre-1.0
 releases before it (`0.7` and earlier) are unsupported. Once `1.0`
@@ -127,15 +127,15 @@ updates where applicable.
 
 ## Threat model at a glance
 
-| Surface | Threat | Mitigation |
-| --- | --- | --- |
-| Zulip message HTML | Stored XSS via rendered content | DOMPurify with strict allow-list (tags, attributes, URI scheme); hrefs forced `rel="noopener noreferrer nofollow ugc"`; images served `referrerpolicy="no-referrer"` |
-| Avatars & inline uploads | SSRF / `javascript:` / `data:` URLs | `resolveUrl` rejects every scheme except `http`, `https`, `mailto` before the DOM sees it |
-| Component config | XSS via attributes (`channel`, `topic`) | All attribute reads flow through `textContent` / DOM API setters — never `innerHTML` |
-| Transport | Plaintext credential exfiltration | `serverUrl` validated to `http(s)` only; `http://` against non-loopback hosts emits a console warning |
-| Credential storage | API key visible in DOM | **Not mitigated** — see "Out of scope" |
-| Third-party script tags | Tampered `zulip-embed` bundle | Publish with SRI-friendly unpkg URLs (roadmap: sign releases) |
-| Flutter transport | Same class of issues as web | `_normalize()` validates scheme; HTTP Basic built from UTF-8 bytes |
+| Surface                  | Threat                                  | Mitigation                                                                                                                                                           |
+| ------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Zulip message HTML       | Stored XSS via rendered content         | DOMPurify with strict allow-list (tags, attributes, URI scheme); hrefs forced `rel="noopener noreferrer nofollow ugc"`; images served `referrerpolicy="no-referrer"` |
+| Avatars & inline uploads | SSRF / `javascript:` / `data:` URLs     | `resolveUrl` rejects every scheme except `http`, `https`, `mailto` before the DOM sees it                                                                            |
+| Component config         | XSS via attributes (`channel`, `topic`) | All attribute reads flow through `textContent` / DOM API setters — never `innerHTML`                                                                                 |
+| Transport                | Plaintext credential exfiltration       | `serverUrl` validated to `http(s)` only; `http://` against non-loopback hosts emits a console warning                                                                |
+| Credential storage       | API key visible in DOM                  | **Not mitigated** — see "Out of scope"                                                                                                                               |
+| Third-party script tags  | Tampered `zulip-embed` bundle           | Publish with SRI-friendly unpkg URLs (roadmap: sign releases)                                                                                                        |
+| Flutter transport        | Same class of issues as web             | `_normalize()` validates scheme; HTTP Basic built from UTF-8 bytes                                                                                                   |
 
 ## What the sanitizer accepts
 
