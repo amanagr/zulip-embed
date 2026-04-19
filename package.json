@@ -36,6 +36,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "dompurify": "^3.2.3",
     "zod": "^4.1.5"
   },
   "devDependencies": {

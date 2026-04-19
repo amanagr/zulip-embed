@@ -1,8 +1,9 @@
 import {z} from "zod";
 
-import type {Transport} from "./transport.ts";
+import type {ReactionParams, Transport} from "./transport.ts";
 import type {
     Message,
+    Reaction,
     ScopeFilter,
     SendMessageParams,
     ZulipEventListener,
@@ -48,14 +49,42 @@ const registerResponseSchema = z.object({
     max_message_id: z.number().optional(),
 });
 
-const eventSchema = z.object({
-    id: z.number(),
-    type: z.string(),
-    message: messageSchema.optional(),
-});
+// Zulip event shapes we consume. Every event has id + type; the rest of the
+// fields are type-specific. We accept unknowns so a newer server adding
+// fields doesn't blow up validation.
+const eventSchema = z
+    .object({
+        id: z.number(),
+        type: z.string(),
+    })
+    .passthrough();
 
 const eventsResponseSchema = z.object({
     events: z.array(eventSchema).default([]),
+});
+
+// update_message carries partial edit info; rendered_content is the HTML
+// we want to swap in. orig_* fields are present but unused here.
+const updateMessageEventSchema = z.object({
+    message_id: z.number(),
+    rendered_content: z.string().optional(),
+    subject: z.string().optional(),
+    edit_timestamp: z.number().optional(),
+});
+
+// delete_message can carry either a single message_id or a list.
+const deleteMessageEventSchema = z.object({
+    message_id: z.number().optional(),
+    message_ids: z.array(z.number()).optional(),
+});
+
+// Per-user reaction event: op=add/remove, identifies the emoji + user +
+// message. We fold these into our bucket model below.
+const reactionEventSchema = z.object({
+    op: z.enum(["add", "remove"]),
+    message_id: z.number(),
+    emoji_name: z.string(),
+    user_id: z.number(),
 });
 
 const messagesResponseSchema = z.object({
@@ -77,10 +106,17 @@ export class ZulipTransport implements Transport {
     private pollController: AbortController | undefined;
     private closed = false;
     private currentUserId: number | undefined;
+    // Per-message reaction state. Zulip's reaction events are per-user
+    // add/remove, but UI subscribers want the full bucketed list. We keep a
+    // map here so we can emit that list on every op.
+    private readonly reactionState = new Map<number, Map<string, Set<number>>>();
 
     constructor(options: ZulipTransportOptions) {
-        this.serverUrl = options.serverUrl.replace(/\/+$/, "");
-        this.authHeader = "Basic " + btoa(`${options.email}:${options.apiKey}`);
+        this.serverUrl = validateServerUrl(options.serverUrl);
+        // btoa can't encode non-ASCII (email/apiKey with extended chars
+        // throw InvalidCharacterError). Encode to UTF-8 first so we match
+        // RFC 7617 and surface a clean error instead of a cryptic one.
+        this.authHeader = "Basic " + base64EncodeUtf8(`${options.email}:${options.apiKey}`);
         this.scope = options.scope;
         this.historyLimit = options.historyLimit ?? 50;
         this.lastEventId = -1;
@@ -128,7 +164,25 @@ export class ZulipTransport implements Transport {
         };
         const response = await this.request("GET", "/api/v1/messages", params);
         const parsed = messagesResponseSchema.parse(response);
-        return parsed.messages.map(convertMessage);
+        const messages = parsed.messages.map(convertMessage);
+        // Prime the reaction cache so per-user reaction events dispatched
+        // afterwards compose with the initial server-reported state.
+        for (const message of messages) {
+            this.rememberReactions(message);
+        }
+        return messages;
+    }
+
+    async addReaction(params: ReactionParams): Promise<void> {
+        await this.request("POST", `/api/v1/messages/${String(params.messageId)}/reactions`, {
+            emoji_name: params.emoji,
+        });
+    }
+
+    async removeReaction(params: ReactionParams): Promise<void> {
+        await this.request("DELETE", `/api/v1/messages/${String(params.messageId)}/reactions`, {
+            emoji_name: params.emoji,
+        });
     }
 
     async sendMessage(params: SendMessageParams): Promise<void> {
@@ -156,7 +210,12 @@ export class ZulipTransport implements Transport {
 
     private async register(): Promise<z.infer<typeof registerResponseSchema>> {
         const body = {
-            event_types: JSON.stringify(["message"]),
+            event_types: JSON.stringify([
+                "message",
+                "update_message",
+                "delete_message",
+                "reaction",
+            ]),
             narrow: JSON.stringify(buildNarrow(this.scope)),
             apply_markdown: "true",
             client_gravatar: "true",
@@ -164,6 +223,85 @@ export class ZulipTransport implements Transport {
         };
         const response = await this.request("POST", "/api/v1/register", body);
         return registerResponseSchema.parse(response);
+    }
+
+    private dispatchEvent(event: {type: string} & Record<string, unknown>): void {
+        if (event.type === "message") {
+            const parsed = messageSchema.safeParse(event["message"]);
+            if (!parsed.success) return;
+            const message = convertMessage(parsed.data);
+            this.rememberReactions(message);
+            this.onEvent?.({type: "message", message});
+        } else if (event.type === "update_message") {
+            const parsed = updateMessageEventSchema.safeParse(event);
+            if (!parsed.success) return;
+            this.onEvent?.({
+                type: "message-update",
+                messageId: parsed.data.message_id,
+                content: parsed.data.rendered_content,
+                topic: parsed.data.subject,
+                editedTimestamp:
+                    parsed.data.edit_timestamp === undefined
+                        ? undefined
+                        : parsed.data.edit_timestamp * 1000,
+            });
+        } else if (event.type === "delete_message") {
+            const parsed = deleteMessageEventSchema.safeParse(event);
+            if (!parsed.success) return;
+            const ids =
+                parsed.data.message_ids ??
+                (parsed.data.message_id === undefined ? [] : [parsed.data.message_id]);
+            for (const messageId of ids) {
+                this.reactionState.delete(messageId);
+                this.onEvent?.({type: "message-delete", messageId});
+            }
+        } else if (event.type === "reaction") {
+            const parsed = reactionEventSchema.safeParse(event);
+            if (!parsed.success) return;
+            const reactions = this.applyReactionOp(parsed.data);
+            this.onEvent?.({
+                type: "reaction",
+                messageId: parsed.data.message_id,
+                reactions,
+            });
+        }
+    }
+
+    private rememberReactions(message: Message): void {
+        const buckets = new Map<string, Set<number>>();
+        for (const r of message.reactions) {
+            buckets.set(r.emoji, new Set(r.userIds));
+        }
+        this.reactionState.set(message.id, buckets);
+    }
+
+    private applyReactionOp(op: {
+        op: "add" | "remove";
+        message_id: number;
+        emoji_name: string;
+        user_id: number;
+    }): Reaction[] {
+        let buckets = this.reactionState.get(op.message_id);
+        if (!buckets) {
+            buckets = new Map();
+            this.reactionState.set(op.message_id, buckets);
+        }
+        let users = buckets.get(op.emoji_name);
+        if (!users) {
+            users = new Set();
+            buckets.set(op.emoji_name, users);
+        }
+        if (op.op === "add") {
+            users.add(op.user_id);
+        } else {
+            users.delete(op.user_id);
+            if (users.size === 0) buckets.delete(op.emoji_name);
+        }
+        return [...buckets.entries()].map(([emoji, userIds]) => ({
+            emoji,
+            count: userIds.size,
+            userIds: [...userIds],
+        }));
     }
 
     private async loadCurrentUser(): Promise<void> {
@@ -188,12 +326,7 @@ export class ZulipTransport implements Transport {
                 const parsed = eventsResponseSchema.parse(response);
                 for (const event of parsed.events) {
                     this.lastEventId = Math.max(this.lastEventId, event.id);
-                    if (event.type === "message" && event.message) {
-                        this.onEvent?.({
-                            type: "message",
-                            message: convertMessage(event.message),
-                        });
-                    }
+                    this.dispatchEvent(event);
                 }
             } catch (error) {
                 if (this.closed) return;
@@ -233,6 +366,51 @@ export class ZulipTransport implements Transport {
         }
         return response.json();
     }
+}
+
+// Validate the server URL embedders configure. Only http/https schemes are
+// accepted, and we emit a console warning for http:// because it means
+// Zulip API credentials (sent as HTTP Basic auth) will travel in the
+// clear. Refusing http outright would break local-development workflows,
+// so we warn instead of throw.
+function validateServerUrl(raw: string): string {
+    const trimmed = raw.trim();
+    let parsed: URL;
+    try {
+        parsed = new URL(trimmed);
+    } catch {
+        throw new Error(`Invalid Zulip server URL: ${raw}`);
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        throw new Error(
+            `Zulip server URL must use http or https (got ${parsed.protocol}): ${raw}`,
+        );
+    }
+    if (
+        parsed.protocol === "http:" &&
+        parsed.hostname !== "localhost" &&
+        parsed.hostname !== "127.0.0.1" &&
+        !parsed.hostname.endsWith(".localhost")
+    ) {
+        // eslint-disable-next-line no-console
+        console.warn(
+            `[zulip-embed] server URL uses http://; API credentials will travel in the clear. Use https:// in production.`,
+        );
+    }
+    // Normalize: strip trailing slashes from the pathname so our _endpoint
+    // concatenation ("$base$path") produces a clean URL.
+    const normalized = parsed.toString().replace(/\/+$/, "");
+    return normalized;
+}
+
+// btoa doesn't handle non-ASCII. Encode the input as UTF-8 bytes first, as
+// required by RFC 7617 for HTTP Basic credentials that contain non-ASCII
+// characters (e.g. display names with accents).
+function base64EncodeUtf8(input: string): string {
+    const bytes = new TextEncoder().encode(input);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
 }
 
 async function describeHttpError(response: Response, path: string): Promise<string> {

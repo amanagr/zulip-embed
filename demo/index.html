@@ -201,6 +201,57 @@
             </header>
 
             <section>
+                <h2>Web-public channel · read-only</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Modeled on Zulip's own <code>#announce &gt; server releases</code> topic:
+                    release notes, beta announcements, and post-mortems. Composer hidden, but
+                    readers can still react.
+                </p>
+                <div class="panel">
+                    <h3>#announce &gt; server releases</h3>
+                    <p>
+                        Shows rich Markdown rendering end-to-end: headings, code blocks, lists,
+                        tables, blockquotes, mentions, and live emoji reactions.
+                    </p>
+                    <div class="chat-slot">
+                        <zulip-chat
+                            demo
+                            read-only
+                            channel="announce"
+                            topic="server releases"
+                            theme="light"
+                            mode="inline"
+                        ></zulip-chat>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Rendering showcase</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Every message element the embed supports, rendered in one topic. Use this
+                    as a visual regression surface for the sanitizer + CSS.
+                </p>
+                <div class="panel">
+                    <h3>#showcase &gt; rendering</h3>
+                    <p>
+                        Bold · italic · strikethrough · inline code · code blocks · blockquotes ·
+                        ordered + unordered lists · tables · mentions · channel references ·
+                        headings · horizontal rules · keyboard shortcuts · images · reactions.
+                    </p>
+                    <div class="chat-slot">
+                        <zulip-chat
+                            demo
+                            channel="showcase"
+                            topic="rendering"
+                            theme="light"
+                            mode="inline"
+                        ></zulip-chat>
+                    </div>
+                </div>
+            </section>
+
+            <section>
                 <h2>Live previews</h2>
                 <div class="grid">
                     <div class="panel">

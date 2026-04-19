@@ -54,6 +54,31 @@ export interface MessageEvent {
     message: Message;
 }
 
+export interface MessageUpdateEvent {
+    type: "message-update";
+    messageId: number;
+    // Updated HTML content (apply_markdown=true). Absent when the edit only
+    // touches topic/channel.
+    content?: string | undefined;
+    topic?: string | undefined;
+    editedTimestamp?: number | undefined;
+}
+
+export interface MessageDeleteEvent {
+    type: "message-delete";
+    messageId: number;
+}
+
+// Zulip's reaction event stream is per-user: one event per (message, emoji,
+// user) tuple, with op: "add" | "remove". The transport keeps bucket state
+// in sync and re-emits the full updated reactions list for the message so
+// UI subscribers don't need to know about the per-user event shape.
+export interface ReactionEvent {
+    type: "reaction";
+    messageId: number;
+    reactions: Reaction[];
+}
+
 export interface TypingEvent {
     type: "typing";
     userIds: number[];
@@ -64,7 +89,14 @@ export interface ErrorEvent {
     error: string;
 }
 
-export type ZulipEvent = ConnectionEvent | MessageEvent | TypingEvent | ErrorEvent;
+export type ZulipEvent =
+    | ConnectionEvent
+    | MessageEvent
+    | MessageUpdateEvent
+    | MessageDeleteEvent
+    | ReactionEvent
+    | TypingEvent
+    | ErrorEvent;
 
 export type ZulipEventListener = (event: ZulipEvent) => void;
 

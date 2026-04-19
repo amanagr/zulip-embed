@@ -1,13 +1,14 @@
 import {ZulipClient} from "./client.ts";
 import {DemoTransport} from "./demo-transport.ts";
-import {isNearBottom, renderMessages, scrollToBottom} from "./render.ts";
+import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
 import type {Transport} from "./transport.ts";
-import type {ConnectionStatus, Message, ScopeFilter} from "./types.ts";
+import type {ConnectionStatus, Message, Reaction, ScopeFilter} from "./types.ts";
 import {ZulipTransport} from "./zulip-transport.ts";
 
 const OBSERVED_ATTRIBUTES = [
     "demo",
+    "demo-variant",
     "server",
     "email",
     "api-key",
@@ -16,10 +17,12 @@ const OBSERVED_ATTRIBUTES = [
     "theme",
     "mode",
     "open",
+    "read-only",
 ] as const;
 
 const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "demo",
+    "demo-variant",
     "server",
     "email",
     "api-key",
@@ -280,6 +283,12 @@ export class ZulipChatElement extends HTMLElement {
             if (token !== this.initToken) return;
             if (event.type === "message") {
                 this.appendMessage(event.message);
+            } else if (event.type === "message-update") {
+                this.updateMessage(event.messageId, event.content, event.topic);
+            } else if (event.type === "message-delete") {
+                this.deleteMessage(event.messageId);
+            } else if (event.type === "reaction") {
+                this.updateReactions(event.messageId, event.reactions);
             } else if (event.type === "connection") {
                 this.setState({status: event.status});
             } else if (event.type === "error") {
@@ -322,7 +331,10 @@ export class ZulipChatElement extends HTMLElement {
 
     private createTransport(scope: ScopeFilter): Transport {
         if (this.hasAttribute("demo")) {
-            return new DemoTransport({scope});
+            return new DemoTransport({
+                scope,
+                readOnly: this.hasAttribute("read-only"),
+            });
         }
         const server = this.getAttribute("server");
         const email = this.getAttribute("email");
@@ -349,6 +361,78 @@ export class ZulipChatElement extends HTMLElement {
                 if (this.feedEl) scrollToBottom(this.feedEl);
             });
         }
+    }
+
+    private updateMessage(
+        id: number,
+        content: string | undefined,
+        topic: string | undefined,
+    ): void {
+        const next = this.state.messages.map((m) => {
+            if (m.id !== id) return m;
+            return {
+                ...m,
+                content: content ?? m.content,
+                contentIsHtml: content !== undefined ? true : m.contentIsHtml,
+                topic: topic ?? m.topic,
+            };
+        });
+        this.setState({messages: next});
+    }
+
+    private deleteMessage(id: number): void {
+        const next = this.state.messages.filter((m) => m.id !== id);
+        if (next.length === this.state.messages.length) return;
+        this.setState({messages: next});
+    }
+
+    private updateReactions(id: number, reactions: Reaction[]): void {
+        const next = this.state.messages.map((m) =>
+            m.id === id ? {...m, reactions} : m,
+        );
+        this.setState({messages: next});
+    }
+
+    private handleToggleReaction(message: Message, emoji: string): void {
+        if (!this.client) return;
+        const userId = this.client.getCurrentUserId();
+        const mine =
+            userId !== undefined &&
+            message.reactions.some(
+                (r) => r.emoji === emoji && r.userIds.includes(userId),
+            );
+        const call = mine
+            ? this.client.removeReaction({messageId: message.id, emoji})
+            : this.client.addReaction({messageId: message.id, emoji});
+        call.catch((error: unknown) => {
+            this.setState({error: describeError(error)});
+        });
+    }
+
+    private handleAddReaction(message: Message): void {
+        // v0.1: simple prompt-based picker. A real emoji picker is roadmap.
+        const emoji = window.prompt("Reaction emoji name (e.g. tada, +1, heart):");
+        if (emoji === null) return;
+        const trimmed = emoji.trim();
+        if (trimmed === "") return;
+        this.handleToggleReaction(message, trimmed);
+    }
+
+    private renderContext(): RenderContext {
+        const context: RenderContext = {
+            serverOrigin: this.getAttribute("server") ?? undefined,
+            currentUserId: this.client?.getCurrentUserId(),
+        };
+        if (this.hasAttribute("read-only")) {
+            return context;
+        }
+        context.onToggleReaction = (m, e) => {
+            this.handleToggleReaction(m, e);
+        };
+        context.onAddReaction = (m) => {
+            this.handleAddReaction(m);
+        };
+        return context;
     }
 
     private async handleSend(): Promise<void> {
@@ -412,7 +496,7 @@ export class ZulipChatElement extends HTMLElement {
                 loading.textContent = "Loading messages…";
                 this.feedEl.replaceChildren(loading);
             } else {
-                renderMessages(this.feedEl, this.state.messages);
+                renderMessages(this.feedEl, this.state.messages, this.renderContext());
             }
         }
 

@@ -73,6 +73,50 @@ describe("DemoTransport", () => {
         await transport.close();
     });
 
+    test("addReaction emits a reaction event with bucketed users", async () => {
+        const transport = new DemoTransport({
+            scope: {channel: "general", topic: "hello"},
+            autoReply: false,
+        });
+        const received: ZulipEvent[] = [];
+        await transport.connect((e) => received.push(e));
+        const [first] = await transport.getMessages({channel: "general", topic: "hello"});
+        if (!first) throw new Error("expected a seeded message");
+
+        await transport.addReaction({messageId: first.id, emoji: "tada"});
+
+        const reactionEvents = received.filter((e) => e.type === "reaction");
+        expect(reactionEvents).toHaveLength(1);
+        const event = reactionEvents[0];
+        if (event?.type !== "reaction") throw new Error();
+        expect(event.messageId).toBe(first.id);
+        const tada = event.reactions.find((r) => r.emoji === "tada");
+        expect(tada?.count).toBeGreaterThanOrEqual(1);
+
+        await transport.removeReaction({messageId: first.id, emoji: "tada"});
+        const afterRemove = received.filter((e) => e.type === "reaction");
+        expect(afterRemove).toHaveLength(2);
+        await transport.close();
+    });
+
+    test("read-only mode refuses sendMessage", async () => {
+        const transport = new DemoTransport({
+            scope: {channel: "announce", topic: "server releases"},
+            readOnly: true,
+            autoReply: false,
+        });
+        await transport.connect(() => {});
+
+        await expect(
+            transport.sendMessage({
+                type: "channel",
+                channel: "announce",
+                content: "try to reply",
+            }),
+        ).rejects.toThrow(/read-only/i);
+        await transport.close();
+    });
+
     test("close cancels pending auto-replies", async () => {
         const transport = new DemoTransport({
             scope: {channel: "general"},

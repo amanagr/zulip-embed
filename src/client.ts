@@ -1,4 +1,4 @@
-import type {Transport} from "./transport.ts";
+import type {ReactionParams, Transport} from "./transport.ts";
 import type {
     Message,
     ScopeFilter,
@@ -35,6 +35,14 @@ export class ZulipClient {
 
     async sendMessage(params: SendMessageParams): Promise<void> {
         await this.transport.sendMessage(params);
+    }
+
+    async addReaction(params: ReactionParams): Promise<void> {
+        await this.transport.addReaction(params);
+    }
+
+    async removeReaction(params: ReactionParams): Promise<void> {
+        await this.transport.removeReaction(params);
     }
 
     getCurrentUserId(): number | undefined {

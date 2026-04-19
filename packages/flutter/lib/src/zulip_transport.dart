@@ -36,6 +36,31 @@ class ZulipTransport implements Transport {
   bool _closed = false;
 
   static Uri _normalize(Uri url) {
+    // Reject anything that isn't http/https — file://, chrome-extension://,
+    // relative URIs, and so on should never reach the Zulip REST calls,
+    // which otherwise would leak HTTP Basic credentials to arbitrary
+    // destinations.
+    final scheme = url.scheme.toLowerCase();
+    if (scheme != 'https' && scheme != 'http') {
+      throw ArgumentError.value(
+        url,
+        'serverUrl',
+        'Zulip server URL must use http or https (got $scheme)',
+      );
+    }
+    if (scheme == 'http' &&
+        url.host != 'localhost' &&
+        url.host != '127.0.0.1' &&
+        !url.host.endsWith('.localhost')) {
+      // Production credentials should never travel in the clear. We log
+      // instead of throwing so local-development against a plain-http
+      // Zulip still works.
+      // ignore: avoid_print
+      print(
+        '[zulip_embed] server URL uses http://; API credentials will travel '
+        'in the clear. Use https:// in production.',
+      );
+    }
     final raw = url.toString();
     final trimmed = raw.endsWith('/') ? raw.substring(0, raw.length - 1) : raw;
     return Uri.parse(trimmed);
