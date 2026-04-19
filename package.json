@@ -1,6 +1,6 @@
 {
   "name": "zulip-embed",
-  "version": "0.8.0-rc.0",
+  "version": "0.8.0",
   "description": "Embed Zulip chat as a framework-agnostic Web Component or headless SDK.",
   "license": "Apache-2.0",
   "type": "module",

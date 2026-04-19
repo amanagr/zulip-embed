@@ -1,6 +1,6 @@
 {
   "name": "zulip-embed-react-native",
-  "version": "0.8.0-rc.0-alpha",
+  "version": "0.8.0-alpha",
   "description": "React Native chat widgets + headless SDK for Zulip (alpha preview — plain-text rendering, narrower surface than web / Flutter).",
   "license": "Apache-2.0",
   "type": "module",
@@ -24,7 +24,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "zulip-embed": ">=0.8.0-rc.0",
+    "zulip-embed": ">=0.8.0",
     "react": ">=17.0.0",
     "react-native": ">=0.70.0"
   },

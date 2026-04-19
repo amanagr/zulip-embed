@@ -6,15 +6,36 @@ project adheres to semantic versioning.
 
 ## 0.8.0 — 2026-04-19
 
-Sprint 5 release: pinned banners, React Native alpha, signed releases,
-and a rewritten developer-documentation surface. Additive over
-`0.8.0-rc.0` — no breaking changes. See
-[`MIGRATION.md`](./MIGRATION.md) for the 0.7 → 0.8 upgrade walkthrough
-and [`docs/RELEASING.md`](./docs/RELEASING.md) for the release
-playbook.
+Sprint 4/5 release. Ships the DM surface (`<zulip-dm-list>` +
+`ScopeFilter` discriminated union), `<zulip-announcement>` pinned
+banners, a React Native alpha, signed releases, and a rewritten
+developer-documentation surface. Additive over `0.8.0-rc.0` — the
+only potentially-breaking surface is `ScopeFilter` widening, which
+ships with a runtime `normalizeScope` shim and a deprecation warning
+for legacy flat shapes. See [`MIGRATION.md`](./MIGRATION.md) for the
+0.7 → 0.8 upgrade walkthrough and
+[`docs/RELEASING.md`](./docs/RELEASING.md) for the release playbook.
 
 ### Added
 
+- **`<zulip-dm-list>`** — DM-conversation discovery custom element.
+  Lists recent 1:1 and group DMs with unread counts; emits
+  `conversation-selected` `CustomEvent` carrying a normalized
+  `DmScope`. Ships with React wrapper (`<ZulipDmList>`) and Flutter
+  parity (`ZulipDmList`).
+- **`ScopeFilter` is now a discriminated union** —
+  `ChannelScope | DmScope | LegacyChannelScope`. `DmScope` targets
+  `{type: "dm", participantIds: number[]}`; sends route into
+  `type: "direct"` on the wire. `normalizeScope()` widens legacy flat
+  shapes (`{channel, topic?}`) once per caller-fingerprint with a
+  `console.warn` so consumers have a visible nudge to migrate.
+- **`ZulipChat.dm()`** factory constructor (Flutter) and `dm:` prop
+  (web / React) for DM-first embeds.
+- **`Transport.listDirectMessageConversations()`** — new transport
+  primitive implemented by `DemoTransport`, `SnapshotTransport`, and
+  `ZulipTransport`. DM bucketing extracted to `src/dm-bucket.ts` so
+  snapshot/demo bundles don't drag the live-transport chunk.
+- **`zulip-embed/dm-list`** subpath entry (4 KB gz / 10 KB budget).
 - **`<zulip-announcement>`** — pinned-banner custom element that
   fetches a single message by id and renders it as a dismissible
   banner at the top of the embed. Emits a `announcement-dismissed`
@@ -22,8 +43,8 @@ playbook.
   Flutter parity as the `ZulipAnnouncement` widget.
 - **New subpath entry `zulip-embed/announcement`** — registers only
   `<zulip-announcement>`, ~18 KB gzipped. Added alongside the
-  existing `/chat`, `/channel-list`, `/topic-list`, `/agent`, and
-  `/demo` subpaths.
+  existing `/chat`, `/channel-list`, `/topic-list`, `/agent`,
+  `/dm-list`, and `/demo` subpaths.
 - **React Native alpha package** (`zulip-embed-react-native@0.8.0-rc.0-alpha`)
   — plain-text `<ZulipChatScreen>`, bundled `ZulipClient` /
   `ZulipTransport` / `DemoTransport`. Ships a one-time
@@ -52,12 +73,23 @@ playbook.
 
 ### Changed
 
+- **Transport `getMessages` respects scope.** Demo, snapshot, and
+  Zulip transports now filter by the active narrow instead of
+  returning the full flat store. This was previously a known quirk in
+  `DemoTransport`; the pinned `demo-transport-persistence` test
+  was flipped to reflect the new contract.
+- **`ZulipClient.sendMessage(string, scope?)`** — accepts a
+  normalized scope; DM scopes route into `type: "direct"` sends.
+- **`startAgentReply` rejects DM scopes** with a clear error —
+  agent-reply wiring for DM conversations is intentionally deferred
+  to a future design pass.
 - **README** — rewritten to reflect the v0.8 surface (the
-  `<zulip-announcement>` element, RN alpha status, subpath entries,
-  the "Verified releases" table, and links to the new onboarding +
-  architecture docs).
-- **Bundle-size gates** — `scripts/bundle-check.mjs` now also
-  enforces the `entries/announcement.js` budget (20 KB gz).
+  `<zulip-dm-list>` and `<zulip-announcement>` elements, RN alpha
+  status, subpath entries, the "Verified releases" table, and links
+  to the new onboarding + architecture docs).
+- **Bundle-size gates** — `scripts/bundle-check.mjs` now enforces
+  budgets for `entries/announcement.js` (20 KB gz) and
+  `entries/dm-list.js` (10 KB gz).
 
 ### Fixed
 

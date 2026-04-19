@@ -16,9 +16,12 @@ See [`CHANGELOG.md`](./CHANGELOG.md) for the full release log and
 
 ## 0.7 → 0.8
 
-**No breaking changes.** 0.8 is additive over 0.7: every 0.7 call
-site keeps compiling against 0.8 unchanged. Adopt the pieces below
-at your own pace.
+**One soft-breaking API change: `ScopeFilter` widens to a
+discriminated union.** Everything else is additive — every 0.7 call
+site that used a plain `{channel, topic?}` object keeps compiling
+against 0.8 through the `normalizeScope` shim (with a one-shot
+deprecation warning per call site). Adopt the pieces below at your
+own pace.
 
 ### 1. Per-entry imports (optional, recommended)
 
@@ -51,6 +54,7 @@ Subpaths wired in `package.json` `exports`:
 | `zulip-embed/channel-list` | `<zulip-channel-list>`                 |
 | `zulip-embed/topic-list`   | `<zulip-topic-list>`                   |
 | `zulip-embed/announcement` | `<zulip-announcement>` (new in 0.8)    |
+| `zulip-embed/dm-list`      | `<zulip-dm-list>` (new in 0.8)         |
 | `zulip-embed/agent`        | `startAgentReply` + `AgentReplyHandle` |
 | `zulip-embed/demo`         | `DemoTransport`, `SnapshotTransport`   |
 | `zulip-embed/all`          | register-everything shim (same as `.`) |
@@ -108,7 +112,7 @@ Flutter gets the same widget as `ZulipAnnouncement` in
 
 ### 3. React Native (alpha)
 
-`zulip-embed-react-native@0.8.0-rc.0-alpha` adds React Native bindings.
+`zulip-embed-react-native@0.8.0-alpha` adds React Native bindings.
 This is an **alpha preview** — plain-text rendering only, no reactions
 / typing / message-action UI in the bundled `<ZulipChatScreen>`. The
 headless `ZulipClient` works end-to-end and is the supported path for
@@ -174,36 +178,62 @@ workspace has `publishConfig.provenance: true`, so
 `npm view zulip-embed dist.signatures` shows the attestation chain
 for the tarball.
 
-### 5. No code changes required
+### 5. DM surface + `ScopeFilter` widening
+
+0.8 adds DM conversations as a first-class scope. If you only pass
+`{channel, topic?}` to `<zulip-chat>` / `ZulipClient`, your existing
+code keeps working through `normalizeScope` — but you'll see a
+one-shot `console.warn` nudging you to migrate. If you read
+`.channel` or `.topic` off a `ScopeFilter` value directly, `tsc`
+will flag every call site once you bump types.
+
+**Before (0.7).** Only channels.
+
+```ts
+const scope = {channel: "general", topic: "welcome"};
+client.sendMessage("hi", scope);
+```
+
+**After (0.8).** DMs are a discriminated variant.
+
+```ts
+type ScopeFilter =
+    | {type: "channel"; channel: string; topic?: string}
+    | {type: "dm"; participantIds: number[]};
+
+const channel: ScopeFilter = {type: "channel", channel: "general", topic: "welcome"};
+const dm: ScopeFilter = {type: "dm", participantIds: [42, 99]};
+client.sendMessage("hi", dm); // routed as type: "direct" on the wire
+```
+
+Legacy flat shapes still compile via `normalizeScope`:
+
+```ts
+import {normalizeScope} from "zulip-embed";
+normalizeScope({channel: "general", topic: "welcome"});
+// → {type: "channel", channel: "general", topic: "welcome"}
+// also prints one-shot console.warn per call-site fingerprint
+```
+
+Discovery UI for DMs ships as `<zulip-dm-list>` (web), `<ZulipDmList>`
+(React), and `ZulipDmList` (Flutter). It emits a
+`conversation-selected` `CustomEvent` with a normalized `DmScope`
+you can hand to `<zulip-chat>`.
+
+`startAgentReply` intentionally rejects DM scopes for now — DM
+agent-reply routing is deferred to a future release.
+
+### 6. No other code changes required
 
 Summary for anyone upgrading: bump `zulip-embed` and the wrapper
-packages, re-run your builds, and you're done. Nothing in the 0.7
-public API was removed or reshaped. The subpath imports,
-`<zulip-announcement>`, RN, and SRI pinning are all opt-in.
+packages, re-run your builds, and address any `ScopeFilter` narrow
+warnings from tsc. The subpath imports, `<zulip-announcement>`,
+`<zulip-dm-list>`, RN, and SRI pinning are all opt-in otherwise.
 
 ## 0.8 → 1.0 (planned)
 
-Additional surfaces land in 1.0 — `<zulip-dm-list>`, gradient avatars,
-starter chips, and first-class typing indicators on the RN widget.
-Migration notes will be written when 1.0 cuts.
-
-**`ScopeFilter` may widen to a discriminated union** so DMs get a
-first-class scope shape alongside channels:
-
-```ts
-// Possible 1.0 shape:
-type ScopeFilter =
-    | {type: "channel"; channel: string; topic?: string}
-    | {type: "dm"; userIds: number[]};
-```
-
-Existing call sites that pass `{channel, topic}` will stay
-back-compat through a `normalizeScope(input: LegacyScopeFilter |
-ScopeFilter): ScopeFilter` helper. Consumers that read `.channel` /
-`.topic` off a `ScopeFilter` value directly will need to narrow on
-`type` first; `tsc` will flag every call site when the union lands.
-
-The `api-key` attribute's 1.0-removal deadline still stands — see
-[`docs/migration-0.2.md`](./docs/migration-0.2.md) for the
-recommended `auth-token` flow. Production deployments should have
-migrated by 1.0.
+Remaining 1.0 surfaces: DM-aware `startAgentReply`, first-class
+typing indicators on the RN widget, and the `api-key` attribute
+removal. See [`docs/migration-0.2.md`](./docs/migration-0.2.md)
+for the recommended `auth-token` flow. Production deployments
+should have migrated by 1.0.

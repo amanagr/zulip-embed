@@ -9,7 +9,7 @@ REST API so your data and your audit trail stay in your Zulip.
 > (`<zulip-chat>`, `<zulip-channel-list>`, `<zulip-topic-list>`,
 > `<zulip-announcement>`), the headless `ZulipClient`, the React
 > wrapper, and the Flutter package are all at v0.8 feature parity.
-> React Native ships as `0.8.0-rc.0-alpha` (plain-text rendering —
+> React Native ships as `0.8.0-alpha` (plain-text rendering —
 > see [package README](./packages/react-native/README.md)). SwiftUI +
 > Compose are on the roadmap. The public API may still move before 1.0.
 
@@ -156,7 +156,7 @@ and [`<ZulipTopicList>`](./packages/react/src/zulip-topic-list.tsx).
 
 ### Track 3 — React Native (alpha)
 
-> **Alpha preview (`0.8.0-rc.0-alpha`).** Plain-text rendering only.
+> **Alpha preview (`0.8.0-alpha`).** Plain-text rendering only.
 > Reactions / typing / message-action UI not yet wired in the
 > `<ZulipChatScreen>` widget. Headless `ZulipClient` works end-to-end.
 > See [`packages/react-native/README.md`](./packages/react-native/README.md)

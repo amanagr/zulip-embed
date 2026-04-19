@@ -11,7 +11,7 @@
     },
     "dependencies": {
         "svelte": "^5.0.0",
-        "zulip-embed": "^0.8.0-rc.0"
+        "zulip-embed": "^0.8.0"
     },
     "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^4.0.0",

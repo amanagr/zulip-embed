@@ -2,7 +2,7 @@
 
 React Native wrappers + headless SDK for Zulip.
 
-> **Status — `0.8.0-rc.0-alpha` preview.** The RN package is an
+> **Status — `0.8.0-alpha` preview.** The RN package is an
 > **alpha preview** of the v0.8 surface. It is intentionally narrower
 > than the web and Flutter packages: messages render as plain text
 > (no Markdown / mentions / reactions UI), and some `Transport`
@@ -50,7 +50,7 @@ pnpm add zulip-embed zulip-embed-react-native
 npm i zulip-embed zulip-embed-react-native
 ```
 
-Peer deps: `react >= 17`, `react-native >= 0.70`, `zulip-embed >= 0.8.0-rc.0`.
+Peer deps: `react >= 17`, `react-native >= 0.70`, `zulip-embed >= 0.8.0`.
 
 ## Quick start
 
@@ -84,13 +84,7 @@ import {ZulipChatScreen, DemoTransport} from "zulip-embed-react-native";
 const transport = new DemoTransport();
 
 export default function DemoScreen() {
-    return (
-        <ZulipChatScreen
-            transport={transport}
-            scope={{channel: "general"}}
-            readOnly
-        />
-    );
+    return <ZulipChatScreen transport={transport} scope={{channel: "general"}} readOnly />;
 }
 ```
 
