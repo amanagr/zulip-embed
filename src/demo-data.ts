@@ -1,4 +1,4 @@
-import type {Message, Stream, User} from "./types.ts";
+import type {Channel, Message, User} from "./types.ts";
 
 const AVATAR_PLACEHOLDER = "";
 
@@ -37,10 +37,10 @@ export const DEMO_USERS: User[] = [
     },
 ];
 
-export const DEMO_STREAMS: Stream[] = [
-    {streamId: 1, name: "general", description: "Say hello to the team"},
-    {streamId: 2, name: "support", description: "Ask questions, share bugs"},
-    {streamId: 3, name: "design", description: "Mocks, critiques, and color debates"},
+export const DEMO_CHANNELS: Channel[] = [
+    {channelId: 1, name: "general", description: "Say hello to the team"},
+    {channelId: 2, name: "support", description: "Ask questions, share bugs"},
+    {channelId: 3, name: "design", description: "Mocks, critiques, and color debates"},
 ];
 
 const MINUTE = 60 * 1000;
@@ -66,8 +66,8 @@ function demoMessage(
         timestamp: Date.now() - minutesAgo * MINUTE,
         content,
         contentIsHtml: false,
-        type: "stream",
-        streamName: channel,
+        type: "channel",
+        channelName: channel,
         topic,
         reactions: [],
     };

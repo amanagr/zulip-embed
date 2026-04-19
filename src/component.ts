@@ -364,7 +364,7 @@ export class ZulipChatElement extends HTMLElement {
 
         try {
             await this.client.sendMessage({
-                type: "stream",
+                type: "channel",
                 channel: scope.channel,
                 topic: scope.topic,
                 content,

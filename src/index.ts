@@ -8,13 +8,13 @@ export {ZulipTransport} from "./zulip-transport.ts";
 export type {ZulipTransportOptions} from "./zulip-transport.ts";
 export {ZulipChatElement, registerZulipChatElement} from "./component.ts";
 export type {
+    Channel,
     ConnectionStatus,
     Message,
     MessageType,
     Reaction,
     ScopeFilter,
     SendMessageParams,
-    Stream,
     User,
     ZulipEvent,
     ZulipEventListener,

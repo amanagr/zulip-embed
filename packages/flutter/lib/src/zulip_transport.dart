@@ -59,6 +59,10 @@ class ZulipTransport implements Transport {
       final me = await _getJson('/api/v1/users/me');
       _userId = (me['user_id'] as num).toInt();
 
+      // Operator is 'stream' (not 'channel') for compatibility with Zulip
+      // < 9, which doesn't know the 'channel' alias. Every supported
+      // server accepts the legacy operator, so we hardcode it and avoid
+      // version sniffing. Callers of this SDK only ever see 'channel'.
       final narrow = <List<String>>[
         ['stream', scope.channel],
         if (scope.topic != null) ['topic', scope.topic!],
@@ -125,6 +129,8 @@ class ZulipTransport implements Transport {
     required ScopeFilter scope,
     int limit = 50,
   }) async {
+    // See buildNarrow comment in connect(): wire operator is 'stream' for
+    // Zulip < 9 compat.
     final narrow = <List<String>>[
       ['stream', scope.channel],
       if (scope.topic != null) ['topic', scope.topic!],
@@ -148,6 +154,8 @@ class ZulipTransport implements Transport {
 
   @override
   Future<Message> sendMessage(SendMessageParams params) async {
+    // Wire type is 'stream' for Zulip < 9 compatibility — /messages still
+    // accepts the legacy value on every supported server.
     final body = await _postForm('/api/v1/messages', {
       'type': 'stream',
       'to': params.channel,

@@ -24,7 +24,10 @@ const messageSchema = z.object({
     avatar_url: z.string().nullable(),
     timestamp: z.number(),
     content: z.string(),
-    type: z.enum(["stream", "private"]),
+    // Zulip < 9 reports the channel variant as "stream"; Zulip >= 9 may emit
+    // "channel". Accept both; we normalize to "channel"/"direct" in
+    // convertMessage so callers only see the current terminology.
+    type: z.enum(["stream", "channel", "private", "direct"]),
     display_recipient: z.union([z.string(), z.array(z.any())]).optional(),
     subject: z.string().optional(),
     reactions: z
@@ -130,7 +133,12 @@ export class ZulipTransport implements Transport {
 
     async sendMessage(params: SendMessageParams): Promise<void> {
         const body: Record<string, string> = {content: params.content};
-        if (params.type === "stream") {
+        if (params.type === "channel") {
+            // Wire value is "stream" for back-compat with Zulip < 9. Zulip
+            // renamed streams to channels but still accepts the legacy value
+            // on /messages for every supported server version, so sending
+            // "stream" here means the embed works against old and new Zulip
+            // without version sniffing.
             body["type"] = "stream";
             body["to"] = params.channel ?? this.scope.channel;
             body["topic"] = params.topic ?? this.scope.topic ?? "";
@@ -244,10 +252,11 @@ async function describeHttpError(response: Response, path: string): Promise<stri
 }
 
 function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
-    // Zulip's /register is strict about the narrow shape and only accepts the
-    // two-element-array form on several versions; the object form works on
-    // /messages but fails on /register. Use the wire format that works
-    // everywhere.
+    // Two-element-array form because /register rejects the object form on
+    // several Zulip versions. Operator is "stream" (not "channel") because
+    // Zulip < 9 doesn't know the "channel" alias; every supported server
+    // accepts the legacy operator, so hardcoding it avoids version
+    // sniffing. Callers see "channel" everywhere else in this SDK.
     const narrow: Array<[string, string]> = [["stream", scope.channel]];
     if (scope.topic !== undefined && scope.topic !== "") {
         narrow.push(["topic", scope.topic]);
@@ -256,8 +265,12 @@ function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
 }
 
 function convertMessage(api: ApiMessage): Message {
-    const streamName =
-        api.type === "stream" && typeof api.display_recipient === "string"
+    // Normalize Zulip's wire-level "stream"/"private" to the current
+    // "channel"/"direct" terminology. Callers of this SDK should never have
+    // to know that the server speaks the older dialect.
+    const isChannelMessage = api.type === "stream" || api.type === "channel";
+    const channelName =
+        isChannelMessage && typeof api.display_recipient === "string"
             ? api.display_recipient
             : undefined;
     const reactionsByEmoji = new Map<string, {emoji: string; userIds: Set<number>}>();
@@ -279,8 +292,8 @@ function convertMessage(api: ApiMessage): Message {
         timestamp: api.timestamp * 1000,
         content: api.content,
         contentIsHtml: true,
-        type: api.type,
-        streamName,
+        type: isChannelMessage ? "channel" : "direct",
+        channelName,
         topic: api.subject,
         reactions: [...reactionsByEmoji.values()].map((bucket) => ({
             emoji: bucket.emoji,

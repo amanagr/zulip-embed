@@ -35,7 +35,7 @@ describe("DemoTransport", () => {
         await transport.connect((e) => received.push(e));
 
         await transport.sendMessage({
-            type: "stream",
+            type: "channel",
             channel: "general",
             topic: "hello",
             content: "Hi team",
@@ -60,7 +60,7 @@ describe("DemoTransport", () => {
         await transport.connect((e) => received.push(e));
 
         await transport.sendMessage({
-            type: "stream",
+            type: "channel",
             channel: "general",
             topic: "hello",
             content: "Ping?",
@@ -81,7 +81,7 @@ describe("DemoTransport", () => {
         });
         const received: ZulipEvent[] = [];
         await transport.connect((e) => received.push(e));
-        await transport.sendMessage({type: "stream", channel: "general", content: "Hello?"});
+        await transport.sendMessage({type: "channel", channel: "general", content: "Hello?"});
 
         await transport.close();
         vi.advanceTimersByTime(1_000);

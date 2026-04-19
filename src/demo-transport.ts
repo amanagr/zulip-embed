@@ -65,8 +65,8 @@ export class DemoTransport implements Transport {
             timestamp: Date.now(),
             content: params.content,
             contentIsHtml: false,
-            type: "stream",
-            streamName: params.channel ?? this.scope.channel,
+            type: "channel",
+            channelName: params.channel ?? this.scope.channel,
             topic: params.topic ?? this.scope.topic,
             reactions: [],
         };
@@ -96,8 +96,8 @@ export class DemoTransport implements Transport {
                 timestamp: Date.now(),
                 content: buildReply(trigger.content),
                 contentIsHtml: false,
-                type: "stream",
-                streamName: trigger.streamName,
+                type: "channel",
+                channelName: trigger.channelName,
                 topic: trigger.topic,
                 reactions: [],
             };

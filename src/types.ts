@@ -1,4 +1,4 @@
-export type MessageType = "stream" | "private";
+export type MessageType = "channel" | "direct";
 
 export interface User {
     userId: number;
@@ -23,19 +23,19 @@ export interface Message {
     content: string;
     contentIsHtml: boolean;
     type: MessageType;
-    streamName: string | undefined;
+    channelName: string | undefined;
     topic: string | undefined;
     reactions: Reaction[];
 }
 
-export interface Stream {
-    streamId: number;
+export interface Channel {
+    channelId: number;
     name: string;
     description: string;
 }
 
 export interface SendMessageParams {
-    type: "stream" | "direct";
+    type: "channel" | "direct";
     channel?: string | undefined;
     topic?: string | undefined;
     recipients?: string[] | undefined;
