@@ -1018,6 +1018,9 @@ button {
 
 .emoji-picker-search-row {
     margin-bottom: 6px;
+    /* Keep the search box from being squeezed by the grid below
+     * in the column flex layout. */
+    flex: 0 0 auto;
 }
 
 .emoji-picker-search {
@@ -1046,6 +1049,14 @@ button {
     overflow-x: auto;
     border-bottom: 1px solid var(--zc-color-border);
     padding-bottom: 4px;
+    /* The picker is a column flex container; without these the
+     * nav loses its content height when the grid has many rows
+     * (default flex-shrink: 1 lets the parent squeeze it). Pin the
+     * height so all category tabs stay visible regardless of how
+     * tall the grid content is. */
+    flex: 0 0 auto;
+    min-height: 32px;
+    align-items: center;
 }
 
 .emoji-picker-tab {
