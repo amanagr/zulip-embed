@@ -1,4 +1,11 @@
-import type {Message, ScopeFilter, SendMessageParams, ZulipEventListener} from "./types.ts";
+import type {
+    Channel,
+    Message,
+    ScopeFilter,
+    SendMessageParams,
+    Topic,
+    ZulipEventListener,
+} from "./types.ts";
 
 export interface ReactionParams {
     messageId: number;
@@ -48,5 +55,11 @@ export interface Transport {
     // snapshot) should still implement the method as a no-op so the
     // composer's debounced emitter doesn't need to feature-detect.
     sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
+    // Subscribed channels for the connected viewer. Transports that
+    // don't model subscriptions (snapshot) should return an empty array.
+    listChannels(): Promise<Channel[]>;
+    // Topics inside a channel, newest first. Returns [] when the channel
+    // has no topics or the transport can't enumerate them.
+    listTopics(channel: string): Promise<Topic[]>;
     getCurrentUserId(): number | undefined;
 }

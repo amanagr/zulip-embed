@@ -32,6 +32,22 @@ export interface Channel {
     channelId: number;
     name: string;
     description: string;
+    // Present for subscribed channels surfaced by listChannels(). Omit
+    // for channel objects that describe a scope the viewer isn't a
+    // member of (e.g. discovery flows) so UIs can branch on the shape.
+    color?: string | undefined;
+    pinToTop?: boolean | undefined;
+    isMuted?: boolean | undefined;
+    unreadCount?: number | undefined;
+}
+
+export interface Topic {
+    name: string;
+    // Newest message id in the topic. Lets the UI sort without having to
+    // re-derive chronology from the message list.
+    maxMessageId: number;
+    unreadCount?: number | undefined;
+    isResolved?: boolean | undefined;
 }
 
 export interface SendMessageParams {

@@ -9,10 +9,12 @@ import type {
     TypingOp,
 } from "./transport.ts";
 import type {
+    Channel,
     Message,
     Reaction,
     ScopeFilter,
     SendMessageParams,
+    Topic,
     TypingUser,
     ZulipEventListener,
 } from "./types.ts";
@@ -117,6 +119,32 @@ const messagesResponseSchema = z.object({
 
 const sendMessageResponseSchema = z.object({
     id: z.number(),
+});
+
+// Subscription records from /api/v1/users/me/subscriptions. We pluck
+// display fields (color/pin/mute) and the per-user unread aggregate
+// that /register reports separately.
+const subscriptionSchema = z.object({
+    stream_id: z.number(),
+    name: z.string(),
+    description: z.string().optional(),
+    color: z.string().optional(),
+    pin_to_top: z.boolean().optional(),
+    is_muted: z.boolean().optional(),
+});
+const subscriptionsResponseSchema = z.object({
+    subscriptions: z.array(subscriptionSchema),
+});
+
+// /api/v1/users/me/{stream_id}/topics — newest first. The server does
+// not expose resolved-topic / unread state here; those come from the
+// event queue on /register. We merge them in listTopics() below.
+const topicSchema = z.object({
+    name: z.string(),
+    max_id: z.number(),
+});
+const topicsResponseSchema = z.object({
+    topics: z.array(topicSchema),
 });
 
 export class ZulipTransport implements Transport {
@@ -322,6 +350,52 @@ export class ZulipTransport implements Transport {
             // composer fires these rapidly, so swallow the error rather
             // than spam the error banner — typing is a best-effort hint.
         }
+    }
+
+    async listChannels(): Promise<Channel[]> {
+        const response = await this.request(
+            "GET",
+            "/api/v1/users/me/subscriptions",
+        );
+        const parsed = subscriptionsResponseSchema.parse(response);
+        // pinned-first, then alphabetical within each group. Matches the
+        // ordering Zulip's own web app uses.
+        const rows = [...parsed.subscriptions].sort((a, b) => {
+            const ap = a.pin_to_top ? 0 : 1;
+            const bp = b.pin_to_top ? 0 : 1;
+            if (ap !== bp) return ap - bp;
+            return a.name.localeCompare(b.name);
+        });
+        return rows.map((s) => ({
+            channelId: s.stream_id,
+            name: s.name,
+            description: s.description ?? "",
+            color: s.color,
+            pinToTop: s.pin_to_top,
+            isMuted: s.is_muted,
+        }));
+    }
+
+    async listTopics(channel: string): Promise<Topic[]> {
+        const streamId = await this.resolveChannelId(channel);
+        if (streamId === undefined) return [];
+        const response = await this.request(
+            "GET",
+            `/api/v1/users/me/${String(streamId)}/topics`,
+        );
+        const parsed = topicsResponseSchema.parse(response);
+        // Resolved topics carry a magic prefix in their name; peel it off
+        // and expose the resolved state as a boolean so UI code doesn't
+        // need to know the server's sentinel.
+        const resolvedPrefix = "\u2714 ";
+        return parsed.topics.map((t) => {
+            const isResolved = t.name.startsWith(resolvedPrefix);
+            return {
+                name: isResolved ? t.name.slice(resolvedPrefix.length) : t.name,
+                maxMessageId: t.max_id,
+                isResolved,
+            };
+        });
     }
 
     getCurrentUserId(): number | undefined {

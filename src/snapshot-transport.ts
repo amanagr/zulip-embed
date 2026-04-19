@@ -9,9 +9,11 @@ import type {
     TypingOp,
 } from "./transport.ts";
 import type {
+    Channel,
     Message,
     ScopeFilter,
     SendMessageParams,
+    Topic,
     ZulipEventListener,
 } from "./types.ts";
 
@@ -140,6 +142,17 @@ export class SnapshotTransport implements Transport {
         // mode, but a host that mounted the component without the
         // read-only attribute shouldn't see error noise for typing pings.
         return Promise.resolve();
+    }
+
+    listChannels(): Promise<Channel[]> {
+        // Snapshots are a single pre-baked window; they don't describe
+        // subscription state. Return empty so a channel-list mounted on
+        // top of a snapshot renders an empty state rather than fake data.
+        return Promise.resolve([]);
+    }
+
+    listTopics(_channel: string): Promise<Topic[]> {
+        return Promise.resolve([]);
     }
 
     getCurrentUserId(): number | undefined {

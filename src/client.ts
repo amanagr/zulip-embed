@@ -7,8 +7,10 @@ import type {
     TypingOp,
 } from "./transport.ts";
 import type {
+    Channel,
     ScopeFilter,
     SendMessageParams,
+    Topic,
     ZulipEvent,
     ZulipEventListener,
 } from "./types.ts";
@@ -64,6 +66,14 @@ export class ZulipClient {
 
     async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
         await this.transport.sendTyping(op, scope);
+    }
+
+    async listChannels(): Promise<Channel[]> {
+        return this.transport.listChannels();
+    }
+
+    async listTopics(channel: string): Promise<Topic[]> {
+        return this.transport.listTopics(channel);
     }
 
     getCurrentUserId(): number | undefined {

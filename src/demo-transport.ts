@@ -8,10 +8,12 @@ import type {
     TypingOp,
 } from "./transport.ts";
 import type {
+    Channel,
     Message,
     Reaction,
     ScopeFilter,
     SendMessageParams,
+    Topic,
     ZulipEventListener,
 } from "./types.ts";
 
@@ -229,6 +231,39 @@ export class DemoTransport implements Transport {
             this.onEvent?.({type: "typing", users: []});
         }
         return Promise.resolve();
+    }
+
+    async listChannels(): Promise<Channel[]> {
+        // Single seeded channel matching the demo feed. Advertised with a
+        // small unread count so the channel-list badge renders out-of-box
+        // in demo mode.
+        return Promise.resolve([
+            {
+                channelId: 1,
+                name: this.scope.channel,
+                description: "In-memory demo channel",
+                color: "#7f56d9",
+                pinToTop: true,
+                isMuted: false,
+                unreadCount: 0,
+            },
+        ]);
+    }
+
+    async listTopics(channel: string): Promise<Topic[]> {
+        // Return whatever distinct topics the in-memory feed currently
+        // carries for this channel, newest-first by max id.
+        const byTopic = new Map<string, number>();
+        for (const m of this.messages) {
+            if (m.channelName !== channel) continue;
+            if (m.topic === undefined) continue;
+            const prev = byTopic.get(m.topic) ?? -1;
+            if (m.id > prev) byTopic.set(m.topic, m.id);
+        }
+        const topics: Topic[] = [...byTopic.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, maxId]) => ({name, maxMessageId: maxId}));
+        return Promise.resolve(topics);
     }
 
     getCurrentUserId(): number {
