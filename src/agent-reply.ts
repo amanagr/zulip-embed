@@ -75,10 +75,6 @@ interface AgentReplyDeps {
     // transport hasn't finished /users/me yet) we fall back to a synthetic
     // id so the UI still has something to key on.
     getCurrentUser?: (() => Promise<User>) | undefined;
-    // Testing hook. When provided, replaces setTimeout; tests use
-    // vi.useFakeTimers() which patches the global setTimeout, so this
-    // is strictly for DI in edge cases.
-    now?: () => number;
 }
 
 export function createAgentReplyHandle(deps: AgentReplyDeps): AgentReplyHandle {
