@@ -30,9 +30,16 @@ declare module "@zulip/embed" {
         userIds: number[];
     }
 
+    export interface User {
+        userId: number;
+        email: string;
+        fullName: string;
+        avatarUrl: string;
+    }
+
     export type MessageType = "channel" | "direct";
 
-    export interface Message {
+    interface MessageBase {
         id: number;
         senderId: number;
         senderFullName: string;
@@ -41,11 +48,21 @@ declare module "@zulip/embed" {
         timestamp: number;
         content: string;
         contentIsHtml: boolean;
-        type: MessageType;
-        channelName?: string;
-        topic?: string;
         reactions: Reaction[];
     }
+
+    export interface ChannelMessage extends MessageBase {
+        type: "channel";
+        channelName: string;
+        topic: string;
+    }
+
+    export interface DirectMessage extends MessageBase {
+        type: "direct";
+        recipients: User[];
+    }
+
+    export type Message = ChannelMessage | DirectMessage;
 
     export interface ScopeFilter {
         channel: string;
@@ -56,14 +73,13 @@ declare module "@zulip/embed" {
         | "idle"
         | "connecting"
         | "connected"
+        | "reconnecting"
         | "disconnected"
         | "error";
 
-    export interface SendMessageParams {
-        content: string;
-        channel?: string;
-        topic?: string;
-    }
+    export type SendMessageParams =
+        | {type: "channel"; channel: string; topic: string; content: string}
+        | {type: "direct"; recipients: string[]; content: string};
 
     export interface TypingUser {
         userId: number;
@@ -72,16 +88,23 @@ declare module "@zulip/embed" {
 
     export type TypingOp = "start" | "stop";
 
-    export interface User {
-        id: number;
-        fullName: string;
-        email: string;
-        avatarUrl: string;
-    }
+    export type ErrorCode =
+        | "unauthorized"
+        | "channel-not-subscribed"
+        | "network"
+        | "rate-limited"
+        | "jwt-not-configured"
+        | "unknown";
 
     export type ZulipEvent =
-        | {type: "connection"; status: ConnectionStatus}
-        | {type: "error"; error: string}
+        | {
+              type: "connection";
+              status: ConnectionStatus;
+              attempt?: number;
+              delayMs?: number;
+              reason?: string;
+          }
+        | {type: "error"; code: ErrorCode; error: string; retryAfterMs?: number}
         | {type: "message"; message: Message}
         | {type: "typing"; op: TypingOp; user: TypingUser; scope: ScopeFilter}
         | {type: string; [key: string]: unknown};
@@ -98,11 +121,10 @@ declare module "@zulip/embed" {
         hasMore: boolean;
     }
 
-    export interface EditMessageParams {
-        messageId: number;
-        content?: string;
-        topic?: string;
-    }
+    export type EditMessageParams =
+        | {messageId: number; kind: "content"; content: string}
+        | {messageId: number; kind: "topic"; topic: string}
+        | {messageId: number; kind: "both"; content: string; topic: string};
 
     export interface ReactionParams {
         messageId: number;
@@ -122,6 +144,7 @@ declare module "@zulip/embed" {
         listChannels?(): Promise<Channel[]>;
         listTopics?(channel: string): Promise<Topic[]>;
         getCurrentUserId?(): number | undefined;
+        getCurrentUser?(): Promise<User>;
     }
 
     export class ZulipClient {
@@ -132,6 +155,7 @@ declare module "@zulip/embed" {
         subscribe(listener: () => void): () => void;
         sendMessage(content: string): Promise<void>;
         loadOlder(): Promise<void>;
+        readonly whenReady: Promise<User>;
     }
 
     export class DemoTransport implements Transport {
