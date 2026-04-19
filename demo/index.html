@@ -3,18 +3,27 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Zulip Embed — Developer Preview</title>
+        <title>Zulip Embed — Fully customizable chat, in one tag</title>
+        <meta
+            name="description"
+            content="Drop fully-customizable Zulip chat into any web app, React app, Flutter app, or React Native app with a single component. Apache-2.0, framework-agnostic, MIT-license-friendly."
+        />
         <link rel="icon" href="data:," />
         <style>
             :root {
-                --page-bg: #f6f7fb;
-                --page-text: #111827;
-                --page-muted: #6b7280;
-                --card-bg: #ffffff;
-                --card-border: #e5e7eb;
+                --page-bg: #0b0f1a;
+                --page-bg-2: #111527;
+                --page-text: #e8ecf4;
+                --page-muted: #8b94a9;
+                --card-bg: #121729;
+                --card-bg-2: #161c32;
+                --card-border: #232a44;
                 --accent: #6172f3;
-                --code-bg: #0f172a;
-                --code-text: #e2e8f0;
+                --accent-2: #8b5cf6;
+                --accent-3: #ec4899;
+                --success: #22c55e;
+                --code-bg: #0d1424;
+                --code-text: #d4dbe8;
             }
 
             * {
@@ -29,6 +38,7 @@
 
             body {
                 font-family:
+                    "Inter",
                     system-ui,
                     -apple-system,
                     "Segoe UI",
@@ -37,163 +47,526 @@
                 background: var(--page-bg);
                 color: var(--page-text);
                 line-height: 1.55;
+                -webkit-font-smoothing: antialiased;
             }
 
-            .page {
-                max-width: 1100px;
+            a {
+                color: inherit;
+            }
+
+            /* -------- Navigation -------- */
+
+            .nav {
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                backdrop-filter: saturate(140%) blur(14px);
+                background: rgba(11, 15, 26, 0.82);
+                border-bottom: 1px solid var(--card-border);
+            }
+
+            .nav-inner {
+                max-width: 1180px;
+                margin: 0 auto;
+                padding: 14px 24px;
+                display: flex;
+                align-items: center;
+                gap: 32px;
+            }
+
+            .brand {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                font-size: 16px;
+                text-decoration: none;
+                color: var(--page-text);
+            }
+
+            .brand-dot {
+                width: 24px;
+                height: 24px;
+                border-radius: 7px;
+                background: linear-gradient(
+                    135deg,
+                    var(--accent) 0%,
+                    var(--accent-2) 60%,
+                    var(--accent-3) 100%
+                );
+                box-shadow: 0 6px 16px rgba(97, 114, 243, 0.45);
+            }
+
+            .nav-links {
+                display: flex;
+                gap: 24px;
+                font-size: 14px;
+            }
+
+            .nav-links a {
+                color: var(--page-muted);
+                text-decoration: none;
+                transition: color 120ms ease;
+            }
+
+            .nav-links a:hover {
+                color: var(--page-text);
+            }
+
+            .nav-cta {
+                margin-left: auto;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 14px;
+                border-radius: 8px;
+                font-size: 13px;
+                font-weight: 600;
+                text-decoration: none;
+                border: 1px solid transparent;
+                cursor: pointer;
+                transition:
+                    transform 100ms ease,
+                    background 120ms ease,
+                    box-shadow 120ms ease;
+            }
+
+            .btn-ghost {
+                color: var(--page-muted);
+                border-color: var(--card-border);
+            }
+
+            .btn-ghost:hover {
+                color: var(--page-text);
+                background: var(--card-bg);
+            }
+
+            .btn-primary {
+                background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+                color: white;
+                box-shadow: 0 10px 24px -8px rgba(97, 114, 243, 0.55);
+            }
+
+            .btn-primary:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 28px -8px rgba(97, 114, 243, 0.7);
+            }
+
+            /* -------- Hero -------- */
+
+            .hero {
+                position: relative;
+                overflow: hidden;
+                padding: 72px 24px 48px;
+                isolation: isolate;
+            }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -10% -10% auto -10%;
+                height: 80%;
+                background:
+                    radial-gradient(
+                        60% 60% at 15% 10%,
+                        rgba(97, 114, 243, 0.28) 0%,
+                        transparent 70%
+                    ),
+                    radial-gradient(
+                        50% 50% at 85% 20%,
+                        rgba(139, 92, 246, 0.26) 0%,
+                        transparent 70%
+                    ),
+                    radial-gradient(
+                        40% 40% at 50% 90%,
+                        rgba(236, 72, 153, 0.18) 0%,
+                        transparent 70%
+                    );
+                filter: blur(40px);
+                z-index: -1;
+            }
+
+            .hero-inner {
+                max-width: 1180px;
+                margin: 0 auto;
+                display: grid;
+                grid-template-columns: 1.1fr 1fr;
+                gap: 56px;
+                align-items: center;
+            }
+
+            @media (max-width: 980px) {
+                .hero-inner {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .hero-kicker {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 12px;
+                background: rgba(97, 114, 243, 0.12);
+                border: 1px solid rgba(97, 114, 243, 0.3);
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 500;
+                letter-spacing: 0.02em;
+                color: #b7c1ff;
+                margin-bottom: 20px;
+            }
+
+            .hero-kicker-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--success);
+                box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+            }
+
+            .hero h1 {
+                margin: 0 0 18px;
+                font-size: clamp(34px, 5vw, 58px);
+                line-height: 1.02;
+                letter-spacing: -0.025em;
+                font-weight: 700;
+            }
+
+            .hero h1 .grad {
+                background: linear-gradient(
+                    110deg,
+                    #a5b4ff 0%,
+                    var(--accent) 30%,
+                    var(--accent-2) 60%,
+                    var(--accent-3) 100%
+                );
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+
+            .hero p.lead {
+                margin: 0 0 28px;
+                font-size: 18px;
+                color: var(--page-muted);
+                max-width: 560px;
+                line-height: 1.6;
+            }
+
+            .hero-ctas {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                margin-bottom: 32px;
+            }
+
+            .hero-stats {
+                display: flex;
+                gap: 32px;
+                flex-wrap: wrap;
+                color: var(--page-muted);
+                font-size: 13px;
+                border-top: 1px solid var(--card-border);
+                padding-top: 24px;
+            }
+
+            .hero-stats b {
+                display: block;
+                color: var(--page-text);
+                font-size: 20px;
+                font-weight: 700;
+                letter-spacing: -0.01em;
+                margin-bottom: 2px;
+            }
+
+            .hero-preview {
+                position: relative;
+                height: 560px;
+                perspective: 1800px;
+            }
+
+            .hero-preview-main {
+                position: absolute;
+                inset: 0;
+                transform: rotateY(-8deg) rotateX(3deg);
+                border-radius: 18px;
+                overflow: hidden;
+                box-shadow:
+                    0 40px 80px -20px rgba(0, 0, 0, 0.6),
+                    0 0 0 1px rgba(255, 255, 255, 0.08);
+            }
+
+            .hero-preview-main zulip-chat {
+                height: 100%;
+                width: 100%;
+            }
+
+            .hero-preview-ping {
+                position: absolute;
+                top: -18px;
+                right: -12px;
+                z-index: 3;
+                background: linear-gradient(135deg, var(--accent-2), var(--accent-3));
+                color: white;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 6px 14px;
+                border-radius: 999px;
+                box-shadow: 0 10px 24px -8px rgba(236, 72, 153, 0.55);
+                transform: rotate(4deg);
+            }
+
+            /* -------- Sections -------- */
+
+            main {
+                max-width: 1180px;
                 margin: 0 auto;
                 padding: 48px 24px 120px;
             }
 
-            header.hero h1 {
-                margin: 0 0 12px;
-                font-size: 38px;
-                letter-spacing: -0.02em;
-            }
-
-            header.hero p {
-                margin: 0 0 8px;
-                color: var(--page-muted);
-                max-width: 640px;
-                font-size: 16px;
-            }
-
-            .badges {
-                display: inline-flex;
-                gap: 8px;
-                margin-top: 16px;
-            }
-
-            .badge {
-                background: #eef2ff;
-                color: #3730a3;
-                border-radius: 999px;
-                padding: 4px 12px;
-                font-size: 12px;
-                font-weight: 500;
-            }
-
             section {
-                margin-top: 48px;
+                margin-top: 96px;
+            }
+
+            .section-kicker {
+                color: var(--accent);
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+                margin: 0 0 10px;
             }
 
             h2 {
-                font-size: 20px;
-                margin: 0 0 16px;
+                font-size: clamp(26px, 3.2vw, 36px);
+                margin: 0 0 12px;
+                letter-spacing: -0.02em;
+                font-weight: 700;
             }
 
-            .grid {
+            .section-lead {
+                color: var(--page-muted);
+                max-width: 640px;
+                margin: 0 0 32px;
+                font-size: 16px;
+            }
+
+            /* -------- Feature grid -------- */
+
+            .features {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-                gap: 24px;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 18px;
             }
 
-            .panel {
+            .feature {
                 background: var(--card-bg);
                 border: 1px solid var(--card-border);
-                border-radius: 16px;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 12px;
+                border-radius: 14px;
+                padding: 22px;
+                transition: border-color 120ms ease, transform 120ms ease;
             }
 
-            .panel h3 {
-                margin: 0;
+            .feature:hover {
+                border-color: rgba(97, 114, 243, 0.6);
+                transform: translateY(-2px);
+            }
+
+            .feature-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: 10px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 14px;
+                background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+                color: white;
+            }
+
+            .feature h3 {
+                margin: 0 0 6px;
                 font-size: 15px;
             }
 
-            .panel p {
+            .feature p {
                 margin: 0;
                 color: var(--page-muted);
                 font-size: 13px;
+                line-height: 1.55;
             }
 
-            .panel .chat-slot {
-                margin-top: 8px;
-            }
+            /* -------- Preview grid (showroom) -------- */
 
-            .controls {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 12px;
-                align-items: end;
-                margin-top: 16px;
-                padding: 16px;
-                background: #eef2ff;
-                border-radius: 12px;
-                border: 1px solid #e0e7ff;
-            }
-
-            .field {
-                display: flex;
-                flex-direction: column;
-                gap: 4px;
-                font-size: 12px;
-            }
-
-            .field label {
-                color: var(--page-muted);
-                font-weight: 500;
-            }
-
-            .field input,
-            .field select {
-                padding: 6px 10px;
-                border: 1px solid var(--card-border);
-                border-radius: 6px;
-                background: white;
-                font: inherit;
-            }
-
-            button.primary {
-                background: var(--accent);
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 6px;
-                font-weight: 600;
-                cursor: pointer;
-            }
-
-            pre {
-                background: var(--code-bg);
-                color: var(--code-text);
-                padding: 16px;
-                border-radius: 12px;
-                font-size: 13px;
-                overflow: auto;
-            }
-
-            code {
-                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            }
-
-            .footer-note {
-                margin-top: 48px;
-                text-align: center;
-                color: var(--page-muted);
-                font-size: 13px;
-            }
-
-            zulip-chat {
-                width: 100%;
-            }
-
-            zulip-channel-list,
-            zulip-topic-list {
-                width: 100%;
-                height: 280px;
-            }
-
-            .playground {
+            .showroom {
                 display: grid;
-                grid-template-columns: minmax(260px, 340px) 1fr;
-                gap: 24px;
+                grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+                gap: 20px;
+            }
+
+            .showroom-card {
                 background: var(--card-bg);
                 border: 1px solid var(--card-border);
                 border-radius: 16px;
-                padding: 20px;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .showroom-label {
+                padding: 14px 18px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                border-bottom: 1px solid var(--card-border);
+                background: var(--card-bg-2);
+            }
+
+            .showroom-label h3 {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            .showroom-label .tag {
+                font-size: 11px;
+                color: var(--page-muted);
+                font-weight: 500;
+                padding: 2px 8px;
+                border-radius: 999px;
+                border: 1px solid var(--card-border);
+            }
+
+            .showroom-slot {
+                padding: 16px;
+            }
+
+            .showroom-slot zulip-chat {
+                width: 100%;
+                height: 420px;
+            }
+
+            .showroom-slot zulip-channel-list,
+            .showroom-slot zulip-topic-list {
+                width: 100%;
+                height: 380px;
+            }
+
+            /* -------- Framework tabs -------- */
+
+            .tabs {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                margin-bottom: 16px;
+            }
+
+            .tab {
+                padding: 8px 14px;
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 10px;
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--page-muted);
+                cursor: pointer;
+                transition:
+                    background 120ms ease,
+                    color 120ms ease,
+                    border-color 120ms ease;
+            }
+
+            .tab:hover {
+                color: var(--page-text);
+            }
+
+            .tab[aria-selected="true"] {
+                background: rgba(97, 114, 243, 0.12);
+                border-color: rgba(97, 114, 243, 0.6);
+                color: #d8ddff;
+            }
+
+            .snippet {
+                position: relative;
+                background: var(--code-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 14px;
+                padding: 20px 24px;
+                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                font-size: 13px;
+                line-height: 1.6;
+                color: var(--code-text);
+                overflow: auto;
+                white-space: pre;
+            }
+
+            .snippet[hidden] {
+                display: none;
+            }
+
+            .copy-btn {
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                background: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                color: var(--page-muted);
+                font-size: 11px;
+                padding: 4px 10px;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 120ms ease;
+            }
+
+            .copy-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: var(--page-text);
+            }
+
+            .copy-btn.copied {
+                background: rgba(34, 197, 94, 0.15);
+                border-color: rgba(34, 197, 94, 0.5);
+                color: #6ee7b7;
+            }
+
+            .kw {
+                color: #c792ea;
+            }
+
+            .str {
+                color: #c3e88d;
+            }
+
+            .attr {
+                color: #82aaff;
+            }
+
+            .tag {
+                color: #f07178;
+            }
+
+            .com {
+                color: #5f6c7b;
+                font-style: italic;
+            }
+
+            /* -------- Playground section -------- */
+
+            .playground {
+                display: grid;
+                grid-template-columns: minmax(280px, 360px) 1fr;
+                gap: 24px;
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 18px;
+                padding: 24px;
             }
 
             @media (max-width: 860px) {
@@ -205,18 +578,44 @@
             .playground-controls {
                 display: flex;
                 flex-direction: column;
-                gap: 12px;
+                gap: 14px;
+            }
+
+            .playground-controls .field {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                font-size: 12px;
+            }
+
+            .playground-controls .field label {
+                color: var(--page-muted);
+                font-weight: 500;
+            }
+
+            .playground-controls .field input[type="text"],
+            .playground-controls .field input[type="url"],
+            .playground-controls .field select {
+                padding: 8px 10px;
+                border: 1px solid var(--card-border);
+                border-radius: 8px;
+                background: var(--page-bg);
+                color: var(--page-text);
+                font: inherit;
             }
 
             .playground-controls .field input[type="color"] {
-                padding: 0;
-                height: 32px;
+                height: 34px;
                 width: 100%;
+                padding: 0;
                 background: transparent;
+                border: 1px solid var(--card-border);
+                border-radius: 8px;
             }
 
             .playground-controls .field input[type="range"] {
                 width: 100%;
+                accent-color: var(--accent);
             }
 
             .preset-row {
@@ -227,139 +626,628 @@
 
             .preset {
                 border: 1px solid var(--card-border);
-                background: #f9fafb;
+                background: var(--page-bg);
+                color: var(--page-muted);
                 border-radius: 999px;
-                padding: 4px 10px;
+                padding: 4px 11px;
                 font-size: 12px;
                 cursor: pointer;
+                transition: all 120ms ease;
             }
 
             .preset:hover {
-                background: #eef2ff;
+                background: rgba(97, 114, 243, 0.12);
                 border-color: var(--accent);
-                color: var(--accent);
+                color: #d8ddff;
+            }
+
+            .playground-preview .chat-slot {
+                position: relative;
+            }
+
+            .playground-preview zulip-chat {
+                width: 100%;
+                min-height: 480px;
             }
 
             .snippet-title {
                 margin: 20px 0 8px;
-                font-size: 14px;
+                font-size: 13px;
                 color: var(--page-muted);
                 font-weight: 500;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
+            }
+
+            /* -------- Use cases -------- */
+
+            .usecases {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+                gap: 20px;
+            }
+
+            .usecase {
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 16px;
+                padding: 24px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                transition: border-color 120ms ease, transform 120ms ease;
+            }
+
+            .usecase:hover {
+                border-color: rgba(97, 114, 243, 0.5);
+                transform: translateY(-2px);
+            }
+
+            .usecase-emoji {
+                font-size: 28px;
+                line-height: 1;
+            }
+
+            .usecase h3 {
+                margin: 0;
+                font-size: 16px;
+            }
+
+            .usecase p {
+                margin: 0;
+                font-size: 13px;
+                color: var(--page-muted);
+                line-height: 1.6;
+            }
+
+            .usecase code {
+                display: inline-block;
+                font-size: 11px;
+                background: var(--code-bg);
+                padding: 2px 6px;
+                border-radius: 4px;
+                color: #a5b4ff;
+                margin-top: 4px;
+            }
+
+            /* -------- Comparison table -------- */
+
+            .compare {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 8px;
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 16px;
+                overflow: hidden;
+            }
+
+            .compare th,
+            .compare td {
+                padding: 14px 18px;
+                border-bottom: 1px solid var(--card-border);
+                text-align: left;
+                font-size: 14px;
+            }
+
+            .compare th {
+                background: var(--card-bg-2);
+                font-weight: 600;
+                color: var(--page-muted);
+                font-size: 12px;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+            }
+
+            .compare tr:last-child td {
+                border-bottom: none;
+            }
+
+            .compare td.yes {
+                color: var(--success);
+            }
+
+            .compare td.no {
+                color: #f87171;
+            }
+
+            /* -------- Connect panel -------- */
+
+            .controls {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 12px;
+                padding: 22px;
+                background: var(--card-bg);
+                border-radius: 16px;
+                border: 1px solid var(--card-border);
+                margin-bottom: 18px;
+            }
+
+            .controls .field {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                font-size: 12px;
+            }
+
+            .controls .field label {
+                color: var(--page-muted);
+                font-weight: 500;
+            }
+
+            .controls .field input,
+            .controls .field select {
+                padding: 8px 10px;
+                border: 1px solid var(--card-border);
+                border-radius: 8px;
+                background: var(--page-bg);
+                color: var(--page-text);
+                font: inherit;
+            }
+
+            .controls .connect-row {
+                grid-column: 1 / -1;
+                display: flex;
+                gap: 10px;
+                justify-content: flex-end;
+            }
+
+            /* -------- Footer -------- */
+
+            footer.site {
+                margin-top: 120px;
+                padding: 48px 24px;
+                border-top: 1px solid var(--card-border);
+                background: var(--page-bg-2);
+            }
+
+            .footer-inner {
+                max-width: 1180px;
+                margin: 0 auto;
+                display: flex;
+                gap: 32px;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                align-items: flex-end;
+            }
+
+            .footer-inner p {
+                color: var(--page-muted);
+                font-size: 13px;
+                margin: 6px 0 0;
+            }
+
+            .footer-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 18px;
+                font-size: 13px;
+            }
+
+            .footer-links a {
+                color: var(--page-muted);
+                text-decoration: none;
+            }
+
+            .footer-links a:hover {
+                color: var(--page-text);
+            }
+
+            /* -------- Links inside prose -------- */
+
+            .lead a,
+            .section-lead a,
+            .usecase a {
+                color: #a5b4ff;
+                text-decoration: underline;
+                text-underline-offset: 3px;
+                text-decoration-thickness: 1px;
+            }
+
+            .lead a:hover,
+            .section-lead a:hover,
+            .usecase a:hover {
+                color: var(--page-text);
+            }
+
+            /* -------- Big CTA -------- */
+
+            .cta {
+                padding: 48px 32px;
+                background:
+                    radial-gradient(
+                        60% 100% at 20% 50%,
+                        rgba(97, 114, 243, 0.3) 0%,
+                        transparent 60%
+                    ),
+                    radial-gradient(
+                        60% 100% at 80% 50%,
+                        rgba(236, 72, 153, 0.2) 0%,
+                        transparent 60%
+                    ),
+                    var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 22px;
+                text-align: center;
+            }
+
+            .cta h2 {
+                font-size: clamp(26px, 3vw, 34px);
+                margin-bottom: 12px;
+            }
+
+            .cta p {
+                color: var(--page-muted);
+                font-size: 15px;
+                margin: 0 0 22px;
+                max-width: 600px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .cta-row {
+                display: flex;
+                gap: 12px;
+                justify-content: center;
+                flex-wrap: wrap;
             }
         </style>
     </head>
     <body>
-        <div class="page">
-            <header class="hero">
-                <h1>Zulip Embed</h1>
-                <p>
-                    Drop Zulip chat into any site as a framework-agnostic Web Component — one tag,
-                    Shadow DOM isolation, themeable via CSS variables, Apache-2.0 licensed.
-                </p>
-                <div class="badges">
-                    <span class="badge">v0.1 · developer preview</span>
-                    <span class="badge">Apache-2.0</span>
-                    <span class="badge">demo mode · no server required</span>
+        <nav class="nav">
+            <div class="nav-inner">
+                <a class="brand" href="#top">
+                    <span class="brand-dot"></span>
+                    <span>Zulip&nbsp;Embed</span>
+                </a>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#showroom">Showroom</a>
+                    <a href="#theming">Theming</a>
+                    <a href="#frameworks">Frameworks</a>
+                    <a href="#usecases">Use cases</a>
+                    <a href="#compare">Compare</a>
                 </div>
-            </header>
-
-            <section>
-                <h2>Live-ish snapshot · chat.zulip.org</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Real messages from
-                    <a
-                        href="https://chat.zulip.org/#narrow/channel/1-announce/topic/Zulip.20updates/"
-                        >#announce &gt; Zulip updates</a
+                <div class="nav-cta">
+                    <a class="btn btn-ghost" href="https://github.com/zulip/zulip-embed"
+                        >GitHub ★</a
                     >
-                    on chat.zulip.org, fetched at deploy time by a scheduled GitHub Action and baked
-                    into a JSON snapshot the demo loads. Read-only; no API key ever reaches your
-                    browser.
-                </p>
-                <div class="panel">
-                    <h3>#announce &gt; Zulip updates</h3>
-                    <p>
-                        Rendered end-to-end: headings, code blocks, lists, tables, blockquotes,
-                        mentions, and reactions — whatever the Zulip community posted.
+                    <a class="btn btn-primary" href="#install">Get started →</a>
+                </div>
+            </div>
+        </nav>
+
+        <header class="hero" id="top">
+            <div class="hero-inner">
+                <div>
+                    <div class="hero-kicker">
+                        <span class="hero-kicker-dot"></span>
+                        Apache-2.0 · v0.1 developer preview · Zulip backend
+                    </div>
+                    <h1>
+                        Drop a <span class="grad">fully-customizable chat</span> into your
+                        product in one tag.
+                    </h1>
+                    <p class="lead">
+                        Zulip Embed ships a framework-agnostic Web Component, typed React and
+                        React Native wrappers, and a first-class Flutter package — all backed
+                        by the open-source Zulip server you already know. Brand it. Theme it.
+                        Snapshot it. Ship it.
                     </p>
-                    <div class="chat-slot">
+                    <div class="hero-ctas">
+                        <a class="btn btn-primary" href="#install">
+                            Start with &lt;zulip-chat&gt;
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="M5 12h14M13 5l7 7-7 7" />
+                            </svg>
+                        </a>
+                        <a class="btn btn-ghost" href="#theming">Try the theming playground</a>
+                    </div>
+                    <div class="hero-stats">
+                        <div>
+                            <b>5</b>
+                            frameworks supported
+                        </div>
+                        <div>
+                            <b>276</b>
+                            tests passing
+                        </div>
+                        <div>
+                            <b>0</b>
+                            credentials leave your browser
+                        </div>
+                        <div>
+                            <b>Apache-2.0</b>
+                            OSS license
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-preview">
+                    <span class="hero-preview-ping">✨ real chat.zulip.org feed</span>
+                    <div class="hero-preview-main">
                         <zulip-chat
                             snapshot-url="./snapshots/announce-zulip-updates.json"
                             channel="announce"
                             topic="Zulip updates"
-                            theme="light"
+                            theme="dark"
                             mode="inline"
+                            brand-name="Zulip Community"
+                            brand-logo="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
                         ></zulip-chat>
                     </div>
                 </div>
-            </section>
+            </div>
+        </header>
 
-            <section>
-                <h2>Rendering showcase</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Every message element the embed supports, rendered in one topic. Use this as a
-                    visual regression surface for the sanitizer + CSS.
+        <main>
+            <section id="features">
+                <p class="section-kicker">Built for developers</p>
+                <h2>Everything a chat integration should be.</h2>
+                <p class="section-lead">
+                    No iframes, no WebView hacks, no vendor lock-in. Same component, same API,
+                    same look on web, iOS, Android, and desktop. Own the UX end-to-end.
                 </p>
-                <div class="panel">
-                    <h3>#showcase &gt; rendering</h3>
-                    <p>
-                        Bold · italic · strikethrough · inline code · code blocks · blockquotes ·
-                        ordered + unordered lists · tables · mentions · channel references ·
-                        headings · horizontal rules · keyboard shortcuts · images · reactions.
-                    </p>
-                    <div class="chat-slot">
-                        <zulip-chat
-                            demo
-                            channel="showcase"
-                            topic="rendering"
-                            theme="light"
-                            mode="inline"
-                        ></zulip-chat>
+                <div class="features">
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <polyline points="16 18 22 12 16 6"></polyline>
+                                <polyline points="8 6 2 12 8 18"></polyline>
+                            </svg>
+                        </div>
+                        <h3>One tag. Zero JS framework required.</h3>
+                        <p>
+                            A standard Web Component. Drop the script tag, write
+                            <code>&lt;zulip-chat&gt;</code> — done. Works in vanilla HTML,
+                            Next.js, SvelteKit, Rails, WordPress, anything that renders the DOM.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="4"></circle>
+                                <path
+                                    d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+                                ></path>
+                            </svg>
+                        </div>
+                        <h3>Theme every pixel via CSS variables.</h3>
+                        <p>
+                            Shadow DOM keeps your CSS out; <code>--zc-*</code> tokens let it in.
+                            Swap colors, fonts, radii, heights without forking. Light + dark
+                            presets ship built-in.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect x="3" y="11" width="18" height="10" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                        </div>
+                        <h3>Credentials stay on-device.</h3>
+                        <p>
+                            Requests go browser → your Zulip server. No middle tier, no vendor
+                            data-store, no tracking. Or go read-only with a pre-baked JSON
+                            snapshot (no API key in the browser at all).
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <h3>Real Zulip, not a fake.</h3>
+                        <p>
+                            Same REST API every Zulip client uses. Full Markdown, code blocks,
+                            KaTeX math, spoilers, reactions, message edit/delete, typing
+                            indicators, topics, channels — not a subset.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                                ></path>
+                            </svg>
+                        </div>
+                        <h3>Headless when you want it.</h3>
+                        <p>
+                            Import <code>ZulipClient</code> + a transport and render your own
+                            UI. The SDK is the same on web, React Native, Flutter — you pick how
+                            much UI we ship for you.
+                        </p>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <polygon
+                                    points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                                ></polygon>
+                            </svg>
+                        </div>
+                        <h3>Fast, tiny, tree-shakeable.</h3>
+                        <p>
+                            ~55&nbsp;KB gzipped for the full bundle. ESM-only, no polyfills, no
+                            jQuery, no bundled React. You ship what you use.
+                        </p>
                     </div>
                 </div>
             </section>
 
-            <section>
-                <h2>Live previews</h2>
-                <div class="grid">
-                    <div class="panel">
-                        <h3>Inline · light theme</h3>
-                        <p>Runs entirely in your browser with seeded messages and an echo bot.</p>
-                        <div class="chat-slot">
+            <section id="showroom">
+                <p class="section-kicker">Live showroom</p>
+                <h2>Every variant, wired up, on this page.</h2>
+                <p class="section-lead">
+                    Real widgets, not screenshots. The dark panel at the top is a snapshot of
+                    chat.zulip.org; the rest run a seeded demo transport so you can type,
+                    react, and edit without a server.
+                </p>
+                <div class="showroom">
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>Community feed · snapshot mode</h3>
+                            <span class="tag">read-only</span>
+                        </div>
+                        <div class="showroom-slot">
                             <zulip-chat
-                                demo
-                                channel="general"
-                                topic="welcome"
+                                snapshot-url="./snapshots/announce-zulip-updates.json"
+                                channel="announce"
+                                topic="Zulip updates"
                                 theme="light"
                                 mode="inline"
                             ></zulip-chat>
                         </div>
                     </div>
-
-                    <div class="panel">
-                        <h3>Inline · dark theme</h3>
-                        <p>
-                            Only the <code>theme</code> attribute changed — every other token
-                            adapts.
-                        </p>
-                        <div class="chat-slot">
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>Support desk · branded</h3>
+                            <span class="tag">demo mode</span>
+                        </div>
+                        <div class="showroom-slot">
                             <zulip-chat
                                 demo
                                 channel="support"
                                 topic="first message"
+                                theme="light"
+                                mode="inline"
+                                brand-name="Acme Support"
+                                brand-logo="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+                            ></zulip-chat>
+                        </div>
+                    </div>
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>Product chat · dark theme</h3>
+                            <span class="tag">demo mode</span>
+                        </div>
+                        <div class="showroom-slot">
+                            <zulip-chat
+                                demo
+                                channel="design"
+                                topic="feedback"
                                 theme="dark"
                                 mode="inline"
                             ></zulip-chat>
                         </div>
                     </div>
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>Full Markdown showcase</h3>
+                            <span class="tag">demo mode</span>
+                        </div>
+                        <div class="showroom-slot">
+                            <zulip-chat
+                                demo
+                                channel="showcase"
+                                topic="rendering"
+                                theme="light"
+                                mode="inline"
+                            ></zulip-chat>
+                        </div>
+                    </div>
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>&lt;zulip-channel-list&gt; · live data</h3>
+                            <span class="tag">chat.zulip.org</span>
+                        </div>
+                        <div class="showroom-slot">
+                            <zulip-channel-list
+                                snapshot-url="./snapshots/chat-zulip-channels.json"
+                                theme="light"
+                            ></zulip-channel-list>
+                        </div>
+                    </div>
+                    <div class="showroom-card">
+                        <div class="showroom-label">
+                            <h3>&lt;zulip-topic-list channel="announce"&gt;</h3>
+                            <span class="tag">chat.zulip.org</span>
+                        </div>
+                        <div class="showroom-slot">
+                            <zulip-topic-list
+                                snapshot-url="./snapshots/chat-zulip-channels.json"
+                                channel="announce"
+                                theme="light"
+                            ></zulip-topic-list>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section>
-                <h2>Theming playground</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Every knob below is a plain CSS custom property or attribute. Tweak them live,
-                    then copy the snippet that appears underneath — paste it into your own page and
-                    the widget renders the same way without any JS glue.
+            <section id="theming">
+                <p class="section-kicker">Customize everything</p>
+                <h2>Theme, brand, and resize — live.</h2>
+                <p class="section-lead">
+                    Every knob below is a plain CSS custom property or attribute. Tweak them,
+                    watch the preview react instantly, copy the snippet that appears underneath
+                    — paste into your own page and the widget renders identically.
                 </p>
                 <div class="playground">
                     <div class="playground-controls">
@@ -397,21 +1285,50 @@
                             <input id="pg-text" type="color" value="#111827" />
                         </div>
                         <div class="field">
-                            <label for="pg-radius">Corner radius (<span id="pg-radius-val">12</span>px)</label>
-                            <input id="pg-radius" type="range" min="0" max="28" step="1" value="12" />
+                            <label for="pg-radius"
+                                >Corner radius (<span id="pg-radius-val">12</span>px)</label
+                            >
+                            <input
+                                id="pg-radius"
+                                type="range"
+                                min="0"
+                                max="28"
+                                step="1"
+                                value="12"
+                            />
                         </div>
                         <div class="field">
-                            <label for="pg-height">Height (<span id="pg-height-val">560</span>px)</label>
-                            <input id="pg-height" type="range" min="360" max="760" step="10" value="560" />
+                            <label for="pg-height"
+                                >Height (<span id="pg-height-val">560</span>px)</label
+                            >
+                            <input
+                                id="pg-height"
+                                type="range"
+                                min="360"
+                                max="760"
+                                step="10"
+                                value="560"
+                            />
                         </div>
                         <div class="field">
-                            <label for="pg-font-size">Font size (<span id="pg-font-size-val">14</span>px)</label>
-                            <input id="pg-font-size" type="range" min="12" max="18" step="1" value="14" />
+                            <label for="pg-font-size"
+                                >Font size (<span id="pg-font-size-val">14</span>px)</label
+                            >
+                            <input
+                                id="pg-font-size"
+                                type="range"
+                                min="12"
+                                max="18"
+                                step="1"
+                                value="14"
+                            />
                         </div>
                         <div class="field">
                             <label for="pg-font-family">Font family</label>
                             <select id="pg-font-family">
-                                <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+                                <option
+                                    value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+                                >
                                     System
                                 </option>
                                 <option value="'Inter', system-ui, sans-serif">Inter</option>
@@ -467,48 +1384,254 @@
                 </div>
 
                 <h3 class="snippet-title">Copy this into your page</h3>
-                <pre><code id="pg-snippet"></code></pre>
+                <div class="snippet"
+                    ><button class="copy-btn" data-copy-target="pg-snippet">Copy</button
+                    ><code id="pg-snippet"></code></div
+                >
             </section>
 
-            <section>
-                <h2>Channel &amp; topic pickers</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Standalone list components you can compose into your own navigation, fed by the
-                    same chat.zulip.org snapshot the announce feed uses — every row below is a real
-                    subscribed channel or live topic. Each fires a
-                    <code>channel-selected</code> / <code>topic-selected</code> CustomEvent on
-                    click.
+            <section id="frameworks">
+                <p class="section-kicker">Every stack</p>
+                <h2>One SDK, five ways to ship.</h2>
+                <p class="section-lead">
+                    Pick the wrapper that matches your stack. Each one is a thin layer over the
+                    same Zulip client, so you only learn the API once.
                 </p>
-                <div class="grid">
-                    <div class="panel">
-                        <h3>&lt;zulip-channel-list&gt;</h3>
-                        <p>Subscribed channels with color dot, pin, mute, and unread badge.</p>
-                        <div class="chat-slot">
-                            <zulip-channel-list
-                                snapshot-url="./snapshots/chat-zulip-channels.json"
-                                theme="light"
-                            ></zulip-channel-list>
-                        </div>
+                <div class="tabs" role="tablist">
+                    <button class="tab" role="tab" data-framework="html" aria-selected="true">
+                        HTML
+                    </button>
+                    <button class="tab" role="tab" data-framework="react">React</button>
+                    <button class="tab" role="tab" data-framework="react-native">
+                        React Native
+                    </button>
+                    <button class="tab" role="tab" data-framework="flutter">Flutter</button>
+                    <button class="tab" role="tab" data-framework="headless">
+                        Headless SDK
+                    </button>
+                </div>
+                <div class="snippet" data-framework-panel="html"
+                    ><button class="copy-btn" data-copy-target="snippet-html">Copy</button
+                    ><code id="snippet-html"><span class="tag">&lt;script</span> <span class="attr">type</span>=<span class="str">"module"</span>
+  <span class="attr">src</span>=<span class="str">"https://unpkg.com/@zulip/embed"</span><span class="tag">&gt;&lt;/script&gt;</span>
+
+<span class="tag">&lt;zulip-chat</span>
+  <span class="attr">server</span>=<span class="str">"https://chat.example.com"</span>
+  <span class="attr">email</span>=<span class="str">"you@example.com"</span>
+  <span class="attr">api-key</span>=<span class="str">"..."</span>
+  <span class="attr">channel</span>=<span class="str">"general"</span>
+  <span class="attr">topic</span>=<span class="str">"welcome"</span>
+  <span class="attr">theme</span>=<span class="str">"dark"</span>
+  <span class="attr">brand-name</span>=<span class="str">"Acme Support"</span>
+<span class="tag">&gt;&lt;/zulip-chat&gt;</span></code></div
+                >
+                <div class="snippet" data-framework-panel="react" hidden
+                    ><button class="copy-btn" data-copy-target="snippet-react">Copy</button
+                    ><code id="snippet-react"><span class="kw">import</span> {ZulipChat} <span class="kw">from</span> <span class="str">"@zulip/react"</span>;
+
+<span class="kw">export function</span> <span class="attr">SupportPage</span>() {
+  <span class="kw">return</span> (
+    <span class="tag">&lt;ZulipChat</span>
+      <span class="attr">server</span>=<span class="str">"https://chat.example.com"</span>
+      <span class="attr">email</span>=<span class="str">"you@example.com"</span>
+      <span class="attr">apiKey</span>={<span class="attr">import</span>.meta.env.VITE_ZULIP_KEY}
+      <span class="attr">channel</span>=<span class="str">"general"</span>
+      <span class="attr">theme</span>=<span class="str">"dark"</span>
+      <span class="attr">brandName</span>=<span class="str">"Acme Support"</span>
+    /<span class="tag">&gt;</span>
+  );
+}</code></div
+                >
+                <div class="snippet" data-framework-panel="react-native" hidden
+                    ><button class="copy-btn" data-copy-target="snippet-rn">Copy</button
+                    ><code id="snippet-rn"><span class="kw">import</span> {
+  ZulipChatScreen, ZulipTransport, DARK_THEME,
+} <span class="kw">from</span> <span class="str">"@zulip/react-native"</span>;
+
+<span class="kw">const</span> transport = <span class="kw">new</span> <span class="attr">ZulipTransport</span>({
+  server: <span class="str">"https://chat.example.com"</span>,
+  email: <span class="str">"you@example.com"</span>,
+  apiKey: process.env.ZULIP_KEY!,
+  scope: { channel: <span class="str">"general"</span> },
+});
+
+<span class="kw">export default function</span> <span class="attr">SupportScreen</span>() {
+  <span class="kw">return</span> (
+    <span class="tag">&lt;ZulipChatScreen</span>
+      <span class="attr">transport</span>={transport}
+      <span class="attr">scope</span>={{ channel: <span class="str">"general"</span> }}
+      <span class="attr">theme</span>={DARK_THEME}
+      <span class="attr">brandName</span>=<span class="str">"Acme Support"</span>
+    /<span class="tag">&gt;</span>
+  );
+}</code></div
+                >
+                <div class="snippet" data-framework-panel="flutter" hidden
+                    ><button class="copy-btn" data-copy-target="snippet-flutter">Copy</button
+                    ><code id="snippet-flutter"><span class="com">// flutter pub add zulip_embed</span>
+
+<span class="kw">import</span> <span class="str">'package:zulip_embed/zulip_embed.dart'</span>;
+
+ZulipChat(
+  transport: ZulipTransport(
+    serverUrl: Uri.parse(<span class="str">'https://chat.example.com'</span>),
+    email: <span class="str">'you@example.com'</span>,
+    apiKey: <span class="str">'...'</span>,
+  ),
+  channel: <span class="str">'general'</span>,
+  topic: <span class="str">'welcome'</span>,
+  theme: ZulipTheme.dark,
+)</code></div
+                >
+                <div class="snippet" data-framework-panel="headless" hidden
+                    ><button class="copy-btn" data-copy-target="snippet-headless">Copy</button
+                    ><code id="snippet-headless"><span class="kw">import</span> {ZulipClient, ZulipTransport} <span class="kw">from</span> <span class="str">"@zulip/embed"</span>;
+
+<span class="kw">const</span> transport = <span class="kw">new</span> <span class="attr">ZulipTransport</span>({
+  server: <span class="str">"https://chat.example.com"</span>,
+  email: <span class="str">"you@example.com"</span>,
+  apiKey: process.env.ZULIP_KEY!,
+  scope: { channel: <span class="str">"general"</span> },
+});
+
+<span class="kw">const</span> client = <span class="kw">new</span> <span class="attr">ZulipClient</span>({
+  transport,
+  scope: { channel: <span class="str">"general"</span> },
+});
+
+client.subscribe(() =&gt; render(client.getState().messages));
+<span class="kw">await</span> client.connect();</code></div
+                >
+            </section>
+
+            <section id="usecases">
+                <p class="section-kicker">Shipped patterns</p>
+                <h2>What people build with it.</h2>
+                <p class="section-lead">
+                    Not just a chat window. Use the primitives to assemble the integration your
+                    product actually needs.
+                </p>
+                <div class="usecases">
+                    <div class="usecase">
+                        <div class="usecase-emoji">💬</div>
+                        <h3>Intercom-style support messenger</h3>
+                        <p>
+                            Floating bottom-right launcher that expands into a full thread. Pass
+                            <code>mode="floating"</code> and you're done — the chat bubble, open
+                            state, and scrolling are handled.
+                        </p>
                     </div>
-                    <div class="panel">
-                        <h3>&lt;zulip-topic-list channel="announce"&gt;</h3>
-                        <p>Topics inside a channel, newest-first, with resolved markers.</p>
-                        <div class="chat-slot">
-                            <zulip-topic-list
-                                snapshot-url="./snapshots/chat-zulip-channels.json"
-                                channel="announce"
-                                theme="light"
-                            ></zulip-topic-list>
-                        </div>
+                    <div class="usecase">
+                        <div class="usecase-emoji">🏛️</div>
+                        <h3>Community hub</h3>
+                        <p>
+                            Embed a public channel as a read-only snapshot on your marketing
+                            site. No API key in the browser; refresh the JSON on a cron. Works
+                            with static hosts.
+                        </p>
+                    </div>
+                    <div class="usecase">
+                        <div class="usecase-emoji">💡</div>
+                        <h3>Product feedback thread</h3>
+                        <p>
+                            Drop the widget on each feature docs page, with
+                            <code>channel="feedback"</code> and
+                            <code>topic</code> set to the feature name. Threads grouped
+                            automatically via Zulip topics.
+                        </p>
+                    </div>
+                    <div class="usecase">
+                        <div class="usecase-emoji">🛠️</div>
+                        <h3>Admin inbox clone</h3>
+                        <p>
+                            Compose <code>&lt;zulip-channel-list&gt;</code>,
+                            <code>&lt;zulip-topic-list&gt;</code>, and
+                            <code>&lt;zulip-chat&gt;</code> into a three-pane layout. You own
+                            routing.
+                        </p>
+                    </div>
+                    <div class="usecase">
+                        <div class="usecase-emoji">📱</div>
+                        <h3>Native mobile chat screen</h3>
+                        <p>
+                            Same Zulip backend, real React Native FlatList + TextInput. Ship
+                            chat inside your existing Expo / bare RN app without a WebView.
+                        </p>
+                    </div>
+                    <div class="usecase">
+                        <div class="usecase-emoji">🧪</div>
+                        <h3>Internal tools</h3>
+                        <p>
+                            Add a chat sidebar to your admin panel so support and engineering
+                            can collaborate inline. On-premise Zulip keeps it inside your
+                            network.
+                        </p>
                     </div>
                 </div>
             </section>
 
-            <section>
-                <h2>Custom connection</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Point the component at a real Zulip server. Your credentials stay in your
-                    browser — requests go directly to the server you enter.
+            <section id="compare">
+                <p class="section-kicker">Honest comparison</p>
+                <h2>Why not the usual chat SaaS?</h2>
+                <p class="section-lead">
+                    If you want a hosted widget with a monthly seat price, there are great
+                    options. If you want to own the backend and the UI, without per-seat
+                    pricing, this is for you.
+                </p>
+                <table class="compare">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Zulip Embed</th>
+                            <th>Hosted chat SaaS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>License</td>
+                            <td class="yes">Apache-2.0 · self-host anywhere</td>
+                            <td class="no">Proprietary · vendor-hosted</td>
+                        </tr>
+                        <tr>
+                            <td>Pricing</td>
+                            <td class="yes">Free forever (you host Zulip)</td>
+                            <td class="no">Per-seat or per-MAU</td>
+                        </tr>
+                        <tr>
+                            <td>Data residency</td>
+                            <td class="yes">Your server, your rules</td>
+                            <td class="no">Vendor-controlled</td>
+                        </tr>
+                        <tr>
+                            <td>UI customization</td>
+                            <td class="yes">CSS custom properties + full source</td>
+                            <td class="no">Theming panel, fixed layout</td>
+                        </tr>
+                        <tr>
+                            <td>Framework support</td>
+                            <td class="yes">Web / React / RN / Flutter</td>
+                            <td class="no">Usually web + RN only</td>
+                        </tr>
+                        <tr>
+                            <td>Threaded conversations</td>
+                            <td class="yes">Native Zulip topics</td>
+                            <td class="no">Flat or bolt-on</td>
+                        </tr>
+                        <tr>
+                            <td>Leaves your page?</td>
+                            <td class="yes">Never (direct to your Zulip)</td>
+                            <td class="no">Always (vendor cloud)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section id="connect">
+                <p class="section-kicker">Your Zulip, right here</p>
+                <h2>Point it at your own server.</h2>
+                <p class="section-lead">
+                    Credentials stay in this tab. Requests go browser → your Zulip. Nothing
+                    passes through us, because there is no us.
                 </p>
                 <div class="controls">
                     <div class="field">
@@ -538,12 +1661,18 @@
                             <option value="dark">dark</option>
                         </select>
                     </div>
-                    <button id="connect" class="primary" type="button">Connect</button>
+                    <div class="connect-row">
+                        <button id="connect" class="btn btn-primary" type="button">
+                            Connect
+                        </button>
+                    </div>
                 </div>
-                <div class="panel" style="margin-top: 16px">
-                    <h3>Live instance</h3>
-                    <p>Configure and click Connect above, or stay in demo mode below.</p>
-                    <div class="chat-slot" id="live-slot">
+                <div class="showroom-card">
+                    <div class="showroom-label">
+                        <h3>Live instance</h3>
+                        <span class="tag" id="live-status">demo mode</span>
+                    </div>
+                    <div class="showroom-slot" id="live-slot">
                         <zulip-chat
                             demo
                             channel="general"
@@ -556,115 +1685,115 @@
                 </div>
             </section>
 
-            <section>
-                <h2>Installation</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Three integration paths — pick the one that matches your stack.
-                </p>
-                <div class="grid">
-                    <div class="panel">
-                        <h3>One-line script tag</h3>
-                        <pre><code>&lt;script type="module"
-  src="https://unpkg.com/@zulip/embed"&gt;&lt;/script&gt;
-
-&lt;zulip-chat
-  server="https://chat.example.com"
-  email="you@example.com"
-  api-key="..."
-  channel="general"&gt;&lt;/zulip-chat&gt;</code></pre>
-                    </div>
-
-                    <div class="panel">
-                        <h3>npm package</h3>
-                        <pre><code>pnpm add @zulip/embed
-
-// Registers &lt;zulip-chat&gt; on import.
-import "@zulip/embed";
-
-// Or use the headless SDK directly:
-import {ZulipClient, ZulipTransport} from "@zulip/embed";</code></pre>
-                    </div>
-
-                    <div class="panel">
-                        <h3>React wrapper</h3>
-                        <pre><code>pnpm add @zulip/embed @zulip/react
-
-import {ZulipChat} from "@zulip/react";
-
-&lt;ZulipChat
-  server="https://chat.example.com"
-  email="you@example.com"
-  apiKey={process.env.ZULIP_KEY}
-  channel="general"
-  brandName="Acme Support"
-/&gt;</code></pre>
-                    </div>
+            <section id="install">
+                <p class="section-kicker">Ready to ship</p>
+                <h2>Install in under a minute.</h2>
+                <div class="tabs" role="tablist">
+                    <button class="tab" role="tab" data-install="script" aria-selected="true">
+                        Script tag
+                    </button>
+                    <button class="tab" role="tab" data-install="npm">npm / pnpm / yarn</button>
+                    <button class="tab" role="tab" data-install="react">React</button>
+                    <button class="tab" role="tab" data-install="rn">React Native</button>
+                    <button class="tab" role="tab" data-install="flutter">Flutter</button>
                 </div>
-            </section>
+                <div class="snippet" data-install-panel="script"
+                    ><button class="copy-btn" data-copy-target="install-script">Copy</button
+                    ><code id="install-script"><span class="tag">&lt;script</span> <span class="attr">type</span>=<span class="str">"module"</span> <span class="attr">src</span>=<span class="str">"https://unpkg.com/@zulip/embed"</span><span class="tag">&gt;&lt;/script&gt;</span>
+<span class="tag">&lt;zulip-chat</span> <span class="attr">server</span>=<span class="str">"..."</span> <span class="attr">email</span>=<span class="str">"..."</span> <span class="attr">api-key</span>=<span class="str">"..."</span> <span class="attr">channel</span>=<span class="str">"general"</span><span class="tag">&gt;&lt;/zulip-chat&gt;</span></code></div
+                >
+                <div class="snippet" data-install-panel="npm" hidden
+                    ><button class="copy-btn" data-copy-target="install-npm">Copy</button
+                    ><code id="install-npm">pnpm add @zulip/embed
 
-            <section>
-                <h2>Native mobile &amp; desktop</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    First-class Flutter widgets — no WebView, no JS bridge. Same Zulip REST API,
-                    native rendering on iOS, Android, macOS, Windows, Linux, and web.
-                </p>
-                <div class="panel" style="margin-top: 16px">
-                    <h3>Flutter demo</h3>
-                    <p>
-                        The same example app compiled for Flutter web. It ships in the repo at
-                        <code>packages/flutter/example/</code> and runs unmodified on every Flutter
-                        target.
-                    </p>
-                    <p>
-                        <a
-                            href="./flutter/"
-                            style="
-                                display: inline-block;
-                                margin-top: 4px;
-                                background: var(--accent);
-                                color: white;
-                                padding: 8px 16px;
-                                border-radius: 6px;
-                                font-weight: 600;
-                                text-decoration: none;
-                            "
-                            >Open the Flutter demo →</a
-                        >
-                    </p>
-                    <pre><code>flutter pub add zulip_embed
+<span class="com">// Registers &lt;zulip-chat&gt; on import.</span>
+<span class="kw">import</span> <span class="str">"@zulip/embed"</span>;
+
+<span class="com">// Or use the headless SDK directly:</span>
+<span class="kw">import</span> {ZulipClient, ZulipTransport} <span class="kw">from</span> <span class="str">"@zulip/embed"</span>;</code></div
+                >
+                <div class="snippet" data-install-panel="react" hidden
+                    ><button class="copy-btn" data-copy-target="install-react">Copy</button
+                    ><code id="install-react">pnpm add @zulip/embed @zulip/react
+
+<span class="kw">import</span> {ZulipChat} <span class="kw">from</span> <span class="str">"@zulip/react"</span>;
+
+<span class="tag">&lt;ZulipChat</span> <span class="attr">demo</span> <span class="attr">channel</span>=<span class="str">"general"</span> <span class="attr">theme</span>=<span class="str">"dark"</span> /<span class="tag">&gt;</span></code></div
+                >
+                <div class="snippet" data-install-panel="rn" hidden
+                    ><button class="copy-btn" data-copy-target="install-rn">Copy</button
+                    ><code id="install-rn">pnpm add @zulip/embed @zulip/react-native
+
+<span class="kw">import</span> {ZulipChatScreen, DemoTransport} <span class="kw">from</span> <span class="str">"@zulip/react-native"</span>;
+
+<span class="tag">&lt;ZulipChatScreen</span>
+  <span class="attr">transport</span>={<span class="kw">new</span> DemoTransport()}
+  <span class="attr">scope</span>={{channel: <span class="str">"general"</span>}}
+/<span class="tag">&gt;</span></code></div
+                >
+                <div class="snippet" data-install-panel="flutter" hidden
+                    ><button class="copy-btn" data-copy-target="install-flutter">Copy</button
+                    ><code id="install-flutter">flutter pub add zulip_embed
+
+<span class="kw">import</span> <span class="str">'package:zulip_embed/zulip_embed.dart'</span>;
 
 ZulipChat(
-  transport: ZulipTransport(
-    serverUrl: Uri.parse('https://chat.example.com'),
-    email: 'you@example.com',
-    apiKey: '...',
-  ),
-  channel: 'general',
-  topic: 'welcome',
-)</code></pre>
-                </div>
+  transport: DemoTransport(),
+  channel: <span class="str">'general'</span>,
+  topic: <span class="str">'welcome'</span>,
+)</code></div
+                >
             </section>
 
             <section>
-                <h2>Floating messenger</h2>
-                <p style="color: var(--page-muted); margin-top: 0">
-                    Pinned to the bottom-right of the viewport, like an Intercom messenger.
-                </p>
+                <div class="cta">
+                    <h2>Ship the chat your users deserve.</h2>
+                    <p>
+                        Drop it in today, own it forever. No per-seat pricing, no vendor
+                        tracking, no half-hidden "enterprise" tier. Open source, all the way
+                        down.
+                    </p>
+                    <div class="cta-row">
+                        <a class="btn btn-primary" href="https://github.com/zulip/zulip-embed"
+                            >Star on GitHub</a
+                        >
+                        <a class="btn btn-ghost" href="./flutter/">Flutter demo →</a>
+                        <a class="btn btn-ghost" href="#theming">Theming playground →</a>
+                    </div>
+                </div>
             </section>
-
-            <p class="footer-note">
-                Built on the Zulip open-source chat platform ·
-                <a href="https://github.com/zulip/zulip">zulip/zulip</a>
-            </p>
-        </div>
+        </main>
 
         <zulip-chat
             demo
             channel="design"
             topic="floating widget"
-            theme="light"
+            theme="dark"
             mode="floating"
+            brand-name="Acme Support"
         ></zulip-chat>
+
+        <footer class="site">
+            <div class="footer-inner">
+                <div>
+                    <div class="brand">
+                        <span class="brand-dot"></span>
+                        <span>Zulip Embed</span>
+                    </div>
+                    <p>
+                        Built on the Zulip open-source chat platform ·
+                        <a href="https://github.com/zulip/zulip">zulip/zulip</a>
+                    </p>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/zulip/zulip-embed">GitHub</a>
+                    <a href="https://github.com/zulip/zulip-embed/blob/main/README.md">Docs</a>
+                    <a href="https://github.com/zulip/zulip-embed/blob/main/LICENSE">License</a>
+                    <a href="https://zulip.com">Zulip.com</a>
+                    <a href="#top">Back to top</a>
+                </div>
+            </div>
+        </footer>
 
         <script type="module" src="./main.ts"></script>
     </body>

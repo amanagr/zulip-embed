@@ -222,3 +222,86 @@ if (pgChat) {
 
     applyPlayground();
 }
+
+// ------------------------------------------------------------------
+// Framework + install tab switching.
+//
+// The landing page repeats the "tabs → snippet panels" pattern twice:
+// once for the framework gallery (HTML / React / React Native / Flutter
+// / Headless) and once for the install commands (script / npm / react /
+// rn / flutter). Both groups share a single wiring by driving off the
+// data-* attributes on the buttons and panels, so we don't end up with
+// two nearly-identical copies of the same logic.
+// ------------------------------------------------------------------
+
+function wireTabs(groupAttr: string, panelAttr: string): void {
+    const tabs = document.querySelectorAll<HTMLButtonElement>(`[${groupAttr}]`);
+    const panels = document.querySelectorAll<HTMLElement>(`[${panelAttr}]`);
+    if (tabs.length === 0 || panels.length === 0) return;
+
+    function activate(key: string): void {
+        for (const tab of tabs) {
+            const isActive = tab.dataset[toCamel(groupAttr)] === key;
+            tab.setAttribute("aria-selected", isActive ? "true" : "false");
+        }
+        for (const panel of panels) {
+            const isActive = panel.dataset[toCamel(panelAttr)] === key;
+            panel.hidden = !isActive;
+        }
+    }
+
+    for (const tab of tabs) {
+        tab.addEventListener("click", () => {
+            const key = tab.dataset[toCamel(groupAttr)];
+            if (key === undefined || key === "") return;
+            activate(key);
+        });
+    }
+}
+
+// data-framework-panel → "frameworkPanel" (dataset keys are camelCase).
+function toCamel(attr: string): string {
+    return attr
+        .replace(/^data-/, "")
+        .replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+}
+
+wireTabs("data-framework", "data-framework-panel");
+wireTabs("data-install", "data-install-panel");
+
+// Copy-to-clipboard buttons. Each carries `data-copy-target="<id>"`
+// pointing at the <code> element whose textContent should be copied.
+for (const btn of document.querySelectorAll<HTMLButtonElement>(".copy-btn")) {
+    btn.addEventListener("click", async () => {
+        const targetId = btn.dataset["copyTarget"];
+        if (targetId === undefined || targetId === "") return;
+        const target = document.getElementById(targetId);
+        if (target === null) return;
+        const text = target.textContent ?? "";
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            // Clipboard API unavailable (http://, older browsers) — fall
+            // back to the legacy execCommand path so the button still
+            // works on the built site.
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand("copy");
+            } finally {
+                document.body.removeChild(ta);
+            }
+        }
+        const original = btn.textContent ?? "Copy";
+        btn.textContent = "Copied!";
+        btn.classList.add("copied");
+        window.setTimeout(() => {
+            btn.textContent = original;
+            btn.classList.remove("copied");
+        }, 1600);
+    });
+}
