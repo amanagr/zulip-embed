@@ -1355,6 +1355,95 @@ button {
     color: var(--zc-color-muted);
 }
 
+/*
+ * Inline confirmation widget — agent emits a ConfirmationMessagePart,
+ * viewer clicks Approve or Deny to unblock the orchestrator. Mirrors
+ * the compact card look of the tool-call panel so the two read as a
+ * single family of agent surfaces.
+ */
+.confirmation-card {
+    margin: 6px 0;
+    padding: var(--zc-spacing-md);
+    border: 1px solid var(--zc-color-border);
+    border-radius: var(--zc-radius-sm);
+    background: var(--zc-color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: var(--zc-spacing-sm);
+}
+
+.confirmation-prompt {
+    font-size: 13px;
+    color: var(--zc-color-text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.confirmation-actions {
+    display: flex;
+    gap: var(--zc-spacing-sm);
+    flex-wrap: wrap;
+}
+
+.confirmation-button {
+    padding: 6px 12px;
+    border-radius: var(--zc-radius-sm);
+    border: 1px solid var(--zc-color-border);
+    font-size: 12.5px;
+    font-weight: 600;
+    background: var(--zc-color-bg);
+    color: var(--zc-color-text);
+    transition:
+        background 120ms ease,
+        border-color 120ms ease,
+        opacity 120ms ease;
+}
+
+.confirmation-button:focus-visible {
+    outline: 2px solid var(--zc-color-accent);
+    outline-offset: 2px;
+}
+
+.confirmation-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.confirmation-button.approve {
+    background: var(--zc-color-accent);
+    color: var(--zc-color-accent-contrast);
+    border-color: var(--zc-color-accent);
+}
+
+.confirmation-button.approve:hover:not(:disabled) {
+    filter: brightness(1.05);
+}
+
+.confirmation-button.deny:hover:not(:disabled) {
+    background: var(--zc-color-surface);
+    border-color: var(--zc-color-muted);
+}
+
+:host([theme="dark"]) .confirmation-card {
+    background: var(--zc-color-surface);
+    border-color: var(--zc-color-border);
+}
+
+:host([theme="dark"]) .confirmation-button {
+    background: var(--zc-color-bg);
+    border-color: var(--zc-color-border);
+}
+
+:host([theme="dark"]) .confirmation-button.approve {
+    background: var(--zc-color-accent);
+    color: var(--zc-color-accent-contrast);
+    border-color: var(--zc-color-accent);
+}
+
+:host([theme="dark"]) .confirmation-button.deny:hover:not(:disabled) {
+    background: var(--zc-color-border);
+}
+
 .error-banner {
     background: #fee2e2;
     color: #991b1b;

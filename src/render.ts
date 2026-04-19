@@ -8,7 +8,13 @@ import {
     type MessageActionDescriptor,
     type MessageActionHostContext,
 } from "./message-actions.ts";
-import type {Message, MessagePart, Reaction} from "./types.ts";
+import type {
+    ConfirmationMessagePart,
+    Message,
+    MessagePart,
+    Reaction,
+    ZulipConfirmationResponseEventDetail,
+} from "./types.ts";
 
 export interface RenderContext {
     // Absolute origin (e.g. https://zulip.example.com) used to resolve
@@ -97,8 +103,7 @@ function computeActionsKey(message: Message, context: RenderContext): string {
     const host = context.messageActionHostContext;
     if (host === undefined) return "";
     const ids = context.messageActionIds ?? DEFAULT_MESSAGE_ACTIONS;
-    const isOwn =
-        host.currentUserId !== undefined && message.senderId === host.currentUserId;
+    const isOwn = host.currentUserId !== undefined && message.senderId === host.currentUserId;
     const extraIds = (context.messageActionsExtra ?? []).map((d) => d.id);
     return `${ids.join(",")}|${extraIds.join(",")}|${isOwn ? "1" : "0"}`;
 }
@@ -150,8 +155,7 @@ export function renderMessages(
     for (const [index, message] of messages.entries()) {
         // The separator counts as "a different sender above" for spacing
         // purposes — force a full avatar/meta on the message right after.
-        const sameSender =
-            index === unreadAnchorIndex ? false : prevSenderId === message.senderId;
+        const sameSender = index === unreadAnchorIndex ? false : prevSenderId === message.senderId;
 
         if (index === unreadAnchorIndex) {
             const separator = buildUnreadSeparator();
@@ -279,10 +283,7 @@ export function renderMessage(
 // message (e.g. `onlyOwn` on a message they didn't send) is filtered out
 // upstream. Returns undefined when nothing would render — that way a
 // rogue CSS rule can't light up an empty bar.
-function renderMessageActions(
-    message: Message,
-    context: RenderContext,
-): HTMLElement | undefined {
+function renderMessageActions(message: Message, context: RenderContext): HTMLElement | undefined {
     const host = context.messageActionHostContext;
     if (host === undefined) return undefined;
     const ids = context.messageActionIds ?? DEFAULT_MESSAGE_ACTIONS;
@@ -311,9 +312,7 @@ function makeActionButton(
     const button = document.createElement("button");
     button.type = "button";
     button.className =
-        descriptor.variant === "danger"
-            ? "message-action message-action-danger"
-            : "message-action";
+        descriptor.variant === "danger" ? "message-action message-action-danger" : "message-action";
     button.dataset["actionId"] = descriptor.id;
     button.setAttribute("aria-label", descriptor.label);
     button.title = descriptor.label;
@@ -480,16 +479,89 @@ function renderPart(part: MessagePart): HTMLElement {
         box.append(input);
         return box;
     }
-    // tool_result
-    const box = document.createElement("div");
-    box.classList.add("part-tool-result");
-    box.dataset["toolCallId"] = part.toolCallId;
-    if (part.isError === true) box.dataset["error"] = "true";
-    const output = document.createElement("pre");
-    output.classList.add("part-tool-result-output");
-    output.textContent = safeStringify(part.output);
-    box.append(output);
-    return box;
+    if (part.type === "tool_result") {
+        const box = document.createElement("div");
+        box.classList.add("part-tool-result");
+        box.dataset["toolCallId"] = part.toolCallId;
+        if (part.isError === true) box.dataset["error"] = "true";
+        const output = document.createElement("pre");
+        output.classList.add("part-tool-result-output");
+        output.textContent = safeStringify(part.output);
+        box.append(output);
+        return box;
+    }
+    // confirmation
+    return renderConfirmationPart(part);
+}
+
+function renderConfirmationPart(part: ConfirmationMessagePart): HTMLElement {
+    const card = document.createElement("div");
+    card.classList.add("confirmation-card");
+    card.dataset["confirmationId"] = part.id;
+    card.setAttribute("role", "group");
+    card.setAttribute("aria-label", "Confirm tool call");
+
+    const prompt = document.createElement("div");
+    prompt.classList.add("confirmation-prompt");
+    prompt.textContent = part.prompt;
+    card.append(prompt);
+
+    const actions = document.createElement("div");
+    actions.classList.add("confirmation-actions");
+
+    const approveLabel = part.approveLabel ?? "Approve";
+    const denyLabel = part.denyLabel ?? "Deny";
+    const approve = makeConfirmationButton(part, "approve", approveLabel);
+    const deny = makeConfirmationButton(part, "deny", denyLabel);
+    actions.append(approve, deny);
+    card.append(actions);
+
+    // Single shared click handler: on the first click, both buttons
+    // disable immediately (idempotency) and a bubbling CustomEvent is
+    // dispatched so the component and any outer listener can react.
+    // A second click on either button is a no-op because the `disabled`
+    // flag is checked before the event fires.
+    const onClick = (event: Event): void => {
+        const target = event.currentTarget;
+        if (!(target instanceof HTMLButtonElement)) return;
+        if (approve.disabled || deny.disabled) return;
+        approve.disabled = true;
+        deny.disabled = true;
+        const action = target.dataset["confirmationAction"] === "approve" ? "approve" : "deny";
+        card.dataset["confirmationResolved"] = action;
+        // `composed: false` keeps the event inside the shadow root so
+        // only the component's shadow-root listener sees it. The
+        // component then re-emits a composed event on the host
+        // element for embedders to pick up — that way there's exactly
+        // one "your confirmation was clicked" event on the host per
+        // click, regardless of how deep the widget sits.
+        card.dispatchEvent(
+            new CustomEvent<ZulipConfirmationResponseEventDetail>("zulip-confirmation-response", {
+                detail: {id: part.id, action, payloadSig: part.payloadSig},
+                bubbles: true,
+                composed: false,
+            }),
+        );
+    };
+    approve.addEventListener("click", onClick);
+    deny.addEventListener("click", onClick);
+
+    return card;
+}
+
+function makeConfirmationButton(
+    part: ConfirmationMessagePart,
+    action: "approve" | "deny",
+    label: string,
+): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.classList.add("confirmation-button", action);
+    button.dataset["confirmationId"] = part.id;
+    button.dataset["confirmationAction"] = action;
+    button.dataset["confirmationSig"] = part.payloadSig;
+    button.textContent = label;
+    return button;
 }
 
 function safeStringify(value: unknown): string {
@@ -708,8 +780,7 @@ export function sanitizeHtml(html: string, serverOrigin: string | undefined): Do
             // (not `//`), `./rel`, `../rel`, `bare`, `sub/path`.
             // Rejected: `javascript:`, `data:`, `vbscript:`, `blob:`,
             // `file:`, `//evil.tld`, anything with a non-allowed scheme.
-            ALLOWED_URI_REGEXP:
-                /^(?:https?:|mailto:|#|\?|\/(?!\/)|\.\.?\/|[^:/?#]+(?:$|[/?#]))/i,
+            ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\?|\/(?!\/)|\.\.?\/|[^:/?#]+(?:$|[/?#]))/i,
             FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input"],
             // Note: `style` is intentionally *not* forbidden at the attr
             // level — we need it for KaTeX layout and scrub the value

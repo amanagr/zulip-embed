@@ -32,6 +32,7 @@ import type {
     ScopeFilter,
     SendMessageParams,
     TypingUser,
+    ZulipConfirmationResponseEventDetail,
     ZulipEvent,
 } from "./types.ts";
 import {ZulipTransport} from "./zulip-transport.ts";
@@ -256,6 +257,23 @@ export class ZulipChatElement extends HTMLElement {
         // The picker lives inside .root (a positioned container) so it
         // can float above messages without escaping the rounded border.
         this.emojiPicker = createEmojiPicker(this.shadow, root);
+
+        // Inline confirmation widgets live inside the shadow root but
+        // the embedder sits on the host element. Listen for the
+        // widget's response event and re-emit a CustomEvent with the
+        // same detail on the host so framework-agnostic consumers can
+        // wire it straight into their agent orchestrator. We don't
+        // auto-send a reply here — that's the embedder's call.
+        root.addEventListener("zulip-confirmation-response", (event) => {
+            if (!(event instanceof CustomEvent)) return;
+            const detail = event.detail as ZulipConfirmationResponseEventDetail;
+            this.dispatchEvent(
+                new CustomEvent<ZulipConfirmationResponseEventDetail>(
+                    "zulip-confirmation-response",
+                    {detail, bubbles: true, composed: true},
+                ),
+            );
+        });
 
         this.shadow.replaceChildren(style, launcher, root);
     }
@@ -734,9 +752,7 @@ export class ZulipChatElement extends HTMLElement {
             const redact = this.redactMessage;
             this.setState({
                 messages:
-                    redact === undefined
-                        ? page.messages
-                        : page.messages.map((m) => redact(m)),
+                    redact === undefined ? page.messages : page.messages.map((m) => redact(m)),
                 loading: false,
                 hasMore: page.hasMore,
             });
@@ -907,7 +923,7 @@ export class ZulipChatElement extends HTMLElement {
             // the HTML sanitizer on the wrong render path.
             const nextContent = content ?? m.content;
             const nextContentIsHtml =
-                content === undefined ? m.contentIsHtml : contentIsHtml ?? false;
+                content === undefined ? m.contentIsHtml : (contentIsHtml ?? false);
             if (m.type === "channel") {
                 return {
                     ...m,
@@ -957,9 +973,7 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private updateReactions(id: number, reactions: Reaction[]): void {
-        const next = this.state.messages.map((m) =>
-            m.id === id ? {...m, reactions} : m,
-        );
+        const next = this.state.messages.map((m) => (m.id === id ? {...m, reactions} : m));
         this.setState({messages: next});
     }
 
@@ -968,9 +982,7 @@ export class ZulipChatElement extends HTMLElement {
         const userId = this.client.getCurrentUserId();
         const mine =
             userId !== undefined &&
-            message.reactions.some(
-                (r) => r.emoji === emoji && r.userIds.includes(userId),
-            );
+            message.reactions.some((r) => r.emoji === emoji && r.userIds.includes(userId));
         const call = mine
             ? this.client.removeReaction({messageId: message.id, emoji})
             : this.client.addReaction({messageId: message.id, emoji});
@@ -1033,9 +1045,7 @@ export class ZulipChatElement extends HTMLElement {
             },
         };
         context.messageActionHostContext = hostContext;
-        context.messageActionIds = parseMessageActionIds(
-            this.getAttribute("message-actions"),
-        );
+        context.messageActionIds = parseMessageActionIds(this.getAttribute("message-actions"));
         if (this.customMessageActions.length > 0) {
             context.messageActionsExtra = this.customMessageActions;
         }
@@ -1049,11 +1059,9 @@ export class ZulipChatElement extends HTMLElement {
     private copyTextToClipboard(text: string): void {
         const asyncWrite = globalThis.navigator?.clipboard?.writeText;
         if (typeof asyncWrite === "function") {
-            void asyncWrite
-                .call(globalThis.navigator.clipboard, text)
-                .catch(() => {
-                    this.copyTextLegacy(text);
-                });
+            void asyncWrite.call(globalThis.navigator.clipboard, text).catch(() => {
+                this.copyTextLegacy(text);
+            });
             return;
         }
         this.copyTextLegacy(text);
@@ -1317,11 +1325,7 @@ export class ZulipChatElement extends HTMLElement {
                 enhanceSpoilers(this.feedEl);
                 // Lazy-load KaTeX CSS the first time we render math. Safe
                 // to call repeatedly — it's a no-op once injected.
-                enhanceKatex(
-                    this.feedEl,
-                    this.shadow,
-                    this.getAttribute("katex-css") ?? undefined,
-                );
+                enhanceKatex(this.feedEl, this.shadow, this.getAttribute("katex-css") ?? undefined);
                 const banner = document.createElement("div");
                 banner.className = "feed-top-banner";
                 if (this.state.loadingOlder) {

@@ -24,7 +24,8 @@ export type MessagePart =
     | TextMessagePart
     | CodeMessagePart
     | ToolCallMessagePart
-    | ToolResultMessagePart;
+    | ToolResultMessagePart
+    | ConfirmationMessagePart;
 
 export interface TextMessagePart {
     type: "text";
@@ -61,6 +62,22 @@ export interface ToolResultMessagePart {
     toolCallId: string;
     output: unknown;
     isError?: boolean | undefined;
+}
+
+// Inline "run tool X?" prompt the agent emits to block on a human
+// decision. The widget renders a compact card with prompt text + two
+// buttons; a click dispatches a `zulip-confirmation-response`
+// CustomEvent the embedder wires back to its agent orchestrator.
+// `payloadSig` is opaque to the widget — the host produced it over
+// `(id, prompt, action)` so a malicious renderer can't forge an
+// approval. The widget just echoes it back in the response event.
+export interface ConfirmationMessagePart {
+    type: "confirmation";
+    id: string;
+    prompt: string;
+    approveLabel?: string | undefined;
+    denyLabel?: string | undefined;
+    payloadSig: string;
 }
 
 interface MessageBase {
@@ -229,6 +246,17 @@ export interface ZulipErrorEventDetail {
     code: ErrorCode;
     error: string;
     retryAfterMs?: number | undefined;
+}
+
+// Fired on the `<zulip-chat>` host when the viewer clicks Approve or
+// Deny inside a ConfirmationMessagePart card. Embedders route this to
+// their agent orchestrator to unblock (or cancel) the proposed tool
+// call. `payloadSig` is echoed through verbatim so the host can
+// verify it — the widget itself does not.
+export interface ZulipConfirmationResponseEventDetail {
+    id: string;
+    action: "approve" | "deny";
+    payloadSig: string;
 }
 
 export interface ScopeFilter {
