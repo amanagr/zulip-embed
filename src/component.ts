@@ -1,5 +1,6 @@
 import {ZulipClient} from "./client.ts";
 import {DemoTransport} from "./demo-transport.ts";
+import {enhanceKatex} from "./katex.ts";
 import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
 import {SnapshotTransport} from "./snapshot-transport.ts";
 import {enhanceSpoilers} from "./spoilers.ts";
@@ -21,6 +22,7 @@ const OBSERVED_ATTRIBUTES = [
     "mode",
     "open",
     "read-only",
+    "katex-css",
 ] as const;
 
 const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
@@ -673,6 +675,13 @@ export class ZulipChatElement extends HTMLElement {
             } else {
                 renderMessages(this.feedEl, this.state.messages, this.renderContext());
                 enhanceSpoilers(this.feedEl);
+                // Lazy-load KaTeX CSS the first time we render math. Safe
+                // to call repeatedly — it's a no-op once injected.
+                enhanceKatex(
+                    this.feedEl,
+                    this.shadow,
+                    this.getAttribute("katex-css") ?? undefined,
+                );
                 const banner = document.createElement("div");
                 banner.className = "feed-top-banner";
                 if (this.state.loadingOlder) {

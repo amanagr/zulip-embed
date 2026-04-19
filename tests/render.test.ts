@@ -44,6 +44,25 @@ describe("sanitizeHtml", () => {
         expect(host.innerHTML).not.toContain("onerror");
     });
 
+    test("strips all event-handler attributes even with style now allowed", () => {
+        // Regression cover: loosening FORBID_ATTR to let `style` through
+        // for KaTeX must not re-open the event-handler door. DOMPurify's
+        // attribute allowlist is what keeps these out.
+        const fragment = sanitizeHtml(
+            `<img src="https://example.com/a" onerror="alert(1)" onload="alert(2)">` +
+                `<span onmouseover="x" onfocus="y" onclick="z">a</span>`,
+            "https://chat.example.com",
+        );
+        const host = document.createElement("div");
+        host.append(fragment);
+        const html = host.innerHTML;
+        expect(html).not.toContain("onerror");
+        expect(html).not.toContain("onload");
+        expect(html).not.toContain("onmouseover");
+        expect(html).not.toContain("onfocus");
+        expect(html).not.toContain("onclick");
+    });
+
     test("drops javascript: hrefs and javascript: image src", () => {
         const fragment = sanitizeHtml(
             `<a href="javascript:alert(1)">click</a><img src="javascript:alert(1)">`,
@@ -66,6 +85,43 @@ describe("sanitizeHtml", () => {
         const img = host.querySelector("img");
         expect(img?.getAttribute("src")).toBe("https://chat.example.com/user_uploads/123.png");
         expect(img?.getAttribute("loading")).toBe("lazy");
+    });
+
+    test("preserves KaTeX spans and strips unsafe inline styles", () => {
+        // Zulip pre-renders LaTeX via KaTeX into a deep <span> tree that
+        // positions each glyph with an inline style. The sanitizer must
+        // preserve the wrappers + layout styles but still strip any
+        // style value that could fetch external resources or inject JS.
+        const fragment = sanitizeHtml(
+            `<span class="katex"><span class="katex-mathml">x</span>` +
+                `<span class="katex-html" aria-hidden="true">` +
+                `<span class="strut" style="height: 0.8em;">a</span>` +
+                `<span class="badstyle" style="background: url(https://evil.example/x)">b</span>` +
+                `</span></span>`,
+            "https://chat.example.com",
+        );
+        const host = document.createElement("div");
+        host.append(fragment);
+        expect(host.querySelector("span.katex")).not.toBeNull();
+        expect(host.querySelector("span.katex-html")?.getAttribute("aria-hidden")).toBe("true");
+        // Static geometry style survives.
+        expect(host.querySelector("span.strut")?.getAttribute("style")).toContain("height");
+        // Style carrying a url() is dropped whole.
+        expect(host.querySelector("span.badstyle")?.getAttribute("style")).toBeNull();
+    });
+
+    test("drops style attributes containing @import or expression()", () => {
+        const fragment = sanitizeHtml(
+            `<span style="@import url(https://evil)">a</span>` +
+                `<span style="width: expression(alert(1))">b</span>`,
+            "https://chat.example.com",
+        );
+        const host = document.createElement("div");
+        host.append(fragment);
+        const spans = host.querySelectorAll("span");
+        for (const s of spans) {
+            expect(s.getAttribute("style")).toBeNull();
+        }
     });
 
     test("preserves Pygments token classes on nested spans", () => {

@@ -677,6 +677,22 @@ button {
     margin: 10px 0;
 }
 
+/* KaTeX math — only layout wrappers are styled here; the glyph
+ * positioning CSS is loaded lazily from the KaTeX stylesheet on demand
+ * (see src/katex.ts). These rules just fix spacing so display math
+ * doesn't collapse against surrounding paragraphs.
+ */
+.message-content .katex-display {
+    margin: 8px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    text-align: center;
+}
+
+.message-content .katex {
+    font-size: 1em;
+}
+
 .message-content kbd {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11.5px;

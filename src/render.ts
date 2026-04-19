@@ -321,6 +321,13 @@ const ALLOWED_ATTR = [
     "start",
     "align",
     "datetime",
+    // Required for KaTeX-rendered math: the server-side Pygments-style
+    // HTML tree positions individual glyphs with inline style declarations
+    // (width/margin/transform on stacked .katex-html > span tiers). The
+    // `uponSanitizeAttribute` hook below scrubs each style value and drops
+    // anything that isn't plain static CSS — no url(), @import, or
+    // expression().
+    "style",
 ];
 
 // Origin used by the sanitizer hook to resolve relative upload URLs. Set
@@ -328,9 +335,33 @@ const ALLOWED_ATTR = [
 let activeServerOrigin: string | undefined;
 let hooksInstalled = false;
 
+// Reject any CSS declaration that could fetch a network resource, run
+// script-like sinks, or import more CSS. Zulip's KaTeX output only uses
+// static geometry/typography declarations, so this intersection covers
+// the visual math while keeping the CSS attack surface closed.
+function isSafeStyleValue(value: string): boolean {
+    const lower = value.toLowerCase();
+    if (lower.includes("url(")) return false;
+    if (lower.includes("@import")) return false;
+    if (lower.includes("expression(")) return false;
+    if (lower.includes("javascript:")) return false;
+    if (lower.includes("/*")) return false; // strip comments that could hide
+    if (lower.includes("\\")) return false; // hex escapes can smuggle tokens
+    if (lower.includes("behavior:")) return false; // legacy IE
+    return true;
+}
+
 function installHooks(): void {
     if (hooksInstalled) return;
     hooksInstalled = true;
+
+    DOMPurify.addHook("uponSanitizeAttribute", (_node, data) => {
+        // Scrub inline styles before they land on the node. Anything with
+        // url()/@import/expression()/javascript: gets dropped wholesale.
+        if (data.attrName === "style" && !isSafeStyleValue(data.attrValue)) {
+            data.keepAttr = false;
+        }
+    });
 
     DOMPurify.addHook("afterSanitizeAttributes", (node) => {
         if (!(node instanceof Element)) return;
@@ -377,7 +408,11 @@ export function sanitizeHtml(html: string, serverOrigin: string | undefined): Do
             ALLOWED_TAGS,
             ALLOWED_ATTR,
             ALLOW_DATA_ATTR: false,
-            ALLOW_ARIA_ATTR: false,
+            // aria-* passes through on any allowed element. KaTeX relies
+            // on aria-hidden to hide the visual subtree from AT; Zulip's
+            // output also marks alt-text fallbacks with aria-hidden. These
+            // are accessibility annotations with no XSS surface.
+            ALLOW_ARIA_ATTR: true,
             ALLOW_UNKNOWN_PROTOCOLS: false,
             // Belt-and-braces: reject any URI that isn't http(s), mailto,
             // a fragment, a query, or a relative path before our
@@ -394,7 +429,10 @@ export function sanitizeHtml(html: string, serverOrigin: string | undefined): Do
             ALLOWED_URI_REGEXP:
                 /^(?:https?:|mailto:|#|\?|\/(?!\/)|\.\.?\/|[^:/?#]+(?:$|[/?#]))/i,
             FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input"],
-            FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
+            // Note: `style` is intentionally *not* forbidden at the attr
+            // level — we need it for KaTeX layout and scrub the value
+            // via the uponSanitizeAttribute hook above.
+            FORBID_ATTR: ["onerror", "onload", "onclick"],
             USE_PROFILES: {html: true},
             RETURN_DOM_FRAGMENT: true,
         });
