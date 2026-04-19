@@ -1010,10 +1010,75 @@ button {
     display: none;
 }
 
+.composer-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border: 1px solid var(--zc-color-border);
+    border-bottom: none;
+    border-top-left-radius: var(--zc-radius-sm);
+    border-top-right-radius: var(--zc-radius-sm);
+    background: var(--zc-color-surface);
+}
+
+.composer-tool {
+    border: none;
+    background: transparent;
+    color: var(--zc-color-muted);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.composer-tool svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+.composer-tool:hover,
+.composer-tool:focus-visible {
+    background: var(--zc-color-bg);
+    color: var(--zc-color-text);
+    outline: none;
+}
+
+.composer-tool.mono code {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: transparent;
+    padding: 0;
+}
+
+.composer-tool-sep {
+    display: inline-block;
+    width: 1px;
+    height: 16px;
+    margin: 0 4px;
+    background: var(--zc-color-border);
+}
+
 .composer-row {
     display: flex;
     align-items: flex-end;
     gap: var(--zc-spacing-sm);
+}
+
+.composer-toolbar + .composer-row .composer-input {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top-color: var(--zc-color-border);
 }
 
 .composer-input {
@@ -1025,10 +1090,12 @@ button {
     font: inherit;
     color: inherit;
     background: var(--zc-color-surface);
-    min-height: 36px;
-    max-height: 120px;
+    min-height: 40px;
+    max-height: 160px;
     outline: none;
     transition: border-color 120ms ease;
+    font-family: inherit;
+    line-height: 1.45;
 }
 
 .composer-input:focus {
@@ -1040,12 +1107,26 @@ button {
     background: var(--zc-color-accent);
     color: var(--zc-color-accent-contrast);
     border-radius: var(--zc-radius-sm);
-    padding: var(--zc-spacing-sm) var(--zc-spacing-md);
+    width: 40px;
+    height: 40px;
+    padding: 0;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    transition: opacity 120ms ease;
+    cursor: pointer;
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.composer-send:not(:disabled):hover {
+    transform: translateY(-1px);
+}
+
+.composer-send svg {
+    width: 18px;
+    height: 18px;
+    display: block;
 }
 
 .composer-send:disabled {

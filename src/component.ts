@@ -1,8 +1,21 @@
 import {ZulipClient} from "./client.ts";
+import {
+    insertAtCursor,
+    prefixLines,
+    wrapCodeBlock,
+    wrapLink,
+    wrapSelection,
+} from "./compose-format.ts";
 import {DemoTransport} from "./demo-transport.ts";
 import {createEmojiPicker, type EmojiPickerHandle} from "./emoji-picker.ts";
 import {enhanceKatex} from "./katex.ts";
-import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
+import {
+    EMOJI_GLYPHS,
+    isNearBottom,
+    renderMessages,
+    scrollToBottom,
+    type RenderContext,
+} from "./render.ts";
 import {SnapshotTransport} from "./snapshot-transport.ts";
 import {enhanceSpoilers} from "./spoilers.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
@@ -47,6 +60,24 @@ const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
 
 const CHAT_BUBBLE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
 const CLOSE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+// Compact 16x16 icons shared by the formatting toolbar. `currentColor`
+// so they pick up --zc-color-text / the disabled state for free.
+const ICON_ATTRS = `viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"`;
+const SEND_ICON_SVG = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M1.724 10.528 17.88 3.31a.6.6 0 0 1 .81.701L15.06 17.68a.6.6 0 0 1-1.135.113l-3.145-6.29a.6.6 0 0 0-.266-.267L4.224 8.09a.6.6 0 0 1-.008-1.077"/></svg>`;
+const LINK_ICON_SVG = `<svg ${ICON_ATTRS}><path d="M6.5 9.5a3 3 0 0 0 4.24 0l2.12-2.12a3 3 0 1 0-4.24-4.24l-1.06 1.06"/><path d="M9.5 6.5a3 3 0 0 0-4.24 0L3.14 8.62a3 3 0 1 0 4.24 4.24l1.06-1.06"/></svg>`;
+const QUOTE_ICON_SVG = `<svg ${ICON_ATTRS}><path d="M3 6h1.5a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H3zM9 6h1.5a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2H9z"/></svg>`;
+const BULLET_ICON_SVG = `<svg ${ICON_ATTRS}><circle cx="3" cy="4" r="1" fill="currentColor"/><circle cx="3" cy="8" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><path d="M6 4h8M6 8h8M6 12h8"/></svg>`;
+const NUMBERED_ICON_SVG = `<svg ${ICON_ATTRS}><path d="M6 4h8M6 8h8M6 12h8"/><path d="M2 3v2M2 3h.5M1.5 5h1M1 7.5c0-.5.5-1 1-1s1 .5 1 1c0 1-2 1.5-2 2.5h2M1.5 10.5h1v1H1.5zM1.5 11.5h1v1H1.5z" stroke-width="1"/></svg>`;
+const SPOILER_ICON_SVG = `<svg ${ICON_ATTRS}><path d="M2 8s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4Z"/><circle cx="8" cy="8" r="1.75"/></svg>`;
+const MENTION_ICON_SVG = `<svg ${ICON_ATTRS}><circle cx="8" cy="8" r="2.5"/><path d="M10.5 8v1.25a1.75 1.75 0 0 0 3.5 0V8a6 6 0 1 0-2.4 4.8"/></svg>`;
+const EMOJI_ICON_SVG = `<svg ${ICON_ATTRS}><circle cx="8" cy="8" r="6"/><circle cx="6" cy="7" r=".75" fill="currentColor"/><circle cx="10" cy="7" r=".75" fill="currentColor"/><path d="M5.5 10a3.5 3.5 0 0 0 5 0"/></svg>`;
+
+function addSeparator(bar: HTMLElement): void {
+    const sep = document.createElement("span");
+    sep.className = "composer-tool-sep";
+    sep.setAttribute("aria-hidden", "true");
+    bar.append(sep);
+}
 
 interface ComponentState {
     messages: Message[];
@@ -399,12 +430,9 @@ export class ZulipChatElement extends HTMLElement {
         this.typingIndicatorEl = typing;
         composer.append(typing);
 
-        const row = document.createElement("div");
-        row.className = "composer-row";
-
         const input = document.createElement("textarea");
         input.className = "composer-input";
-        input.placeholder = "Write a message…";
+        input.placeholder = this.composerPlaceholder();
         input.rows = 1;
         input.setAttribute("aria-label", "Message");
         input.addEventListener("input", () => {
@@ -412,28 +440,25 @@ export class ZulipChatElement extends HTMLElement {
             this.refreshSendButton();
             this.onComposerKeystroke();
         });
-        input.addEventListener("keydown", (event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void this.handleSend();
-                return;
-            }
-            if (event.key === "Escape" && this.state.editingMessageId !== undefined) {
-                // Stop the event before the root-level handler treats it
-                // as a "close floating panel" request — when editing, the
-                // user almost certainly means "abandon this edit".
-                event.stopPropagation();
-                this.cancelEdit();
-            }
-        });
+        input.addEventListener("keydown", (event) => this.onComposerKeydown(event, input));
         this.composerInputEl = input;
+
+        // Formatting toolbar. Sits above the textarea so it reads left-
+        // to-right as users scan from most-common (bold) to least-common
+        // (emoji) actions, matching Zulip's web composer.
+        composer.append(this.buildComposerToolbar(input));
+
+        const row = document.createElement("div");
+        row.className = "composer-row";
         row.append(input);
 
         const send = document.createElement("button");
         send.className = "composer-send";
         send.type = "button";
-        send.textContent = "Send";
+        send.setAttribute("aria-label", "Send message");
+        send.title = "Send (Enter)";
         send.disabled = true;
+        send.innerHTML = SEND_ICON_SVG;
         send.addEventListener("click", () => {
             void this.handleSend();
         });
@@ -444,10 +469,135 @@ export class ZulipChatElement extends HTMLElement {
 
         const hint = document.createElement("div");
         hint.className = "composer-hint";
-        hint.textContent = "Enter to send · Shift+Enter for newline";
+        hint.textContent = "Enter to send · Shift+Enter for newline · Markdown supported";
         composer.append(hint);
 
         return composer;
+    }
+
+    // Formatting-toolbar row: bold / italic / strike / code / link /
+    // quote / bullet list / numbered list / emoji. Each button acts on
+    // the composer textarea via compose-format helpers so a browser
+    // sees one atomic edit (and undo stays intact). Labels are plain
+    // text so a missing webfont doesn't break the UI.
+    private buildComposerToolbar(input: HTMLTextAreaElement): HTMLElement {
+        const bar = document.createElement("div");
+        bar.className = "composer-toolbar";
+        bar.setAttribute("role", "toolbar");
+        bar.setAttribute("aria-label", "Formatting");
+
+        const add = (
+            label: string,
+            title: string,
+            action: () => void,
+            className = "",
+        ): HTMLButtonElement => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = `composer-tool ${className}`.trim();
+            b.title = title;
+            b.setAttribute("aria-label", title);
+            b.innerHTML = label;
+            b.addEventListener("mousedown", (event) => {
+                // Keep focus in the textarea so the selection survives.
+                event.preventDefault();
+            });
+            b.addEventListener("click", (event) => {
+                event.preventDefault();
+                action();
+            });
+            bar.append(b);
+            return b;
+        };
+
+        add("<strong>B</strong>", "Bold (Ctrl+B)", () => wrapSelection(input, "**", "**", "bold"));
+        add("<em>I</em>", "Italic (Ctrl+I)", () => wrapSelection(input, "*", "*", "italic"));
+        add("<s>S</s>", "Strikethrough", () => wrapSelection(input, "~~", "~~", "strike"));
+        add("<code>&lt;/&gt;</code>", "Code (Ctrl+E)", () => wrapCodeBlock(input), "mono");
+        add(LINK_ICON_SVG, "Link (Ctrl+K)", () => wrapLink(input));
+        addSeparator(bar);
+        add(QUOTE_ICON_SVG, "Quote", () => prefixLines(input, "> "));
+        add(BULLET_ICON_SVG, "Bulleted list", () => prefixLines(input, "- "));
+        add(NUMBERED_ICON_SVG, "Numbered list", () => prefixLines(input, "1. "));
+        add(SPOILER_ICON_SVG, "Spoiler", () =>
+            wrapSelection(input, "```spoiler\n", "\n```", "hidden text"),
+        );
+        add(MENTION_ICON_SVG, "Mention (@)", () => insertAtCursor(input, "@"));
+        addSeparator(bar);
+        add(EMOJI_ICON_SVG, "Emoji", () => {
+            if (this.emojiPicker === undefined) return;
+            if (this.emojiPicker.isOpen()) {
+                this.emojiPicker.close();
+                return;
+            }
+            const anchor = bar.lastElementChild as HTMLElement;
+            this.emojiPicker.open(anchor, (emojiName) => {
+                const glyph = EMOJI_GLYPHS[emojiName] ?? `:${emojiName}:`;
+                insertAtCursor(input, glyph);
+            });
+        });
+
+        return bar;
+    }
+
+    // Composer placeholder reflects the current scope so users always
+    // know where their message will land. Mirrors Zulip's own composer:
+    //     Message #general > welcome
+    private composerPlaceholder(): string {
+        const channel = this.getAttribute("channel") ?? "general";
+        const topic = this.getAttribute("topic");
+        if (topic !== null && topic !== "") {
+            return `Message #${channel} > ${topic}`;
+        }
+        return `Message #${channel}`;
+    }
+
+    // Keydown handler shared between the main composer and (later) the
+    // in-place edit textarea. Returns true if the event was handled so
+    // callers can skip default textarea behaviour.
+    private onComposerKeydown(event: KeyboardEvent, input: HTMLTextAreaElement): void {
+        // Markdown formatting shortcuts. Zulip web binds Ctrl/Cmd+B for
+        // bold, Ctrl/Cmd+I for italic, Ctrl/Cmd+K for link, Ctrl/Cmd+E
+        // for code — we match so muscle memory carries over.
+        const mod = event.ctrlKey || event.metaKey;
+        if (mod && !event.shiftKey && !event.altKey) {
+            switch (event.key.toLowerCase()) {
+                case "b":
+                    event.preventDefault();
+                    wrapSelection(input, "**", "**", "bold");
+                    return;
+                case "i":
+                    event.preventDefault();
+                    wrapSelection(input, "*", "*", "italic");
+                    return;
+                case "k":
+                    event.preventDefault();
+                    wrapLink(input);
+                    return;
+                case "e":
+                    event.preventDefault();
+                    wrapCodeBlock(input);
+                    return;
+            }
+        }
+        // Ctrl/Cmd+Enter: save (when editing) or send (always).
+        if (mod && event.key === "Enter") {
+            event.preventDefault();
+            void this.handleSend();
+            return;
+        }
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            void this.handleSend();
+            return;
+        }
+        if (event.key === "Escape" && this.state.editingMessageId !== undefined) {
+            // Stop the event before the root-level handler treats it
+            // as a "close floating panel" request — when editing, the
+            // user almost certainly means "abandon this edit".
+            event.stopPropagation();
+            this.cancelEdit();
+        }
     }
 
     private buildFooter(): HTMLElement {
@@ -936,6 +1086,13 @@ export class ZulipChatElement extends HTMLElement {
         if (this.statusDotEl) {
             this.statusDotEl.dataset["status"] = this.state.status;
             this.statusDotEl.title = `Status: ${this.state.status}`;
+        }
+
+        if (this.composerInputEl !== undefined) {
+            const next = this.composerPlaceholder();
+            if (this.composerInputEl.placeholder !== next) {
+                this.composerInputEl.placeholder = next;
+            }
         }
 
         if (this.errorBannerEl) {
