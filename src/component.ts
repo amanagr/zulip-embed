@@ -1,6 +1,7 @@
 import {ZulipClient} from "./client.ts";
 import {DemoTransport} from "./demo-transport.ts";
 import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
+import {SnapshotTransport} from "./snapshot-transport.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
 import type {Transport} from "./transport.ts";
 import type {ConnectionStatus, Message, Reaction, ScopeFilter} from "./types.ts";
@@ -9,6 +10,7 @@ import {ZulipTransport} from "./zulip-transport.ts";
 const OBSERVED_ATTRIBUTES = [
     "demo",
     "demo-variant",
+    "snapshot-url",
     "server",
     "email",
     "api-key",
@@ -23,6 +25,7 @@ const OBSERVED_ATTRIBUTES = [
 const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "demo",
     "demo-variant",
+    "snapshot-url",
     "server",
     "email",
     "api-key",
@@ -412,6 +415,12 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private createTransport(scope: ScopeFilter): Transport {
+        const snapshotUrl = this.getAttribute("snapshot-url");
+        if (snapshotUrl !== null && snapshotUrl !== "") {
+            // Snapshot mode is implicitly read-only; the transport rejects
+            // writes and the composer is hidden via the read-only attribute.
+            return new SnapshotTransport({url: snapshotUrl, scope});
+        }
         if (this.hasAttribute("demo")) {
             return new DemoTransport({
                 scope,
@@ -505,7 +514,7 @@ export class ZulipChatElement extends HTMLElement {
             serverOrigin: this.getAttribute("server") ?? undefined,
             currentUserId: this.client?.getCurrentUserId(),
         };
-        if (this.hasAttribute("read-only")) {
+        if (this.hasAttribute("read-only") || this.hasAttribute("snapshot-url")) {
             return context;
         }
         context.onToggleReaction = (m, e) => {

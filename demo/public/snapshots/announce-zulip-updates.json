@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "generatedAt": 0,
+  "server": "https://chat.zulip.org",
+  "channel": "announce",
+  "topic": "Zulip updates",
+  "messages": [
+    {
+      "id": 1,
+      "senderId": 11,
+      "senderFullName": "Zulip release bot",
+      "senderEmail": "release-bot@zulip.com",
+      "avatarUrl": "",
+      "timestamp": 1744675200000,
+      "content": "<p>This is a placeholder snapshot of <a href=\"https://chat.zulip.org/#narrow/channel/1-announce/topic/Zulip.20updates/\">#announce &gt; Zulip updates</a>. Once <code>ZULIP_ANNOUNCE_EMAIL</code> and <code>ZULIP_ANNOUNCE_API_KEY</code> are set on the <code>github-pages</code> environment, CI will replace this file with the latest ~30 messages from chat.zulip.org at deploy time.</p>",
+      "contentIsHtml": true,
+      "type": "channel",
+      "channelName": "announce",
+      "topic": "Zulip updates",
+      "reactions": []
+    },
+    {
+      "id": 2,
+      "senderId": 12,
+      "senderFullName": "Zulip release bot",
+      "senderEmail": "release-bot@zulip.com",
+      "avatarUrl": "",
+      "timestamp": 1744678800000,
+      "content": "<p>The snapshot transport is read-only: the demo fetches a baked JSON file instead of opening a live event queue, so no API credentials ever travel to the browser.</p>\n<p>See <code>scripts/fetch-announce-snapshot.mjs</code> for the CI script and <code>src/snapshot-transport.ts</code> for the runtime.</p>",
+      "contentIsHtml": true,
+      "type": "channel",
+      "channelName": "announce",
+      "topic": "Zulip updates",
+      "reactions": [
+        {"emoji": "heart", "count": 3, "userIds": [101, 102, 103]}
+      ]
+    }
+  ]
+}

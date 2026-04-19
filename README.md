@@ -71,6 +71,7 @@ local development.
 | Attribute | Required | Description |
 | --- | --- | --- |
 | `demo` | — | Use an in-memory transport instead of a real Zulip server. |
+| `snapshot-url` | — | Load a pre-fetched JSON snapshot of messages instead of opening a live event queue. Implies read-only; no credentials in the browser. See [Snapshot mode](#snapshot-mode). |
 | `server` | live mode | Base URL of the Zulip server (e.g. `https://chat.zulip.org`). |
 | `email` | live mode | Account email or bot email. |
 | `api-key` | live mode | API key for that account. |
@@ -95,6 +96,36 @@ zulip-chat {
 ```
 
 Complete token list lives in [`src/styles.ts`](./src/styles.ts).
+
+## Snapshot mode
+
+For public, read-only embeds where you don't want to ship API credentials
+to the browser, point the component at a pre-fetched JSON file instead
+of a live server:
+
+```html
+<zulip-chat
+    snapshot-url="/snapshots/announce.json"
+    channel="announce"
+    topic="Zulip updates"
+></zulip-chat>
+```
+
+The snapshot is a `{version: 1, messages: Message[], ...}` JSON payload
+produced by `scripts/fetch-announce-snapshot.mjs`. This repo's Pages
+deployment runs that script every six hours against chat.zulip.org and
+bakes the latest ~30 messages into the site. Required secrets on the
+`github-pages` environment:
+
+- `GH_ACTIONS_BOT_API_KEY` (secret) — Zulip API key for a bot subscribed
+  to the channel you want to snapshot.
+- `ZULIP_ANNOUNCE_EMAIL` (environment variable) — the bot's email.
+- `ZULIP_ANNOUNCE_SERVER` (environment variable, optional) — defaults to
+  `https://chat.zulip.org`.
+
+If the secret is absent, CI falls back to the checked-in snapshot at
+`demo/public/snapshots/announce-zulip-updates.json`, so the site always
+deploys.
 
 ## Development
 

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Refresh the chat.zulip.org snapshot four times a day so the Pages
+  # deployment tracks the live feed even without a code change.
+  schedule:
+    - cron: "0 */6 * * *"
 
 permissions:
   contents: read
@@ -17,6 +21,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Pull environment secrets (GH_ACTIONS_BOT_API_KEY lives here) into
+    # the build job. The deploy job below scopes itself to the same env.
+    environment: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +39,18 @@ jobs:
       - run: pnpm typecheck
 
       - run: pnpm test
+
+      - name: Fetch chat.zulip.org announce snapshot
+        # Only runs when the bot key is configured on the github-pages
+        # environment. On failure we fall back to the checked-in snapshot
+        # so the site always deploys.
+        if: ${{ secrets.GH_ACTIONS_BOT_API_KEY != '' }}
+        continue-on-error: true
+        env:
+          ZULIP_ANNOUNCE_EMAIL: ${{ vars.ZULIP_ANNOUNCE_EMAIL }}
+          ZULIP_ANNOUNCE_API_KEY: ${{ secrets.GH_ACTIONS_BOT_API_KEY }}
+          ZULIP_ANNOUNCE_SERVER: ${{ vars.ZULIP_ANNOUNCE_SERVER || 'https://chat.zulip.org' }}
+        run: node scripts/fetch-announce-snapshot.mjs
 
       - name: Build static site
         env:

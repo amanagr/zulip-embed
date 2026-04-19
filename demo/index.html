@@ -201,24 +201,28 @@
             </header>
 
             <section>
-                <h2>Web-public channel · read-only</h2>
+                <h2>Live-ish snapshot · chat.zulip.org</h2>
                 <p style="color: var(--page-muted); margin-top: 0">
-                    Modeled on Zulip's own <code>#announce &gt; server releases</code> topic:
-                    release notes, beta announcements, and post-mortems. Composer hidden, but
-                    readers can still react.
+                    Real messages from
+                    <a
+                        href="https://chat.zulip.org/#narrow/channel/1-announce/topic/Zulip.20updates/"
+                        >#announce &gt; Zulip updates</a
+                    >
+                    on chat.zulip.org, fetched at deploy time by a scheduled GitHub Action
+                    and baked into a JSON snapshot the demo loads. Read-only; no API key
+                    ever reaches your browser.
                 </p>
                 <div class="panel">
-                    <h3>#announce &gt; server releases</h3>
+                    <h3>#announce &gt; Zulip updates</h3>
                     <p>
-                        Shows rich Markdown rendering end-to-end: headings, code blocks, lists,
-                        tables, blockquotes, mentions, and live emoji reactions.
+                        Rendered end-to-end: headings, code blocks, lists, tables, blockquotes,
+                        mentions, and reactions — whatever the Zulip community posted.
                     </p>
                     <div class="chat-slot">
                         <zulip-chat
-                            demo
-                            read-only
+                            snapshot-url="./snapshots/announce-zulip-updates.json"
                             channel="announce"
-                            topic="server releases"
+                            topic="Zulip updates"
                             theme="light"
                             mode="inline"
                         ></zulip-chat>

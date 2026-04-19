@@ -537,7 +537,8 @@ button {
     background: var(--zc-color-bg);
 }
 
-:host([read-only]) .composer {
+:host([read-only]) .composer,
+:host([snapshot-url]) .composer {
     display: none;
 }
 

@@ -4,6 +4,8 @@ export {ZulipClient} from "./client.ts";
 export type {ZulipClientOptions} from "./client.ts";
 export {DemoTransport} from "./demo-transport.ts";
 export type {DemoTransportOptions} from "./demo-transport.ts";
+export {SnapshotTransport} from "./snapshot-transport.ts";
+export type {SnapshotFile, SnapshotTransportOptions} from "./snapshot-transport.ts";
 export {ZulipTransport} from "./zulip-transport.ts";
 export type {ZulipTransportOptions} from "./zulip-transport.ts";
 export {ZulipChatElement, registerZulipChatElement} from "./component.ts";
