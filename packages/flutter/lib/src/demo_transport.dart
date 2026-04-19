@@ -135,6 +135,14 @@ class DemoTransport extends Transport {
   }
 
   @override
+  Future<Message?> fetchMessage(int messageId) async {
+    for (final m in _messages) {
+      if (m.id == messageId) return m;
+    }
+    return null;
+  }
+
+  @override
   Future<Message> sendMessage(SendMessageParams params) async {
     // Demo transport only models channel sends today — DM support would
     // require a synthetic recipient directory. Accept but store a

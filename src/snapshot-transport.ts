@@ -219,6 +219,15 @@ export class SnapshotTransport implements Transport {
         return topics ? [...topics] : [];
     }
 
+    async fetchMessage(messageId: number): Promise<Message | undefined> {
+        // Search the full snapshot rather than `this.messages` so a
+        // standalone <zulip-announcement> — which has no opinion about
+        // scope — can surface a pinned message from any channel in the
+        // file.
+        const file = await this.ensureDirectory();
+        return file?.messages.find((m) => m.id === messageId);
+    }
+
     private async ensureDirectory(): Promise<SnapshotFile | undefined> {
         if (this.directory) return this.directory;
         if (this.inline) {

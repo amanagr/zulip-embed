@@ -460,6 +460,25 @@ export class ZulipTransport implements Transport {
         });
     }
 
+    async fetchMessage(messageId: number): Promise<Message | undefined> {
+        try {
+            const response = await this.request(
+                "GET",
+                `/api/v1/messages/${String(messageId)}`,
+                {apply_markdown: "true"},
+            );
+            const parsed = z
+                .object({message: messageSchema})
+                .safeParse(response);
+            if (!parsed.success) return undefined;
+            const message = convertMessage(parsed.data.message);
+            this.rememberReactions(message);
+            return message;
+        } catch {
+            return undefined;
+        }
+    }
+
     getCurrentUserId(): number | undefined {
         return this.currentUserId;
     }

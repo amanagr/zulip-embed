@@ -565,6 +565,32 @@ class ZulipTransport implements Transport {
     return List.unmodifiable(topics);
   }
 
+  @override
+  Future<Message?> fetchMessage(int messageId) async {
+    // Zulip's single-message endpoint returns the HTML-rendered body so
+    // the announcement banner can surface rich content. Failures (401 /
+    // 403 / 404) degrade to null — the caller renders "not visible".
+    try {
+      final uri = _endpoint('/api/v1/messages/$messageId', {
+        'apply_markdown': 'true',
+      });
+      final resp = await _http.get(uri, headers: _authHeaders);
+      if (resp.statusCode >= 400) return null;
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final raw = body['message'];
+      if (raw is! Map<String, dynamic>) return null;
+      // _parseMessage runs `_stripHtml` on `content`, which we don't
+      // want here — the announcement widget renders HTML itself. Call
+      // _parseMessage for the metadata, then overwrite content with the
+      // original HTML and flip `contentIsHtml`.
+      final msg = _parseMessage(raw);
+      final htmlContent = (raw['content'] as String?) ?? '';
+      return msg.copyWith(content: htmlContent, contentIsHtml: true);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<int?> _resolveStreamId(String channel) async {
     final cached = _streamIdCache[channel];
     if (cached != null) return cached;

@@ -64,6 +64,10 @@ export default defineConfig(() => {
                         "src/entries/topic-list.ts",
                     ),
                     "entries/agent": resolve(import.meta.dirname, "src/entries/agent.ts"),
+                    "entries/announcement": resolve(
+                        import.meta.dirname,
+                        "src/entries/announcement.ts",
+                    ),
                     "entries/demo": resolve(import.meta.dirname, "src/entries/demo.ts"),
                 },
                 output: {

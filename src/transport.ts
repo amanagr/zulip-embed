@@ -53,6 +53,11 @@ export interface Transport {
     sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
     listChannels(): Promise<Channel[]>;
     listTopics(channel: string): Promise<Topic[]>;
+    // Fetches a single message by id, or resolves undefined if the viewer
+    // can't see it (unsubscribed channel, deleted message, etc.). Used by
+    // <zulip-announcement>; optional so read-only transports that can't
+    // address messages individually (pure demo snapshots) can omit it.
+    fetchMessage?(messageId: number): Promise<Message | undefined>;
     // Synchronous id lookup for the connected viewer. Returns undefined
     // before the first `/users/me` response lands. Prefer `ZulipClient.whenReady`
     // when you need to await the full User record.

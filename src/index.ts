@@ -1,3 +1,4 @@
+import {registerZulipAnnouncementElement} from "./announcement.ts";
 import {registerZulipChannelListElement} from "./channel-list.ts";
 import {registerZulipChatElement} from "./component.ts";
 import {registerZulipTopicListElement} from "./topic-list.ts";
@@ -14,6 +15,7 @@ export type {ZulipTransportOptions} from "./zulip-transport.ts";
 export {ZulipChatElement, registerZulipChatElement} from "./component.ts";
 export {ZulipChannelListElement, registerZulipChannelListElement} from "./channel-list.ts";
 export {ZulipTopicListElement, registerZulipTopicListElement} from "./topic-list.ts";
+export {ZulipAnnouncementElement, registerZulipAnnouncementElement} from "./announcement.ts";
 export type {
     Channel,
     ChannelMessage,
@@ -58,11 +60,13 @@ export type {
 registerZulipChatElement();
 registerZulipChannelListElement();
 registerZulipTopicListElement();
+registerZulipAnnouncementElement();
 
 declare global {
     interface HTMLElementTagNameMap {
         "zulip-chat": import("./component.ts").ZulipChatElement;
         "zulip-channel-list": import("./channel-list.ts").ZulipChannelListElement;
         "zulip-topic-list": import("./topic-list.ts").ZulipTopicListElement;
+        "zulip-announcement": import("./announcement.ts").ZulipAnnouncementElement;
     }
 }

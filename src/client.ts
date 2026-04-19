@@ -167,6 +167,11 @@ export class ZulipClient {
         return this.transport.listTopics(channel);
     }
 
+    async fetchMessage(messageId: number): Promise<Message | undefined> {
+        if (this.transport.fetchMessage === undefined) return undefined;
+        return this.transport.fetchMessage(messageId);
+    }
+
     // Starts a new agent-reply stream against the active or a caller-
     // supplied scope. The returned handle exposes append/finish/abort
     // primitives; every side-effect flows through the same transport +

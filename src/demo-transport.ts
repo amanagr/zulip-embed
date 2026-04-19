@@ -291,6 +291,10 @@ export class DemoTransport implements Transport {
         return Promise.resolve(topics);
     }
 
+    async fetchMessage(messageId: number): Promise<Message | undefined> {
+        return Promise.resolve(this.messages.find((m) => m.id === messageId));
+    }
+
     getCurrentUserId(): number {
         return DEMO_GUEST_USER.userId;
     }

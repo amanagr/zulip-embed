@@ -28,6 +28,10 @@ const BUDGETS = {
     "entries/channel-list.js": 8 * 1024,
     "entries/topic-list.js": 8 * 1024,
     "entries/agent.js": 5 * 1024,
+    // announcement pulls render.ts for `sanitizeHtml` (Zulip-server
+    // content is HTML). Transports are dynamic-imported, so the budget
+    // only covers the sanitizer + shadow-DOM scaffolding.
+    "entries/announcement.js": 20 * 1024,
     "entries/demo.js": 28 * 1024,
 };
 

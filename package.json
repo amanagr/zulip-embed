@@ -33,6 +33,10 @@
       "types": "./dist/entries/agent.d.ts",
       "import": "./dist/entries/agent.js"
     },
+    "./announcement": {
+      "types": "./dist/entries/announcement.d.ts",
+      "import": "./dist/entries/announcement.js"
+    },
     "./demo": {
       "types": "./dist/entries/demo.d.ts",
       "import": "./dist/entries/demo.js"

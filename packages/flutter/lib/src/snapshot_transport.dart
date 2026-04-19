@@ -33,6 +33,9 @@ class SnapshotTransport extends Transport {
   final bool _ownsHttp;
 
   List<Message> _messages = const [];
+  // Full parse of the snapshot, kept for lookups that ignore the active
+  // scope filter (e.g. [fetchMessage], used by ZulipAnnouncement).
+  List<Message> _allMessages = const [];
 
   @override
   int? get currentUserId => null;
@@ -53,7 +56,8 @@ class SnapshotTransport extends Transport {
   }) async {
     try {
       final file = _inline ?? await _fetchSnapshot();
-      _messages = _parseMessages(file)
+      _allMessages = List.unmodifiable(_parseMessages(file));
+      _messages = _allMessages
           .where((m) => _inScope(m, scope))
           .toList(growable: false);
       onEvent(const ConnectionEvent(ConnectionStatus.connected));
@@ -105,6 +109,14 @@ class SnapshotTransport extends Transport {
   @override
   Future<void> removeReaction(ReactionParams params) {
     return Future.error(StateError('Snapshot transport is read-only'));
+  }
+
+  @override
+  Future<Message?> fetchMessage(int messageId) async {
+    for (final m in _allMessages) {
+      if (m.id == messageId) return m;
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>> _fetchSnapshot() async {

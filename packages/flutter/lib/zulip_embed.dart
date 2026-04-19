@@ -25,5 +25,6 @@ export 'src/widgets/channel_list.dart' show ZulipChannelList;
 export 'src/widgets/composer.dart' show Composer;
 export 'src/widgets/message_list.dart' show MessageList;
 export 'src/widgets/topic_list.dart' show ZulipTopicList;
+export 'src/widgets/zulip_announcement.dart' show ZulipAnnouncement;
 export 'src/widgets/zulip_chat.dart' show ZulipChat;
 export 'src/zulip_transport.dart';

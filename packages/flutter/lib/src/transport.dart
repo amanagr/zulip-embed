@@ -59,4 +59,10 @@ abstract class Transport {
 
   /// List topics inside [channel]. Same default rationale as listChannels.
   Future<List<Topic>> listTopics(String channel) async => const [];
+
+  /// Fetch a single message by id. Returns null if the viewer cannot see
+  /// the message (unsubscribed channel, deleted message, etc.). Used by
+  /// [ZulipAnnouncement]; default returns null so transports that can't
+  /// address messages individually inherit a safe no-op.
+  Future<Message?> fetchMessage(int messageId) async => null;
 }
