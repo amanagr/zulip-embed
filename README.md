@@ -492,6 +492,9 @@ zulip-embed/
 │   ├── ONBOARDING.md      # step-by-step Zulip server + auth-token setup
 │   ├── ARCHITECTURE.md    # transport / scope / event / bundle model
 │   ├── TROUBLESHOOTING.md # error codes, CSP, bundle size, styling
+│   ├── agents.md          # startAgentReply + MessagePart reference
+│   ├── events.md          # CustomEvent catalog (detail shapes, triggers)
+│   ├── theming.md         # --zc-* token table, brand-name/logo, pitfalls
 │   ├── jwt.md             # JWT provisioning
 │   └── migration-0.2.md   # 0.1 → 0.2 migration notes
 ├── packages/
@@ -552,6 +555,12 @@ dart test
   interface, scope model, event pipeline, bundle strategy.
 - [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — error
   codes, CSP directives, bundle-size surprises, shadow-DOM styling.
+- [`docs/agents.md`](./docs/agents.md) — `startAgentReply` streaming
+  primitive, `MessagePart` union, confirmation widget orchestration.
+- [`docs/events.md`](./docs/events.md) — canonical list of every
+  `CustomEvent` the `<zulip-*>` elements dispatch.
+- [`docs/theming.md`](./docs/theming.md) — `--zc-*` CSS custom-property
+  table, brand-name/logo attributes, dark-mode mechanics.
 - [`docs/jwt.md`](./docs/jwt.md) — minting auth tokens on your
   backend for the `auth-token` attribute.
 - [`docs/migration-0.2.md`](./docs/migration-0.2.md) — 0.1 → 0.2
