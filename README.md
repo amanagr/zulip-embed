@@ -87,7 +87,8 @@ your bundler instead — see [Bundle subpaths](#bundle-subpaths).
 ### Track 2 — React
 
 Install [`zulip-embed-react`](./packages/react/) for typed JSX wrappers
-+ the headless `useZulipChat` hook.
+
+- the headless `useZulipChat` hook.
 
 ```bash
 npm i zulip-embed zulip-embed-react
@@ -248,15 +249,15 @@ is published as a workflow artifact on each run.
 
 <!-- sri:start -->
 
-| Entry                           | Size (gz) | SRI hash    |
-| ------------------------------- | --------- | ----------- |
-| `zulip-embed.iife.js` (unpkg)   | —         | `sha256-…`  |
-| `zulip-embed/chat`              | —         | `sha256-…`  |
-| `zulip-embed/channel-list`      | —         | `sha256-…`  |
-| `zulip-embed/topic-list`        | —         | `sha256-…`  |
-| `zulip-embed/announcement`      | —         | `sha256-…`  |
-| `zulip-embed/agent`             | —         | `sha256-…`  |
-| `zulip-embed/demo`              | —         | `sha256-…`  |
+| Entry                         | Size (gz) | SRI hash   |
+| ----------------------------- | --------- | ---------- |
+| `zulip-embed.iife.js` (unpkg) | —         | `sha256-…` |
+| `zulip-embed/chat`            | —         | `sha256-…` |
+| `zulip-embed/channel-list`    | —         | `sha256-…` |
+| `zulip-embed/topic-list`      | —         | `sha256-…` |
+| `zulip-embed/announcement`    | —         | `sha256-…` |
+| `zulip-embed/agent`           | —         | `sha256-…` |
+| `zulip-embed/demo`            | —         | `sha256-…` |
 
 <!-- sri:end -->
 
@@ -370,34 +371,34 @@ always deploys.
 v0.8 ships a catalog of composable custom elements so you can drop any
 subset of the Zulip web app's UI into your own product:
 
-| Component              | Status          | Description                                                                      |
-| ---------------------- | --------------- | -------------------------------------------------------------------------------- |
-| `<zulip-chat>`         | done            | Full channel/topic feed + composer + reactions + typing + edit/delete            |
-| `<zulip-channel-list>` | done            | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
-| `<zulip-topic-list>`   | done            | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
-| `<zulip-announcement>` | done            | Pinned-message banner; dismissible; fetches a single message by id               |
-| `<zulip-dm-list>`      | v0.8 (planned)  | Direct-message pane                                                              |
-| `<zulip-compose>`      | v1.x            | Standalone composer (drafts, scheduled send, file upload)                        |
-| `<zulip-inbox>`        | v1.x            | Unreads grouped by channel > topic                                               |
-| `<zulip-recent>`       | v1.x            | Recent conversations view                                                        |
-| `<zulip-user-list>`    | v1.x            | Presence sidebar                                                                 |
-| `<zulip-user-card>`    | v1.x            | Hover / click profile popover                                                    |
-| `<zulip-search>`       | v1.x            | Advanced-filter search box + results                                             |
-| `<zulip-message>`      | v1.x            | Single-message embed for quote-of-the-day widgets                                |
+| Component              | Status         | Description                                                                      |
+| ---------------------- | -------------- | -------------------------------------------------------------------------------- |
+| `<zulip-chat>`         | done           | Full channel/topic feed + composer + reactions + typing + edit/delete            |
+| `<zulip-channel-list>` | done           | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
+| `<zulip-topic-list>`   | done           | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
+| `<zulip-announcement>` | done           | Pinned-message banner; dismissible; fetches a single message by id               |
+| `<zulip-dm-list>`      | v0.8 (planned) | Direct-message pane                                                              |
+| `<zulip-compose>`      | v1.x           | Standalone composer (drafts, scheduled send, file upload)                        |
+| `<zulip-inbox>`        | v1.x           | Unreads grouped by channel > topic                                               |
+| `<zulip-recent>`       | v1.x           | Recent conversations view                                                        |
+| `<zulip-user-list>`    | v1.x           | Presence sidebar                                                                 |
+| `<zulip-user-card>`    | v1.x           | Hover / click profile popover                                                    |
+| `<zulip-search>`       | v1.x           | Advanced-filter search box + results                                             |
+| `<zulip-message>`      | v1.x           | Single-message embed for quote-of-the-day widgets                                |
 
 Each Web Component is mirrored by a typed React wrapper in
 [`zulip-embed-react`](./packages/react/) as soon as it lands.
 
 ## Frameworks
 
-| Framework                           | Status   | Package                                                |
-| ----------------------------------- | -------- | ------------------------------------------------------ |
-| Web Components (framework-agnostic) | done     | [`zulip-embed`](./src/)                                |
-| React                               | done     | [`zulip-embed-react`](./packages/react/)               |
-| React Native                        | alpha    | [`zulip-embed-react-native`](./packages/react-native/) |
-| Flutter                             | done     | [`packages/flutter/`](./packages/flutter/)             |
-| SwiftUI (iOS)                       | planned  | `packages/swiftui/`                                    |
-| Jetpack Compose (Android)           | planned  | `packages/compose/`                                    |
+| Framework                           | Status  | Package                                                |
+| ----------------------------------- | ------- | ------------------------------------------------------ |
+| Web Components (framework-agnostic) | done    | [`zulip-embed`](./src/)                                |
+| React                               | done    | [`zulip-embed-react`](./packages/react/)               |
+| React Native                        | alpha   | [`zulip-embed-react-native`](./packages/react-native/) |
+| Flutter                             | done    | [`packages/flutter/`](./packages/flutter/)             |
+| SwiftUI (iOS)                       | planned | `packages/swiftui/`                                    |
+| Jetpack Compose (Android)           | planned | `packages/compose/`                                    |
 
 ## Architecture
 
@@ -439,28 +440,28 @@ Rich HTML returned by Zulip's server-side markdown renderer is run
 through DOMPurify with a strict allow-list before it hits the DOM.
 See [`SECURITY.md`](./SECURITY.md) for the threat model.
 
-| Element                                                                  | Status  |
-| ------------------------------------------------------------------------ | ------- |
-| Paragraphs, headings (`h1`–`h6`), horizontal rules                       | done    |
-| Bold, italic, strikethrough, underline                                   | done    |
-| Inline code, fenced code blocks                                          | done    |
-| Ordered + unordered lists (incl. nesting)                                | done    |
-| Blockquotes (incl. nested)                                               | done    |
-| Tables with header row                                                   | done    |
-| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`) | done    |
-| Autolinked plain-text URLs                                               | done    |
-| Inline images (relative paths resolved against `server`)                 | done    |
-| Unicode emoji                                                            | done    |
-| Custom Zulip emoji (`<img class="emoji">`)                               | done    |
-| `@user` mentions, `#channel` references, `#channel > topic` links        | done    |
-| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup                     | done    |
-| Spoilers (click / keyboard reveal)                                       | done    |
-| KaTeX math (lazy-loaded)                                                 | done    |
-| Code-block syntax highlighting (Pygments classes)                        | done    |
-| Structured `MessagePart[]` (text/code/tool_call/tool_result/confirmation)| done    |
-| Polls                                                                    | planned |
-| Widgets / custom message extensions                                      | planned |
-| File / image attachment previews beyond `<img>`                          | planned |
+| Element                                                                   | Status  |
+| ------------------------------------------------------------------------- | ------- |
+| Paragraphs, headings (`h1`–`h6`), horizontal rules                        | done    |
+| Bold, italic, strikethrough, underline                                    | done    |
+| Inline code, fenced code blocks                                           | done    |
+| Ordered + unordered lists (incl. nesting)                                 | done    |
+| Blockquotes (incl. nested)                                                | done    |
+| Tables with header row                                                    | done    |
+| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`)  | done    |
+| Autolinked plain-text URLs                                                | done    |
+| Inline images (relative paths resolved against `server`)                  | done    |
+| Unicode emoji                                                             | done    |
+| Custom Zulip emoji (`<img class="emoji">`)                                | done    |
+| `@user` mentions, `#channel` references, `#channel > topic` links         | done    |
+| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup                      | done    |
+| Spoilers (click / keyboard reveal)                                        | done    |
+| KaTeX math (lazy-loaded)                                                  | done    |
+| Code-block syntax highlighting (Pygments classes)                         | done    |
+| Structured `MessagePart[]` (text/code/tool_call/tool_result/confirmation) | done    |
+| Polls                                                                     | planned |
+| Widgets / custom message extensions                                       | planned |
+| File / image attachment previews beyond `<img>`                           | planned |
 
 ### Live data & interaction
 
@@ -503,6 +504,7 @@ zulip-embed/
 ├── docs/                  # Developer documentation
 │   ├── ONBOARDING.md      # step-by-step Zulip server + auth-token setup
 │   ├── ARCHITECTURE.md    # transport / scope / event / bundle model
+│   ├── TROUBLESHOOTING.md # error codes, CSP, bundle size, styling
 │   ├── jwt.md             # JWT provisioning
 │   └── migration-0.2.md   # 0.1 → 0.2 migration notes
 ├── packages/
@@ -561,6 +563,8 @@ dart test
   server + auth-token setup for first-time users.
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — transport
   interface, scope model, event pipeline, bundle strategy.
+- [`docs/TROUBLESHOOTING.md`](./docs/TROUBLESHOOTING.md) — error
+  codes, CSP directives, bundle-size surprises, shadow-DOM styling.
 - [`docs/jwt.md`](./docs/jwt.md) — minting auth tokens on your
   backend for the `auth-token` attribute.
 - [`docs/migration-0.2.md`](./docs/migration-0.2.md) — 0.1 → 0.2
