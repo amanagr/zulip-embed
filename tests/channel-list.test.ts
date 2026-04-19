@@ -198,4 +198,34 @@ describe("<zulip-channel-list>", () => {
         const err = el.shadowRoot?.querySelector(".error");
         expect(err?.textContent ?? "").toContain('requires a "server"');
     });
+
+    test("rejects non-hex channel colors (CSS shorthand injection)", async () => {
+        // A snapshot or misbehaving server could ship a Channel.color
+        // that carries a background-image payload. The `background`
+        // shorthand accepts `<color> <image>` together, so without
+        // validation this turns into a silent URL fetch every time
+        // the dot renders.
+        fakeChannels = [
+            {
+                channelId: 1,
+                name: "attacker",
+                description: "",
+                color: "red url(https://attacker.example/leak.png)",
+            },
+            {channelId: 2, name: "ok", description: "", color: "#ff0000"},
+        ];
+
+        const el = document.createElement("zulip-channel-list");
+        el.setAttribute("demo", "");
+        document.body.append(el);
+
+        for (let i = 0; i < 3; i++) await flush();
+
+        const dots = el.shadowRoot?.querySelectorAll<HTMLSpanElement>(".color-dot") ?? [];
+        expect(dots.length).toBe(2);
+        // First channel's dot should have no inline background (rejected).
+        expect(dots[0]?.style.background).toBe("");
+        // Second channel's dot should carry the hex color.
+        expect(dots[1]?.style.background.toLowerCase()).toContain("rgb(255, 0, 0)");
+    });
 });

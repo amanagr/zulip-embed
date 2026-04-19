@@ -357,10 +357,7 @@ export class ZulipChannelListElement extends HTMLElement {
 
         const dot = document.createElement("span");
         dot.className = "color-dot";
-        if (channel.color !== undefined && channel.color !== "") {
-            // Apply via .style to avoid inlining untrusted values into
-            // the stylesheet. The Channel.color field is a hex string
-            // from the server; browsers silently drop invalid input.
+        if (channel.color !== undefined && isSafeHexColor(channel.color)) {
             dot.style.background = channel.color;
         }
         button.append(dot);
@@ -438,6 +435,17 @@ export class ZulipChannelListElement extends HTMLElement {
 function describeError(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
+}
+
+// Channel colors come through as #rgb / #rrggbb / #rrggbbaa from the
+// server, but `Channel.color` is externally declared as `string` so the
+// transport layer can't guarantee the shape. Reject anything that isn't
+// a bare hex color before handing it to `.style.background`, because
+// the `background` shorthand accepts `<color> <image>` together — a
+// server or snapshot sending `"red url(https://attacker/leak.png)"`
+// would otherwise trigger a remote fetch every time the dot renders.
+function isSafeHexColor(value: string): boolean {
+    return /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
 }
 
 let registered = false;
