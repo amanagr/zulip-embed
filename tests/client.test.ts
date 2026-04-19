@@ -10,8 +10,10 @@ import type {
     TypingOp,
 } from "../src/transport.ts";
 import type {
+    Channel,
     ScopeFilter,
     SendMessageParams,
+    Topic,
     ZulipEvent,
     ZulipEventListener,
 } from "../src/types.ts";
@@ -69,6 +71,16 @@ class FakeTransport implements Transport {
 
     async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
         this.calls.push({method: "sendTyping", args: [op, scope]});
+    }
+
+    async listChannels(): Promise<Channel[]> {
+        this.calls.push({method: "listChannels", args: []});
+        return [];
+    }
+
+    async listTopics(channel: string): Promise<Topic[]> {
+        this.calls.push({method: "listTopics", args: [channel]});
+        return [];
     }
 
     getCurrentUserId(): number | undefined {
