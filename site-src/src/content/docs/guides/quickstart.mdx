@@ -1,15 +1,18 @@
 ---
 title: Quickstart
-description: Drop a <zulip-chat> widget into any HTML page in under a minute.
+description: Drop a <zulip-chat> widget into any HTML page in under a minute, then swap in your own Zulip server.
 ---
 
-import {Tabs, TabItem, Code} from "@astrojs/starlight/components";
+import {Tabs, TabItem, Steps, LinkCard, Aside} from "@astrojs/starlight/components";
 
-The fastest way to embed Zulip chat. Copy-paste the snippet below, point
-`server` at your instance, and paste a short-lived JWT into `auth-token`.
+The shortest path from zero to a live chat panel on your page. We'll
+start with demo mode (no backend), then flip to live mode against
+your Zulip instance.
 
-<Tabs>
-  <TabItem label="HTML / CDN">
+## 1. Drop in the widget
+
+<Tabs syncKey="quickstart">
+  <TabItem label="HTML">
     ```html
     <script
       type="module"
@@ -17,47 +20,155 @@ The fastest way to embed Zulip chat. Copy-paste the snippet below, point
     ></script>
 
     <zulip-chat
-      server="https://chat.example.com"
-      auth-token="<short-lived JWT from your backend>"
+      demo
       channel="general"
       topic="welcome"
       theme="light"
+      style="--zc-height: 560px;"
     ></zulip-chat>
     ```
   </TabItem>
   <TabItem label="React">
+    ```bash
+    npm install zulip-embed-react
+    ```
+
     ```tsx
     import {ZulipChat} from "zulip-embed-react";
 
     export function App() {
-      return (
-        <ZulipChat
-          server="https://chat.example.com"
-          authToken={authToken}
-          channel="general"
-          topic="welcome"
-          theme="light"
-        />
-      );
+      return <ZulipChat demo channel="general" topic="welcome" theme="light" />;
     }
     ```
   </TabItem>
+  <TabItem label="React Native">
+    ```bash
+    npm install zulip-embed-react-native
+    ```
+
+    ```tsx
+    import {ZulipChat} from "zulip-embed-react-native";
+
+    export function App() {
+      return <ZulipChat demo channel="general" />;
+    }
+    ```
+  </TabItem>
+  <TabItem label="Flutter">
+    ```yaml
+    dependencies:
+      zulip_embed: ^1.0.0
+    ```
+
+    ```dart
+    ZulipChat(
+      demo: true,
+      scope: const ChannelScope(channel: 'general', topic: 'welcome'),
+    )
+    ```
+  </TabItem>
 </Tabs>
-
-## Live preview
-
-Here's the same widget in demo mode — no backend, no credentials, driven
-by a seeded transport:
 
 <zulip-chat
   demo
   channel="general"
   topic="welcome"
   theme="light"
-  style="--zc-height: 460px; --zc-radius: 12px; display: block;"
+  style="--zc-height: 460px; --zc-radius: 12px; display: block; margin: 1.5rem 0;"
 ></zulip-chat>
+
+<Aside type="note">
+  Demo mode renders seeded messages and a friendly echo bot. No
+  network calls, no credentials. Perfect for local dev and Storybook.
+</Aside>
+
+## 2. Flip to live mode
+
+<Steps>
+1. **Configure JWT auth** in your Zulip instance. Add a shared secret
+   to `/etc/zulip/settings.py`:
+
+   ```python
+   JWT_AUTH_KEYS = {
+       "your-realm.zulipchat.com": {
+           "key": "<32+ random bytes>",
+           "algorithms": ["HS256"],
+       },
+   }
+   ```
+
+2. **Mint a short-lived JWT** on your backend, signed with the same
+   secret. See [the auth guide](/guides/auth/) for Node / Python / Go
+   minters.
+
+3. **Swap `demo` for `server` + `auth-token`** on the widget:
+
+   ```html
+   <zulip-chat
+     server="https://chat.example.com"
+     auth-token="<short-lived JWT from your backend>"
+     channel="general"
+     topic="welcome"
+   ></zulip-chat>
+   ```
+
+4. **Open the page.** The widget hits
+   `/api/internal/jwt/fetch_api_key` on your Zulip server, exchanges
+   the JWT for a scoped API key, and streams live messages.
+</Steps>
+
+## 3. Theme it
+
+Every visual token is a CSS custom property:
+
+```html
+<zulip-chat
+  server="…"
+  auth-token="…"
+  channel="support"
+  style="
+    --zc-color-accent: #ff5722;
+    --zc-color-bg: #fafafa;
+    --zc-radius: 14px;
+    --zc-height: 640px;
+    --zc-font-family: 'Inter', system-ui, sans-serif;
+  "
+></zulip-chat>
+```
+
+Or flip the whole palette to dark mode:
+
+```html
+<zulip-chat theme="dark" server="…" auth-token="…" channel="support"></zulip-chat>
+```
+
+See the [theming reference](/reference/theming/) for every
+`--zc-*` token.
+
+## 4. React to events
+
+```html
+<zulip-chat id="chat" server="…" auth-token="…" channel="support"></zulip-chat>
+
+<script type="module">
+  const chat = document.querySelector("#chat");
+  chat.addEventListener("zulip-message", (e) => {
+    analytics.track("zulip_message", {senderId: e.detail.message.senderId});
+  });
+  chat.addEventListener("zulip-error", (e) => {
+    if (e.detail.code === "channel-not-subscribed") {
+      alert("Ask an admin to add the bot to #support.");
+    }
+  });
+</script>
+```
+
+See [events reference](/reference/events/) for the full event
+surface.
 
 ## Next steps
 
-Wire up auth with a short-lived JWT handoff, then theme the widget to
-match your product. (Full guides land in Phase 1.)
+<LinkCard title="Auth (JWT)" description="The full handoff: shared secrets, minting tokens, refreshing before expiry." href="/guides/auth/" />
+<LinkCard title="Theming" description="Every --zc-* token, theme attribute, brand-name, brand-logo." href="/reference/theming/" />
+<LinkCard title="Events" description="Every CustomEvent with detail shapes and handler patterns." href="/reference/events/" />
+<LinkCard title="Troubleshooting" description="Error codes and the most common connectivity failures." href="/guides/troubleshooting/" />

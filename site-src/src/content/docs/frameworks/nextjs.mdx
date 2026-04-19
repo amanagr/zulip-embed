@@ -1,0 +1,93 @@
+---
+title: Next.js
+description: Drop zulip-chat into the Next.js App Router with a client wrapper — SSR-safe, works with React Server Components.
+---
+
+import {Aside, LinkCard} from "@astrojs/starlight/components";
+
+Next.js lets you render the widget on the client while keeping the
+rest of the page server-rendered. Use the React wrapper for the
+cleanest ergonomics.
+
+## Install
+
+```bash
+npm install zulip-embed-react
+```
+
+## Client boundary
+
+`<ZulipChat>` must render on the client. The simplest setup is a
+colocated `"use client"` component:
+
+```tsx
+// app/(marketing)/support/client-chat.tsx
+"use client";
+
+import {ZulipChat} from "zulip-embed-react";
+
+export function ClientChat({authToken}: {authToken: string}) {
+  return (
+    <ZulipChat
+      server="https://chat.example.com"
+      authToken={authToken}
+      channel="support"
+      topic="new"
+      theme="light"
+    />
+  );
+}
+```
+
+```tsx
+// app/(marketing)/support/page.tsx
+import {cookies} from "next/headers";
+import {ClientChat} from "./client-chat";
+
+export default async function SupportPage() {
+  const token = await mintZulipToken(cookies().get("session")?.value);
+  return (
+    <main>
+      <h1>Support</h1>
+      <ClientChat authToken={token} />
+    </main>
+  );
+}
+```
+
+<Aside type="tip">
+  Mint the JWT on the server using the session cookie, then pass it
+  to the client wrapper as a prop. Don't ship your Zulip API key to
+  the browser. See the [auth guide](/guides/auth/).
+</Aside>
+
+## Pages Router
+
+For `pages/`-based projects, use `dynamic` with `ssr: false`:
+
+```tsx
+import dynamic from "next/dynamic";
+
+const ZulipChat = dynamic(
+  () => import("zulip-embed-react").then((m) => m.ZulipChat),
+  {ssr: false},
+);
+
+export default function SupportPage({authToken}) {
+  return (
+    <ZulipChat
+      server="https://chat.example.com"
+      authToken={authToken}
+      channel="support"
+    />
+  );
+}
+```
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/nextjs/"
+  description="Next.js App Router app with a client wrapper, ready to pnpm install + pnpm dev."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/nextjs"
+/>

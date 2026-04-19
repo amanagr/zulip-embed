@@ -40,11 +40,38 @@ export default defineConfig({
                     },
                 },
             ],
-            // Phase 0 smoke-test only ships the landing + quickstart.
-            // Phase 1 fills in Frameworks / Reference / Guides.
             sidebar: [
                 {label: "Introduction", slug: "index"},
-                {label: "Quickstart", slug: "guides/quickstart"},
+                {
+                    label: "Guides",
+                    items: [
+                        {label: "Quickstart", slug: "guides/quickstart"},
+                        {label: "Auth (JWT)", slug: "guides/auth"},
+                        {label: "Troubleshooting", slug: "guides/troubleshooting"},
+                    ],
+                },
+                {
+                    label: "Frameworks",
+                    items: [
+                        {label: "HTML / CDN", slug: "frameworks/html"},
+                        {label: "React", slug: "frameworks/react"},
+                        {label: "React Native", slug: "frameworks/react-native"},
+                        {label: "Flutter", slug: "frameworks/flutter"},
+                        {label: "Vue", slug: "frameworks/vue"},
+                        {label: "Svelte", slug: "frameworks/svelte"},
+                        {label: "Next.js", slug: "frameworks/nextjs"},
+                        {label: "Angular", slug: "frameworks/angular"},
+                        {label: "Headless SDK", slug: "frameworks/headless"},
+                    ],
+                },
+                {
+                    label: "Reference",
+                    items: [
+                        {label: "Events", slug: "reference/events"},
+                        {label: "Theming", slug: "reference/theming"},
+                        {label: "Agents & AI", slug: "reference/agents"},
+                    ],
+                },
             ],
         }),
     ],

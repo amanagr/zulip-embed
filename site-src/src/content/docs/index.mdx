@@ -1,12 +1,12 @@
 ---
 title: zulip-embed
-description: Embed Zulip chat as a framework-agnostic Web Component or headless SDK.
+description: Embed Zulip chat as a framework-agnostic Web Component or headless SDK. Drop in with one script tag, theme with CSS variables, or drive the headless client from your own UI.
 template: splash
 hero:
-  tagline: A drop-in Zulip chat widget. One &lt;script&gt; tag, any framework, any theme.
+  tagline: Drop Zulip chat into any web, mobile, or native app. One &lt;script&gt; tag, any framework, any theme.
   actions:
     - text: Quickstart
-      link: /guides/quickstart/
+      link: guides/quickstart/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
@@ -14,7 +14,7 @@ hero:
       icon: external
 ---
 
-import {Card, CardGrid} from "@astrojs/starlight/components";
+import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/components";
 
 <div class="zc-hero">
   <div class="zc-hero-copy">
@@ -26,7 +26,7 @@ import {Card, CardGrid} from "@astrojs/starlight/components";
     </p>
     <p>
       Swap <code>demo</code> for <code>server</code> + <code>auth-token</code>
-      and it connects to your own Zulip instance in seconds.
+      and it connects to your own Zulip instance.
     </p>
   </div>
   <zulip-chat
@@ -38,21 +38,170 @@ import {Card, CardGrid} from "@astrojs/starlight/components";
   ></zulip-chat>
 </div>
 
+## Install
+
+<Tabs syncKey="install">
+  <TabItem label="CDN">
+    ```html
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+    ```
+  </TabItem>
+  <TabItem label="npm">
+    ```bash
+    npm install zulip-embed
+    ```
+  </TabItem>
+  <TabItem label="React">
+    ```bash
+    npm install zulip-embed-react
+    ```
+  </TabItem>
+  <TabItem label="React Native">
+    ```bash
+    npm install zulip-embed-react-native
+    ```
+  </TabItem>
+  <TabItem label="Flutter">
+    ```yaml
+    # pubspec.yaml
+    dependencies:
+      zulip_embed: ^1.0.0
+    ```
+  </TabItem>
+</Tabs>
+
+## Pick your framework
+
+<Tabs syncKey="framework">
+  <TabItem label="HTML">
+    ```html
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+
+    <zulip-chat
+      server="https://chat.example.com"
+      auth-token="<short-lived JWT>"
+      channel="general"
+      topic="welcome"
+      theme="light"
+    ></zulip-chat>
+    ```
+    [Full HTML / CDN guide →](/frameworks/html/)
+  </TabItem>
+  <TabItem label="React">
+    ```tsx
+    import {ZulipChat} from "zulip-embed-react";
+
+    export function Support() {
+      return (
+        <ZulipChat
+          server="https://chat.example.com"
+          authToken={authToken}
+          channel="support"
+          topic="new"
+          theme="light"
+        />
+      );
+    }
+    ```
+    [Full React guide →](/frameworks/react/)
+  </TabItem>
+  <TabItem label="React Native">
+    ```tsx
+    import {ZulipChat} from "zulip-embed-react-native";
+
+    export function SupportScreen({authToken}) {
+      return (
+        <ZulipChat
+          server="https://chat.example.com"
+          authToken={authToken}
+          channel="support"
+        />
+      );
+    }
+    ```
+    [Full React Native guide →](/frameworks/react-native/)
+  </TabItem>
+  <TabItem label="Flutter">
+    ```dart
+    import 'package:zulip_embed/zulip_embed.dart';
+
+    ZulipChat(
+      server: 'https://chat.example.com',
+      authToken: authToken,
+      scope: const ChannelScope(channel: 'support'),
+    )
+    ```
+    [Full Flutter guide →](/frameworks/flutter/)
+  </TabItem>
+  <TabItem label="Headless">
+    ```ts
+    import {ZulipClient} from "zulip-embed";
+
+    const client = new ZulipClient({
+      serverUrl: "https://chat.example.com",
+      authToken,
+      scope: {channel: "support"},
+    });
+    await client.connect();
+    client.subscribe((event) => render(event));
+    ```
+    [Full headless guide →](/frameworks/headless/)
+  </TabItem>
+</Tabs>
+
+## Why zulip-embed
+
 <CardGrid>
-  <Card title="Web Component" icon="seti:html">
-    `<zulip-chat>` works in plain HTML, any SSR framework, or anywhere the
-    DOM runs. No bundler required.
+  <Card title="Framework-agnostic" icon="seti:html">
+    Custom elements work in plain HTML, React, Vue, Svelte, Angular,
+    Next.js, and any other SSR framework. No build step required for
+    the CDN version.
   </Card>
-  <Card title="React / React Native" icon="seti:react">
-    First-party wrappers: `zulip-embed-react` for the web, `zulip-embed-react-native`
-    for mobile, both built on the same core.
+  <Card title="Theme with CSS variables" icon="seti:css">
+    Every color, radius, font, and size is a `--zc-*` custom property.
+    Match your product's design system without writing a shadow-DOM
+    stylesheet. [Theming reference →](/reference/theming/)
   </Card>
-  <Card title="Flutter" icon="seti:dart">
-    `zulip_embed` Dart package mirrors the TypeScript domain model so your
-    Flutter app gets the same widget surface and event model.
+  <Card title="Agent-native" icon="seti:graphql">
+    Streaming tokens, tool-call messages, and inline confirmation
+    widgets land with first-class UI. [Agents reference →](/reference/agents/)
   </Card>
-  <Card title="Headless SDK" icon="seti:typescript">
-    Skip the widget entirely and drive the transport yourself — useful for
-    agent integrations, custom UIs, or analytics dashboards.
+  <Card title="Headless when you need it" icon="seti:typescript">
+    Skip the widget and drive the transport directly — build a custom
+    UI, power analytics, or integrate with an agent orchestrator.
+  </Card>
+  <Card title="Open source, Apache-2.0" icon="seti:git">
+    Stable v1.0 API under semver. Hosted on
+    [GitHub](https://github.com/amanagr/zulip-embed), published to
+    [npm](https://www.npmjs.com/package/zulip-embed), installable
+    straight from the CDN.
+  </Card>
+  <Card title="Every Zulip server" icon="seti:default">
+    Works against current Zulip and every prior version that ships the
+    REST API. The SDK speaks the legacy wire dialect when needed so
+    your embed isn't tied to the server's release cadence.
   </Card>
 </CardGrid>
+
+## Live examples
+
+<LinkCard
+  title="Examples repository"
+  description="Minimal, self-contained apps for every framework. Clone a folder, pnpm install, pnpm dev."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples"
+/>
+
+## Further reading
+
+<LinkCard title="Quickstart" description="Five-minute setup from npm install to live chat." href="/guides/quickstart/" />
+<LinkCard title="Auth (JWT)" description="Short-lived JWT handoff and the /api/internal/jwt/fetch_api_key flow." href="/guides/auth/" />
+<LinkCard title="Custom events" description="Every CustomEvent, the detail shape, when it fires." href="/reference/events/" />
+<LinkCard title="Theming" description="Every --zc-* CSS custom property and theming attribute." href="/reference/theming/" />
+<LinkCard title="Agents & AI" description="startAgentReply, MessagePart, and confirmation widgets." href="/reference/agents/" />
+<LinkCard title="Troubleshooting" description="Error codes, CSP gotchas, common connectivity failures." href="/guides/troubleshooting/" />

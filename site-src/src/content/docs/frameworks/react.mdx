@@ -1,0 +1,152 @@
+---
+title: React
+description: First-party React wrapper with a useZulipChat hook, event props, and full TypeScript types.
+---
+
+import {Tabs, TabItem, LinkCard, Aside} from "@astrojs/starlight/components";
+
+`zulip-embed-react` wraps the core custom element behind a first-party
+React component and a `useZulipChat` hook. Event handlers land as
+typed React props; attributes land as React props. Works with React
+18+.
+
+## Install
+
+```bash
+npm install zulip-embed-react
+```
+
+<Aside type="tip">
+  The React wrapper bundles the core `zulip-embed` as a dependency, so
+  you don't need to install both.
+</Aside>
+
+## Minimal component
+
+```tsx
+import {ZulipChat} from "zulip-embed-react";
+
+export function SupportChat({authToken}: {authToken: string}) {
+  return (
+    <ZulipChat
+      server="https://chat.example.com"
+      authToken={authToken}
+      channel="support"
+      topic="new"
+      theme="light"
+    />
+  );
+}
+```
+
+## Event handlers
+
+```tsx
+<ZulipChat
+  server="https://chat.example.com"
+  authToken={authToken}
+  channel="support"
+  onMessage={(detail) => {
+    telemetry.capture("support_message", {
+      senderId: detail.message.senderId,
+    });
+  }}
+  onConnectionChange={(detail) => setStatus(detail.status)}
+  onError={(detail) => {
+    if (detail.code === "channel-not-subscribed") {
+      sentry.captureMessage("bot not subscribed to #support");
+    }
+  }}
+/>
+```
+
+Every [custom event](/reference/events/) has a corresponding `on*`
+prop with a fully-typed detail argument. No need to wire
+`addEventListener` yourself.
+
+## Headless hook
+
+For custom UIs, skip `<ZulipChat>` and use `useZulipChat`:
+
+```tsx
+import {useZulipChat} from "zulip-embed-react";
+
+export function MessageCount() {
+  const {messages, connectionStatus} = useZulipChat({
+    server: "https://chat.example.com",
+    authToken,
+    scope: {channel: "support"},
+  });
+
+  return (
+    <div>
+      {connectionStatus} — {messages.length} messages
+    </div>
+  );
+}
+```
+
+The hook owns a `ZulipClient` internally, keeps the message list in
+React state, and tears the transport down on unmount. Pair with the
+[headless guide](/frameworks/headless/) for the raw client surface.
+
+## Demo mode
+
+```tsx
+<ZulipChat demo channel="general" topic="welcome" theme="light" />
+```
+
+Runs against the in-memory `DemoTransport` — seeded messages, echo
+bot, no network calls. Great for Storybook and design reviews.
+
+## Theming
+
+CSS variables flow through the shadow root, so ordinary React style
+props work:
+
+```tsx
+<ZulipChat
+  server="https://chat.example.com"
+  authToken={authToken}
+  channel="support"
+  style={{
+    "--zc-color-accent": "#ff5722",
+    "--zc-radius": "14px",
+    "--zc-height": "560px",
+  } as React.CSSProperties}
+/>
+```
+
+See the [theming reference](/reference/theming/) for every
+`--zc-*` token.
+
+## SSR / Next.js
+
+`<ZulipChat>` must render client-side (the underlying custom element
+uses the DOM). In Next.js App Router:
+
+```tsx
+"use client";
+import {ZulipChat} from "zulip-embed-react";
+
+export default function SupportPage({authToken}: {authToken: string}) {
+  return <ZulipChat server="…" authToken={authToken} channel="support" />;
+}
+```
+
+Or dynamically import with `ssr: false` if the parent component is
+otherwise a server component.
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/react/"
+  description="React + Vite starter wiring <ZulipChat>. Clone, pnpm install, pnpm dev."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/react"
+/>
+
+<LinkCard
+  title="examples/nextjs/"
+  description="Next.js App Router example with a client wrapper."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/nextjs"
+/>

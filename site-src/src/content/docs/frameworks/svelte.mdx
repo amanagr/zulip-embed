@@ -1,0 +1,71 @@
+---
+title: Svelte
+description: Zero-config web component support in Svelte 5 — drop zulip-chat into any component.
+---
+
+import {LinkCard} from "@astrojs/starlight/components";
+
+Svelte 5 natively treats unknown elements as web components. No
+compiler configuration, no wrapper — just import the bundle and use
+the tag.
+
+## Install
+
+```bash
+npm install zulip-embed
+```
+
+## Minimal component
+
+```svelte
+<script lang="ts">
+  import "zulip-embed";
+
+  let {authToken}: {authToken: string} = $props();
+</script>
+
+<zulip-chat
+  server="https://chat.example.com"
+  auth-token={authToken}
+  channel="support"
+  topic="new"
+  theme="light"
+/>
+```
+
+## Events
+
+Svelte's `on:event` syntax forwards the browser `CustomEvent`
+unchanged:
+
+```svelte
+<zulip-chat
+  server="https://chat.example.com"
+  auth-token={authToken}
+  channel="support"
+  on:zulip-message={(e) => console.log(e.detail.message)}
+  on:zulip-error={(e) => console.warn(e.detail.code, e.detail.error)}
+/>
+```
+
+See [events reference](/reference/events/) for every payload type.
+
+## SvelteKit
+
+Works inside SvelteKit's `+page.svelte` components. If you hit an SSR
+error, guard the import:
+
+```svelte
+<script>
+  import {onMount} from "svelte";
+  onMount(() => import("zulip-embed"));
+</script>
+```
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/svelte/"
+  description="Svelte 5 + Vite starter wiring <zulip-chat> with no extra configuration."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/svelte"
+/>

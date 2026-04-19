@@ -1,0 +1,162 @@
+---
+title: Auth (JWT)
+description: How the auth-token attribute gets exchanged for a per-user Zulip API key, and how to mint JWTs on your backend.
+---
+
+import {Aside, Tabs, TabItem, LinkCard} from "@astrojs/starlight/components";
+
+The embed's `auth-token` attribute accepts a short-lived JWT that the
+browser exchanges, on first load, for a scoped Zulip API key. The key
+stays inside the SDK — the host page never sees it. This page covers
+the server side of that handoff.
+
+## 1. Provision a shared secret in your Zulip org
+
+Zulip's JWT login requires the admin to set `JWT_AUTH_KEYS` in
+`/etc/zulip/settings.py`:
+
+```python
+JWT_AUTH_KEYS = {
+    "your-realm.zulipchat.com": {
+        "key": "<32+ random bytes, hex or base64>",
+        "algorithms": ["HS256"],
+    },
+}
+```
+
+Restart the `zulip` service. The same secret now signs every JWT your
+backend mints for this realm.
+
+## 2. Mint a JWT on your backend
+
+<Tabs syncKey="jwt-lang">
+  <TabItem label="Node (jose)">
+    ```ts
+    import {SignJWT} from "jose";
+
+    const secret = new TextEncoder().encode(process.env.ZULIP_JWT_SECRET);
+
+    export async function mintZulipJwt(viewerEmail: string): Promise<string> {
+      return new SignJWT({email: viewerEmail, realm: "your-realm"})
+        .setProtectedHeader({alg: "HS256"})
+        .setIssuedAt()
+        .setExpirationTime("5m")
+        .sign(secret);
+    }
+    ```
+  </TabItem>
+  <TabItem label="Python (PyJWT)">
+    ```python
+    import jwt, time
+
+    def mint_zulip_jwt(viewer_email: str) -> str:
+        payload = {
+            "email": viewer_email,
+            "realm": "your-realm",
+            "exp": int(time.time()) + 300,
+        }
+        return jwt.encode(payload, SECRET, algorithm="HS256")
+    ```
+  </TabItem>
+  <TabItem label="Go (golang-jwt)">
+    ```go
+    import (
+        "time"
+        jwt "github.com/golang-jwt/jwt/v5"
+    )
+
+    func MintZulipJWT(viewerEmail string) (string, error) {
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+            "email": viewerEmail,
+            "realm": "your-realm",
+            "exp":   time.Now().Add(5 * time.Minute).Unix(),
+        })
+        return token.SignedString([]byte(os.Getenv("ZULIP_JWT_SECRET")))
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+Expose the minter behind a session-gated endpoint —
+`GET /api/zulip-token` — so only authenticated viewers can pull a
+token. **Never sign JWTs on the client.**
+
+<Aside type="caution">
+  Keep token lifetimes short (≤5 minutes). The JWT is the viewer's
+  key — a leaked long-lived JWT is a long-lived session for an
+  attacker.
+</Aside>
+
+## 3. Deliver the token to the page
+
+Two common patterns:
+
+- **Server-render the attribute.** In Rails / Django / Remix, embed
+  the minted token into the HTML when rendering the page that hosts
+  `<zulip-chat>`. Shortest code path; locks the token to that one
+  page view.
+- **Fetch on mount.** Emit `<zulip-chat>` with no `auth-token`, then
+  fetch `/api/zulip-token` in an effect and set the attribute
+  programmatically. Handy in SPAs where the token needs to refresh.
+
+```html
+<zulip-chat id="chat" server="https://chat.example.com" channel="support"></zulip-chat>
+
+<script type="module">
+  const res = await fetch("/api/zulip-token", {credentials: "include"});
+  const {token} = await res.json();
+  document.querySelector("#chat").setAttribute("auth-token", token);
+</script>
+```
+
+The component re-initialises its transport whenever the `auth-token`
+attribute changes, so pattern two lets you rotate tokens at runtime.
+
+## 4. What the browser does
+
+On mount, `<zulip-chat>` POSTs the JWT to
+`{server}/api/internal/jwt/fetch_api_key`. Zulip verifies the
+signature with the `JWT_AUTH_KEYS` entry for the realm, finds or
+auto-creates the viewer account, and returns a scoped API key + the
+viewer's `user_id`.
+
+The API key lives in memory for the life of the page. It's never
+exposed to `window`, never logged, never persisted. If the page
+reloads, the SDK re-runs the handoff.
+
+## 5. Refresh before expiry
+
+Today the SDK re-fetches the API key once, on mount. If the page
+lives longer than the JWT's `exp`, you currently have two options:
+
+- Set a long-enough `exp` for the session (trading off leak blast
+  radius).
+- Replace the `<zulip-chat>` element (or its `auth-token` attribute)
+  with a freshly-minted JWT before expiry.
+
+A `refreshAuthToken` callback that re-mints transparently on 401 is
+on the v1.x roadmap.
+
+## Troubleshooting
+
+- **`zulip-error` with `code === "jwt-not-configured"`.** The Zulip
+  server returned 404 from `/api/internal/jwt/fetch_api_key` — the
+  admin hasn't added `JWT_AUTH_KEYS`, or the setting targets a
+  different realm than the one `server="..."` points at.
+- **`zulip-error` with `code === "unauthorized"` immediately after
+  mount.** The token signature didn't verify. Check that
+  `ZULIP_JWT_SECRET` on your server matches the `key` in
+  `JWT_AUTH_KEYS`, and that the `realm` claim is present.
+- **No network call to `/api/internal/jwt/fetch_api_key`.** The
+  embed only hits it when `auth-token` is non-empty. Check that the
+  attribute is set and the JWT is not empty.
+
+## Further reading
+
+<LinkCard title="Troubleshooting" description="Every zulip-error code, CSP gotchas, and common failure modes." href="/guides/troubleshooting/" />
+<LinkCard title="Events reference" description="What zulip-error actually looks like on the wire." href="/reference/events/#zulip-error" />
+<LinkCard
+  title="SECURITY.md"
+  description="Full security policy: credential handling, threat model, responsible disclosure."
+  href="https://github.com/amanagr/zulip-embed/blob/main/SECURITY.md"
+/>

@@ -1,0 +1,88 @@
+---
+title: Angular
+description: Use zulip-chat in Angular 18+ via CUSTOM_ELEMENTS_SCHEMA — standalone or module-based, with or without Vite.
+---
+
+import {LinkCard} from "@astrojs/starlight/components";
+
+Angular ships first-class support for custom elements through
+`CUSTOM_ELEMENTS_SCHEMA`. Works in standalone components (Angular 14+)
+and in NgModule-based apps.
+
+## Install
+
+```bash
+npm install zulip-embed
+```
+
+## Minimal standalone component
+
+```ts
+import {Component, CUSTOM_ELEMENTS_SCHEMA, Input} from "@angular/core";
+import "zulip-embed";
+
+@Component({
+  selector: "app-support",
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `
+    <zulip-chat
+      server="https://chat.example.com"
+      [attr.auth-token]="authToken"
+      channel="support"
+      topic="new"
+      theme="light"
+    ></zulip-chat>
+  `,
+})
+export class SupportComponent {
+  @Input() authToken!: string;
+}
+```
+
+Use `[attr.auth-token]` rather than `[authToken]` so Angular binds to
+the HTML attribute the custom element observes, not a property on the
+class instance.
+
+## NgModule flavor
+
+```ts
+import {NgModule, CUSTOM_ELEMENTS_SCHEMA} from "@angular/core";
+
+@NgModule({
+  declarations: [SupportComponent],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+})
+export class SupportModule {}
+```
+
+## Events
+
+Listen with `@HostListener` or from the template:
+
+```ts
+@Component({
+  // …
+  template: `
+    <zulip-chat
+      server="…"
+      [attr.auth-token]="authToken"
+      channel="support"
+      (zulip-message)="onMessage($event)"
+    ></zulip-chat>
+  `,
+})
+export class SupportComponent {
+  onMessage(event: CustomEvent) {
+    console.log(event.detail.message);
+  }
+}
+```
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/angular/"
+  description="Angular 18 standalone + Vite app wiring a <zulip-chat> with CUSTOM_ELEMENTS_SCHEMA."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/angular"
+/>

@@ -1,0 +1,83 @@
+---
+title: Vue 3
+description: Use zulip-chat in Vue 3 as a native web component — no wrapper required.
+---
+
+import {LinkCard, Code} from "@astrojs/starlight/components";
+
+Vue 3 treats unknown elements as custom elements out of the box, so
+`<zulip-chat>` drops in with no wrapper.
+
+## Install
+
+```bash
+npm install zulip-embed
+```
+
+## Configure Vue
+
+Tell the Vue compiler `zulip-*` tags are custom elements so it
+doesn't warn about them at compile time. In `vite.config.ts`:
+
+```ts
+import {defineConfig} from "vite";
+import vue from "@vitejs/plugin-vue";
+
+export default defineConfig({
+  plugins: [
+    vue({
+      template: {
+        compilerOptions: {
+          isCustomElement: (tag) => tag.startsWith("zulip-"),
+        },
+      },
+    }),
+  ],
+});
+```
+
+## Minimal component
+
+```vue
+<script setup lang="ts">
+import "zulip-embed";
+
+defineProps<{authToken: string}>();
+</script>
+
+<template>
+  <zulip-chat
+    server="https://chat.example.com"
+    :auth-token="authToken"
+    channel="support"
+    topic="new"
+    theme="light"
+  />
+</template>
+```
+
+## Events
+
+Custom events bubble through Vue's `@event` syntax:
+
+```vue
+<zulip-chat
+  server="https://chat.example.com"
+  :auth-token="authToken"
+  channel="support"
+  @zulip-message="onMessage"
+  @zulip-error="onError"
+/>
+```
+
+`$event` on each handler is the `CustomEvent` — access
+`$event.detail` for the payload. See
+[events reference](/reference/events/) for every payload type.
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/vue/"
+  description="Vue 3 + Vite app with a chat screen and the isCustomElement hook wired."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/vue"
+/>

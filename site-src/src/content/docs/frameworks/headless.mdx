@@ -1,0 +1,120 @@
+---
+title: Headless SDK
+description: Drive the ZulipClient directly — no widget, no shadow DOM. Build custom UIs, agent orchestrators, and analytics dashboards.
+---
+
+import {LinkCard} from "@astrojs/starlight/components";
+
+When the default UI isn't the right fit — custom layouts, agent
+orchestration, analytics dashboards — skip the widget entirely and
+talk to `ZulipClient` yourself. Same auth, same scopes, same event
+stream.
+
+## Install
+
+```bash
+npm install zulip-embed
+```
+
+No wrapper required. The headless client is a named export of the
+main package.
+
+## Minimal client
+
+```ts
+import {ZulipClient} from "zulip-embed";
+
+const client = new ZulipClient({
+  serverUrl: "https://chat.example.com",
+  authToken,
+  scope: {channel: "support"},
+});
+
+await client.connect();
+
+client.subscribe((event) => {
+  switch (event.type) {
+    case "message":
+      console.log("new message", event.message.content);
+      break;
+    case "connection":
+      console.log("status:", event.status);
+      break;
+    case "error":
+      console.error("[zulip]", event.code);
+      break;
+  }
+});
+```
+
+## Sending
+
+```ts
+await client.sendMessage({
+  type: "channel",
+  channel: "support",
+  topic: "new",
+  content: "Hi, we saw your report and we're looking into it.",
+});
+
+await client.sendMessage({
+  type: "direct",
+  recipients: ["viewer@acme.com"],
+  content: "Private follow-up.",
+});
+```
+
+## Editing and reacting
+
+```ts
+await client.editMessage({
+  messageId: 4242,
+  kind: "content",
+  content: "Updated with the fix.",
+});
+
+await client.addReaction({messageId: 4242, emoji: "tada"});
+await client.removeReaction({messageId: 4242, emoji: "tada"});
+
+await client.deleteMessage(4242);
+```
+
+## Typing indicators
+
+```ts
+await client.sendTyping("start", {channel: "support", topic: "new"});
+// …user types…
+await client.sendTyping("stop", {channel: "support", topic: "new"});
+```
+
+## Agent streaming
+
+The client exposes `startAgentReply` for building LLM transcripts —
+see [agents reference](/reference/agents/) for the full orchestration
+loop.
+
+```ts
+const handle = await client.startAgentReply(scope, {author: "Acme Bot"});
+handle.appendToken("Looking at your account…");
+handle.appendEvent({type: "tool_call", name: "getUser", args: {id: 42}});
+handle.appendToken("Found it. Here's the status…");
+await handle.finish();
+```
+
+## Teardown
+
+```ts
+await client.close();
+```
+
+Cancels the long-poll, flushes pending writes, and drops listeners.
+Always call this before navigating away or the browser leaks the
+queue registration.
+
+## Copy-paste example
+
+<LinkCard
+  title="Headless SDK examples"
+  description="See the tests/ dir for the minimal client surface exercised end-to-end."
+  href="https://github.com/amanagr/zulip-embed/tree/main/tests"
+/>

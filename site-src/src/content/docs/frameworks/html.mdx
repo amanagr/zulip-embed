@@ -1,0 +1,133 @@
+---
+title: HTML / CDN
+description: Drop a zulip-chat widget into a plain HTML page with one script tag — no bundler, no npm install.
+---
+
+import {Tabs, TabItem, LinkCard} from "@astrojs/starlight/components";
+
+The zero-build-step path. Works in a static file on disk, on a CDN, or
+inside any SSR framework that lets you render a `<script>` tag.
+
+## Install
+
+<Tabs syncKey="cdn">
+  <TabItem label="jsDelivr (recommended)">
+    ```html
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+    ```
+  </TabItem>
+  <TabItem label="unpkg">
+    ```html
+    <script
+      type="module"
+      src="https://unpkg.com/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+    ```
+  </TabItem>
+  <TabItem label="IIFE (no modules)">
+    ```html
+    <script src="https://unpkg.com/zulip-embed@1/dist/zulip-embed.iife.js"></script>
+    ```
+    Registers the custom elements onto `customElements`; useful if
+    your bundler doesn't support `<script type="module">`.
+  </TabItem>
+</Tabs>
+
+## Minimal page
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Support chat</title>
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/zulip-embed.js"
+    ></script>
+  </head>
+  <body>
+    <zulip-chat
+      server="https://chat.example.com"
+      auth-token="<short-lived JWT from your backend>"
+      channel="support"
+      topic="new"
+      theme="light"
+      style="--zc-height: 600px; --zc-radius: 12px;"
+    ></zulip-chat>
+  </body>
+</html>
+```
+
+## Live demo
+
+<zulip-chat
+  demo
+  channel="general"
+  topic="welcome"
+  theme="light"
+  style="--zc-height: 440px; --zc-radius: 12px; display: block;"
+></zulip-chat>
+
+## Fetch an auth token
+
+```html
+<zulip-chat id="chat" server="https://chat.example.com" channel="support"></zulip-chat>
+
+<script type="module">
+  const res = await fetch("/api/auth/zulip", {credentials: "include"});
+  const {token} = await res.json();
+  document.querySelector("#chat").setAttribute("auth-token", token);
+</script>
+```
+
+The component re-initialises its transport any time the `auth-token`
+attribute changes, so you can rotate tokens without reloading the
+page. See the [auth guide](/guides/auth/) for the full handoff.
+
+## Import map (per-component entries)
+
+For the smallest bundle, load only the elements you use:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "zulip-embed/": "https://cdn.jsdelivr.net/npm/zulip-embed@1/dist/"
+    }
+  }
+</script>
+<script type="module">
+  import "zulip-embed/chat";
+  import "zulip-embed/channel-list";
+</script>
+```
+
+Entries available: `chat`, `channel-list`, `dm-list`, `topic-list`,
+`agent`, `announcement`, `demo`. The root `zulip-embed` entry
+registers all of them.
+
+## Subresource Integrity
+
+<LinkCard
+  title="SRI hashes per release"
+  description="Every published version ships a sha384 hash bundle under the GitHub release. Pin it if your CSP requires integrity="
+  href="https://github.com/amanagr/zulip-embed/releases"
+/>
+
+## Copy-paste example
+
+<LinkCard
+  title="examples/vanilla-cdn/"
+  description="Single HTML file that loads the IIFE bundle from unpkg. Open it straight off disk."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/vanilla-cdn"
+/>
+
+<LinkCard
+  title="examples/vanilla-esm/"
+  description="Plain HTML with an ESM import map for per-entry imports. No bundler."
+  href="https://github.com/amanagr/zulip-embed/tree/main/examples/vanilla-esm"
+/>

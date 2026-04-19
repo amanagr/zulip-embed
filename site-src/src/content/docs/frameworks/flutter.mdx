@@ -1,0 +1,127 @@
+---
+title: Flutter
+description: Native Flutter widget with the same transport and event model as the web embed.
+---
+
+import {LinkCard, Aside} from "@astrojs/starlight/components";
+
+The `zulip_embed` Dart package mirrors the TypeScript SDK — same
+scopes, same transport semantics, same event model. The UI is a
+native Flutter widget, not a WebView.
+
+## Install
+
+```yaml
+# pubspec.yaml
+dependencies:
+  zulip_embed: ^1.0.0
+```
+
+```bash
+flutter pub get
+```
+
+Requires Dart SDK ≥ 3.0 and Flutter ≥ 3.13.
+
+## Minimal widget
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:zulip_embed/zulip_embed.dart';
+
+class SupportScreen extends StatelessWidget {
+  final String authToken;
+  const SupportScreen({super.key, required this.authToken});
+
+  @override
+  Widget build(BuildContext context) {
+    return ZulipChat(
+      server: 'https://chat.example.com',
+      authToken: authToken,
+      scope: const ChannelScope(channel: 'support', topic: 'new'),
+    );
+  }
+}
+```
+
+## Scopes
+
+```dart
+// Channel + topic
+const ChannelScope(channel: 'support', topic: 'new');
+
+// Channel only (all topics)
+const ChannelScope(channel: 'support');
+
+// Direct message
+DmScope(userIds: [42, 99]);
+```
+
+Mirrors the TypeScript `Scope` union — see
+[Scope reference](https://github.com/amanagr/zulip-embed/blob/main/docs/ARCHITECTURE.md#scope).
+
+## Events and callbacks
+
+```dart
+ZulipChat(
+  server: 'https://chat.example.com',
+  authToken: authToken,
+  scope: const ChannelScope(channel: 'support'),
+  onMessage: (message) => analytics.log('message', message.id),
+  onConnectionChange: (status) => debugPrint('zulip: $status'),
+  onError: (error) => Sentry.captureMessage('zulip: ${error.code}'),
+)
+```
+
+## Theming
+
+```dart
+ZulipChat(
+  server: 'https://chat.example.com',
+  authToken: authToken,
+  scope: const ChannelScope(channel: 'support'),
+  theme: const ZulipChatTheme(
+    colorAccent: Color(0xFFFF5722),
+    colorBg: Color(0xFF0B0F1A),
+    radius: 14,
+  ),
+)
+```
+
+The `ZulipChatTheme` class carries the same tokens as the web
+`--zc-*` CSS variables.
+
+## Headless usage
+
+```dart
+final client = ZulipClient(
+  serverUrl: 'https://chat.example.com',
+  authToken: authToken,
+  scope: const ChannelScope(channel: 'support'),
+);
+await client.connect();
+client.events.listen((event) => handle(event));
+```
+
+Same pattern as the TypeScript headless client — useful for
+orchestration code or custom UI.
+
+<Aside type="tip">
+  The Flutter and TypeScript packages share the same domain model.
+  Any change to the transport interface gets mirrored; file an issue
+  if you spot drift.
+</Aside>
+
+## Live web demo
+
+The repo builds a Flutter web example alongside the docs site. Visit
+[/flutter/](/flutter/) on the deployed site to see it running (this
+link is only live on GitHub Pages).
+
+## Copy-paste example
+
+<LinkCard
+  title="packages/flutter/example/"
+  description="Complete Flutter app wiring a ZulipChat screen against the in-memory demo transport."
+  href="https://github.com/amanagr/zulip-embed/tree/main/packages/flutter/example"
+/>

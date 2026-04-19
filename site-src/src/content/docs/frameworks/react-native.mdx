@@ -1,0 +1,100 @@
+---
+title: React Native
+description: Native chat UI on iOS and Android, sharing the same transport and event model as the web embed.
+---
+
+import {Aside, LinkCard} from "@astrojs/starlight/components";
+
+`zulip-embed-react-native` ships native screens built on top of
+React Native's core components — no WebView, no headless browser. It
+shares the underlying `ZulipClient` with the web SDK, so the
+transport, event stream, and auth flow are identical.
+
+<Aside type="note" title="v1.0 alpha">
+  The React Native wrapper is published as `1.0.0-alpha.x`. The
+  transport / event / scope surface matches v1.0; the UI screens are
+  still stabilising. Check
+  [CHANGELOG](https://github.com/amanagr/zulip-embed/blob/main/CHANGELOG.md)
+  for the current alpha.
+</Aside>
+
+## Install
+
+```bash
+npm install zulip-embed-react-native
+```
+
+Peer dependencies: `react` ≥ 18 and `react-native` ≥ 0.76.
+
+## Minimal screen
+
+```tsx
+import {ZulipChat} from "zulip-embed-react-native";
+
+export function SupportScreen({authToken}: {authToken: string}) {
+  return (
+    <ZulipChat
+      server="https://chat.example.com"
+      authToken={authToken}
+      channel="support"
+    />
+  );
+}
+```
+
+The component fills its parent; wrap with `<View style={{flex: 1}}>`
+for a full-screen chat.
+
+## Events
+
+```tsx
+<ZulipChat
+  server="https://chat.example.com"
+  authToken={authToken}
+  channel="support"
+  onMessage={(detail) => analytics.track("message", detail.message)}
+  onError={(detail) => crashlytics.log(`zulip: ${detail.code}`)}
+/>
+```
+
+The event surface mirrors the web wrapper. See
+[events reference](/reference/events/) for every payload.
+
+## Theming
+
+React Native styles don't use CSS custom properties, so pass a
+`theme` prop object instead:
+
+```tsx
+<ZulipChat
+  server="…"
+  authToken={authToken}
+  channel="support"
+  theme={{
+    colorAccent: "#ff5722",
+    colorBg: "#0b0f1a",
+    colorText: "#e8ecf4",
+    radius: 14,
+  }}
+/>
+```
+
+Every `--zc-*` token has a camelCase equivalent. The RN wrapper lets
+you also pass `theme="light" | "dark"` for the default palettes.
+
+## Expo
+
+Works inside Expo managed and bare workflows. No native module
+configuration required — the wrapper is pure JS.
+
+```bash
+npx expo install zulip-embed-react-native
+```
+
+## Copy-paste example
+
+<LinkCard
+  title="Expo Snack starter"
+  description="Spin up a live React Native playground with the widget wired in."
+  href="https://github.com/amanagr/zulip-embed/tree/main/packages/react-native"
+/>
