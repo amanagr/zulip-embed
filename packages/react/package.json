@@ -1,0 +1,47 @@
+{
+  "name": "@zulip/react",
+  "version": "0.1.0",
+  "description": "React wrapper for the Zulip Embed Web Component.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@zulip/embed": "^0.1.0",
+    "react": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.0.1",
+    "@types/react": "^19.0.0",
+    "@zulip/embed": "workspace:*",
+    "jsdom": "^25.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "~5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "zulip",
+    "chat",
+    "react",
+    "embed",
+    "web-component"
+  ]
+}

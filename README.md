@@ -261,7 +261,7 @@ subset of the Zulip web app's UI into your own product:
 | ----------------------------------- | ---------- | ------------------------------------------ |
 | Web Components (framework-agnostic) | ✅         | this repo root                             |
 | Flutter                             | ✅         | [`packages/flutter/`](./packages/flutter/) |
-| React (thin wrapper over WCs)       | 🚧         | `packages/react/`                          |
+| React (thin wrapper over WCs)       | ✅         | [`packages/react/`](./packages/react/)     |
 | React Native                        | ⏳         | `packages/react-native/`                   |
 | SwiftUI (iOS)                       | ⏳ planned | `packages/swiftui/`                        |
 | Jetpack Compose (Android)           | ⏳ planned | `packages/compose/`                        |
@@ -276,7 +276,7 @@ subset of the Zulip web app's UI into your own product:
 4. ✅ Flutter parity (live chat, edit/delete, typing, snapshot)
 5. ✅ `Transport.listChannels()` + `listTopics()` primitives
 6. ✅ `<zulip-channel-list>` + `<zulip-topic-list>` components
-7. 🚧 React wrapper package
+7. ✅ React wrapper package (`@zulip/react`)
 8. ⏳ React Native package
 9. ⏳ Composer file / image upload (multipart to `/user_uploads`)
 10. ⏳ Direct messages, presence, search, inbox/recent views
