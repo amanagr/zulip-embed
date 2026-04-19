@@ -38,6 +38,9 @@ interface ComponentState {
     status: ConnectionStatus;
     error: string | undefined;
     loading: boolean;
+    // Pagination state for loading older messages as the user scrolls up.
+    hasMore: boolean;
+    loadingOlder: boolean;
 }
 
 export class ZulipChatElement extends HTMLElement {
@@ -51,6 +54,8 @@ export class ZulipChatElement extends HTMLElement {
         status: "idle",
         error: undefined,
         loading: true,
+        hasMore: false,
+        loadingOlder: false,
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
@@ -187,8 +192,74 @@ export class ZulipChatElement extends HTMLElement {
         feed.className = "feed";
         feed.setAttribute("role", "log");
         feed.setAttribute("aria-live", "polite");
+        feed.addEventListener("scroll", () => {
+            this.handleFeedScroll();
+        });
         this.feedEl = feed;
         return feed;
+    }
+
+    private handleFeedScroll(): void {
+        const feed = this.feedEl;
+        if (!feed) return;
+        // Load older messages when the user is within ~80px of the top
+        // and we still have backlog to fetch. The loadingOlder latch
+        // prevents duplicate concurrent requests while the network is in
+        // flight.
+        if (
+            feed.scrollTop < 80 &&
+            this.state.hasMore &&
+            !this.state.loadingOlder &&
+            !this.state.loading
+        ) {
+            void this.loadOlderMessages();
+        }
+    }
+
+    private async loadOlderMessages(): Promise<void> {
+        const client = this.client;
+        const feed = this.feedEl;
+        if (!client || !feed) return;
+        const oldest = this.state.messages[0];
+        if (oldest === undefined) return;
+
+        const token = this.initToken;
+        this.setState({loadingOlder: true});
+
+        // Preserve the viewport: capture scrollHeight before prepend so we
+        // can restore the offset relative to the bottom and keep the user
+        // pinned to the same message they were reading.
+        const beforeHeight = feed.scrollHeight;
+        const beforeTop = feed.scrollTop;
+
+        try {
+            const scope = this.readScope();
+            const page = await client.getMessages(scope, {beforeId: oldest.id});
+            if (token !== this.initToken) return;
+            if (page.messages.length === 0) {
+                this.setState({loadingOlder: false, hasMore: page.hasMore});
+                return;
+            }
+            const seen = new Set(this.state.messages.map((m) => m.id));
+            const newer = page.messages.filter((m) => !seen.has(m.id));
+            const merged = [...newer, ...this.state.messages];
+            this.setState({
+                messages: merged,
+                loadingOlder: false,
+                hasMore: page.hasMore,
+            });
+            requestAnimationFrame(() => {
+                if (!this.feedEl) return;
+                const delta = this.feedEl.scrollHeight - beforeHeight;
+                this.feedEl.scrollTop = beforeTop + delta;
+            });
+        } catch (error) {
+            if (token !== this.initToken) return;
+            this.setState({
+                loadingOlder: false,
+                error: describeError(error),
+            });
+        }
     }
 
     private buildComposer(): HTMLElement {
@@ -267,7 +338,14 @@ export class ZulipChatElement extends HTMLElement {
 
         const token = ++this.initToken;
         const scope = this.readScope();
-        this.setState({messages: [], status: "connecting", error: undefined, loading: true});
+        this.setState({
+            messages: [],
+            status: "connecting",
+            error: undefined,
+            loading: true,
+            hasMore: false,
+            loadingOlder: false,
+        });
 
         let transport: Transport;
         try {
@@ -299,9 +377,13 @@ export class ZulipChatElement extends HTMLElement {
         try {
             await client.connect();
             if (token !== this.initToken) return;
-            const messages = await client.getMessages(scope);
+            const page = await client.getMessages(scope);
             if (token !== this.initToken) return;
-            this.setState({messages, loading: false});
+            this.setState({
+                messages: page.messages,
+                loading: false,
+                hasMore: page.hasMore,
+            });
             requestAnimationFrame(() => {
                 if (this.feedEl) scrollToBottom(this.feedEl);
             });
@@ -497,6 +579,17 @@ export class ZulipChatElement extends HTMLElement {
                 this.feedEl.replaceChildren(loading);
             } else {
                 renderMessages(this.feedEl, this.state.messages, this.renderContext());
+                const banner = document.createElement("div");
+                banner.className = "feed-top-banner";
+                if (this.state.loadingOlder) {
+                    banner.textContent = "Loading older messages…";
+                } else if (!this.state.hasMore && this.state.messages.length > 0) {
+                    banner.textContent = "Beginning of history";
+                    banner.classList.add("feed-top-banner-end");
+                } else {
+                    banner.hidden = true;
+                }
+                this.feedEl.prepend(banner);
             }
         }
 

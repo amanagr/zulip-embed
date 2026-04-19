@@ -1,6 +1,10 @@
-import type {ReactionParams, Transport} from "./transport.ts";
 import type {
-    Message,
+    GetMessagesOptions,
+    GetMessagesResult,
+    ReactionParams,
+    Transport,
+} from "./transport.ts";
+import type {
     ScopeFilter,
     SendMessageParams,
     ZulipEvent,
@@ -29,8 +33,11 @@ export class ZulipClient {
         await this.transport.close();
     }
 
-    async getMessages(scope: ScopeFilter): Promise<Message[]> {
-        return this.transport.getMessages(scope);
+    async getMessages(
+        scope: ScopeFilter,
+        options?: GetMessagesOptions,
+    ): Promise<GetMessagesResult> {
+        return this.transport.getMessages(scope, options);
     }
 
     async sendMessage(params: SendMessageParams): Promise<void> {

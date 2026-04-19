@@ -1,6 +1,11 @@
 import {z} from "zod";
 
-import type {ReactionParams, Transport} from "./transport.ts";
+import type {
+    GetMessagesOptions,
+    GetMessagesResult,
+    ReactionParams,
+    Transport,
+} from "./transport.ts";
 import type {
     Message,
     Reaction,
@@ -89,6 +94,9 @@ const reactionEventSchema = z.object({
 
 const messagesResponseSchema = z.object({
     messages: z.array(messageSchema),
+    // found_oldest is true when the server has nothing older than the
+    // anchor we requested — use it to stop paginating.
+    found_oldest: z.boolean().optional(),
 });
 
 const sendMessageResponseSchema = z.object({
@@ -154,23 +162,43 @@ export class ZulipTransport implements Transport {
         this.onEvent = undefined;
     }
 
-    async getMessages(scope: ScopeFilter): Promise<Message[]> {
+    async getMessages(
+        scope: ScopeFilter,
+        options: GetMessagesOptions = {},
+    ): Promise<GetMessagesResult> {
         const narrow = buildNarrow(scope);
+        // Anchor semantics: for pagination we anchor on the oldest id we
+        // already have and ask for num_before messages strictly older.
+        // Zulip includes the anchor in its response, so we strip it below
+        // to avoid a duplicate.
+        const limit = options.limit ?? this.historyLimit;
+        const anchor =
+            options.beforeId === undefined ? "newest" : String(options.beforeId);
         const params = {
-            anchor: "newest",
-            num_before: String(this.historyLimit),
+            anchor,
+            num_before: String(limit),
             num_after: "0",
             narrow: JSON.stringify(narrow),
         };
         const response = await this.request("GET", "/api/v1/messages", params);
         const parsed = messagesResponseSchema.parse(response);
-        const messages = parsed.messages.map(convertMessage);
+        let messages = parsed.messages.map(convertMessage);
+        if (options.beforeId !== undefined) {
+            messages = messages.filter((m) => m.id !== options.beforeId);
+        }
         // Prime the reaction cache so per-user reaction events dispatched
         // afterwards compose with the initial server-reported state.
         for (const message of messages) {
             this.rememberReactions(message);
         }
-        return messages;
+        // found_oldest true means the server has nothing older than the
+        // anchor. If the field is missing (older servers), infer from the
+        // returned batch size.
+        const hasMore =
+            parsed.found_oldest === undefined
+                ? messages.length >= limit
+                : !parsed.found_oldest;
+        return {messages, hasMore};
     }
 
     async addReaction(params: ReactionParams): Promise<void> {

@@ -233,6 +233,18 @@ button {
     font-size: 13px;
 }
 
+.feed-top-banner {
+    text-align: center;
+    font-size: 11px;
+    color: var(--zc-color-muted);
+    padding: 6px 0 10px;
+}
+
+.feed-top-banner-end {
+    color: var(--zc-color-muted);
+    opacity: 0.6;
+}
+
 .message {
     display: flex;
     gap: var(--zc-spacing-md);

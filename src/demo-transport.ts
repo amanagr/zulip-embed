@@ -1,5 +1,10 @@
 import {DEMO_GUEST_USER, seedMessages} from "./demo-data.ts";
-import type {ReactionParams, Transport} from "./transport.ts";
+import type {
+    GetMessagesOptions,
+    GetMessagesResult,
+    ReactionParams,
+    Transport,
+} from "./transport.ts";
 import type {
     Message,
     Reaction,
@@ -53,8 +58,62 @@ export class DemoTransport implements Transport {
         return Promise.resolve();
     }
 
-    async getMessages(_scope: ScopeFilter): Promise<Message[]> {
-        return Promise.resolve([...this.messages]);
+    async getMessages(
+        _scope: ScopeFilter,
+        options: GetMessagesOptions = {},
+    ): Promise<GetMessagesResult> {
+        const limit = options.limit ?? 20;
+        // Sorted oldest-first. For paginated demo requests we synthesize
+        // filler history on the fly so the scroll-up gesture has something
+        // to load; seeded messages are returned on the first page only.
+        if (options.beforeId === undefined) {
+            return Promise.resolve({messages: [...this.messages], hasMore: true});
+        }
+        const anchor = options.beforeId;
+        const historyBatch = this.buildDemoHistory(anchor, limit);
+        return Promise.resolve({
+            messages: historyBatch.messages,
+            hasMore: historyBatch.hasMore,
+        });
+    }
+
+    // Produce a small synthetic page of older messages ending just before
+    // `anchorId`. Demo history floors at id=1 so infinite scrolling
+    // terminates cleanly; hasMore=false on the final page.
+    private buildDemoHistory(
+        anchorId: number,
+        limit: number,
+    ): {messages: Message[]; hasMore: boolean} {
+        const FLOOR_ID = 1;
+        if (anchorId <= FLOOR_ID) {
+            return {messages: [], hasMore: false};
+        }
+        const channel = this.scope.channel;
+        const topic = this.scope.topic ?? "history";
+        const startId = Math.max(FLOOR_ID, anchorId - limit);
+        const out: Message[] = [];
+        for (let id = startId; id < anchorId; id++) {
+            // JS modulo is signed; we only feed positive ids now (floor at
+            // FLOOR_ID=1) but defend against future changes.
+            const authorIdx = ((id % SAMPLE_AUTHORS.length) + SAMPLE_AUTHORS.length) %
+                SAMPLE_AUTHORS.length;
+            const user = SAMPLE_AUTHORS[authorIdx]!;
+            out.push({
+                id,
+                senderId: user.id,
+                senderFullName: user.name,
+                senderEmail: user.email,
+                avatarUrl: "",
+                timestamp: Date.now() - (anchorId - id) * 60 * 60 * 1000,
+                content: `Older message #${String(id)} — synthesized on demand to demo pagination.`,
+                contentIsHtml: false,
+                type: "channel",
+                channelName: channel,
+                topic,
+                reactions: [],
+            });
+        }
+        return {messages: out, hasMore: startId > FLOOR_ID};
     }
 
     async sendMessage(params: SendMessageParams): Promise<void> {
@@ -151,6 +210,13 @@ export class DemoTransport implements Transport {
         this.pendingReplies.add(handle);
     }
 }
+
+const SAMPLE_AUTHORS: Array<{id: number; name: string; email: string}> = [
+    {id: 11, name: "Iago", email: "iago@zulip.com"},
+    {id: 12, name: "King Hamlet", email: "hamlet@zulip.com"},
+    {id: 13, name: "Cordelia, Lear's daughter", email: "cordelia@zulip.com"},
+    {id: 15, name: "Prospero from The Tempest", email: "prospero@zulip.com"},
+];
 
 function buildReply(incoming: string): string {
     const trimmed = incoming.trim();

@@ -19,9 +19,9 @@ describe("DemoTransport", () => {
         });
         const events: ZulipEvent[] = [];
         await transport.connect((e) => events.push(e));
-        const messages = await transport.getMessages({channel: "general", topic: "hello"});
+        const page = await transport.getMessages({channel: "general", topic: "hello"});
 
-        expect(messages.length).toBeGreaterThan(0);
+        expect(page.messages.length).toBeGreaterThan(0);
         expect(events.at(0)).toEqual({type: "connection", status: "connected"});
         await transport.close();
     });
@@ -80,7 +80,8 @@ describe("DemoTransport", () => {
         });
         const received: ZulipEvent[] = [];
         await transport.connect((e) => received.push(e));
-        const [first] = await transport.getMessages({channel: "general", topic: "hello"});
+        const {messages} = await transport.getMessages({channel: "general", topic: "hello"});
+        const first = messages[0];
         if (!first) throw new Error("expected a seeded message");
 
         await transport.addReaction({messageId: first.id, emoji: "tada"});

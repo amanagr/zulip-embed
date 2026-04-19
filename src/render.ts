@@ -16,26 +16,111 @@ export interface RenderContext {
     onAddReaction?: ((message: Message) => void) | undefined;
 }
 
+// Per-DOM-node snapshot of what we last rendered for a given message, so
+// we can skip re-rendering when the message is structurally unchanged.
+// Using a WeakMap means we don't leak once the node detaches.
+const renderedSnapshot = new WeakMap<HTMLElement, MessageSnapshot>();
+
+interface MessageSnapshot {
+    content: string;
+    contentIsHtml: boolean;
+    reactionsKey: string;
+    sameSender: boolean;
+    currentUserId: number | undefined;
+}
+
+function snapshotFor(
+    message: Message,
+    sameSender: boolean,
+    context: RenderContext,
+): MessageSnapshot {
+    // Serialize reactions compactly; order is stable from the transport.
+    const reactionsKey = message.reactions
+        .map((r) => `${r.emoji}:${r.userIds.slice().sort().join(",")}`)
+        .join("|");
+    return {
+        content: message.content,
+        contentIsHtml: message.contentIsHtml,
+        reactionsKey,
+        sameSender,
+        currentUserId: context.currentUserId,
+    };
+}
+
+function snapshotsEqual(a: MessageSnapshot, b: MessageSnapshot): boolean {
+    return (
+        a.content === b.content &&
+        a.contentIsHtml === b.contentIsHtml &&
+        a.reactionsKey === b.reactionsKey &&
+        a.sameSender === b.sameSender &&
+        a.currentUserId === b.currentUserId
+    );
+}
+
+// Render messages by reconciling against the DOM already inside `container`
+// instead of rebuilding from scratch. This keeps scroll position stable
+// when a single message is appended, edited, or reacted to — the DOM only
+// changes for the specific node that changed.
 export function renderMessages(
     container: HTMLElement,
     messages: Message[],
     context: RenderContext = {},
 ): void {
-    container.replaceChildren();
     if (messages.length === 0) {
         const empty = document.createElement("div");
         empty.className = "feed-empty";
         empty.textContent = "No messages yet — say hello.";
-        container.append(empty);
+        container.replaceChildren(empty);
         return;
     }
 
-    let previousSenderId: number | undefined;
-    for (const message of messages) {
-        const node = renderMessage(message, previousSenderId === message.senderId, context);
-        container.append(node);
-        previousSenderId = message.senderId;
+    // Remove any non-message children (empty-state placeholder, loader).
+    // Banners are added back by the component after this call returns.
+    for (const child of [...container.children]) {
+        const el = child as HTMLElement;
+        if (el.dataset["messageId"] === undefined) el.remove();
     }
+
+    const existing = new Map<string, HTMLElement>();
+    for (const child of [...container.children]) {
+        const el = child as HTMLElement;
+        const id = el.dataset["messageId"];
+        if (id !== undefined) existing.set(id, el);
+    }
+
+    let prevSenderId: number | undefined;
+    let prevNode: ChildNode | null = null;
+    for (const message of messages) {
+        const key = String(message.id);
+        const sameSender = prevSenderId === message.senderId;
+        let node = existing.get(key);
+        if (node === undefined) {
+            node = renderMessage(message, sameSender, context);
+            renderedSnapshot.set(node, snapshotFor(message, sameSender, context));
+        } else {
+            const prev = renderedSnapshot.get(node);
+            const next = snapshotFor(message, sameSender, context);
+            if (prev === undefined || !snapshotsEqual(prev, next)) {
+                const fresh = renderMessage(message, sameSender, context);
+                renderedSnapshot.set(fresh, next);
+                node.replaceWith(fresh);
+                node = fresh;
+            }
+            existing.delete(key);
+        }
+        // Move into position without detaching if already correct.
+        const expectedAfter: ChildNode | null =
+            prevNode === null ? container.firstChild : prevNode.nextSibling;
+        if (expectedAfter !== (node as ChildNode)) {
+            container.insertBefore(node, expectedAfter);
+        }
+        prevNode = node;
+        prevSenderId = message.senderId;
+    }
+
+    // Anything left over is a message that was deleted or moved out of
+    // view — drop it.
+    for (const leftover of existing.values()) leftover.remove();
 }
 
 export function renderMessage(
