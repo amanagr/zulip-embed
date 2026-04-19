@@ -30,6 +30,7 @@ import type {
     Message,
     Reaction,
     ScopeFilter,
+    SendMessageParams,
     TypingUser,
     ZulipEvent,
 } from "./types.ts";
@@ -119,6 +120,22 @@ const TYPING_IDLE_MS = 5000;
 
 export class ZulipChatElement extends HTMLElement {
     static readonly observedAttributes = OBSERVED_ATTRIBUTES;
+
+    // JS-property hooks the embedding app sets imperatively. They sit
+    // outside the attribute pipeline (and therefore survive reinit) so
+    // host apps can wire them once on mount without worrying about the
+    // component tearing down its client. Both are strictly optional.
+    //
+    // `beforeSend` runs right before we forward a message to the
+    // transport. Returning a mutated params object rewrites the send;
+    // returning `null` cancels it silently. The host is responsible for
+    // user feedback on cancellation (a toast, an error banner, etc.).
+    // `redactMessage` runs on every incoming message before it hits the
+    // renderer — useful for DLP / PII scrubbing in regulated embeds.
+    beforeSend?: (
+        params: SendMessageParams,
+    ) => SendMessageParams | Promise<SendMessageParams> | null | Promise<null>;
+    redactMessage?: (message: Message) => Message;
 
     private readonly shadow: ShadowRoot;
     private client: ZulipClient | undefined;
@@ -714,8 +731,12 @@ export class ZulipChatElement extends HTMLElement {
             if (token !== this.initToken) return;
             const page = await client.getMessages(scope);
             if (token !== this.initToken) return;
+            const redact = this.redactMessage;
             this.setState({
-                messages: page.messages,
+                messages:
+                    redact === undefined
+                        ? page.messages
+                        : page.messages.map((m) => redact(m)),
                 loading: false,
                 hasMore: page.hasMore,
             });
@@ -844,8 +865,12 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private appendMessage(message: Message): void {
+        // redactMessage runs in the main render path so DLP / PII hooks
+        // apply uniformly — whether the message came from the initial
+        // history fetch or arrived mid-session via the event queue.
+        const redacted = this.redactMessage?.(message) ?? message;
         const stickToBottom = this.feedEl ? isNearBottom(this.feedEl) : true;
-        const messages = [...this.state.messages, message];
+        const messages = [...this.state.messages, redacted];
         if (stickToBottom) {
             // Viewer is caught up — no unread state to accumulate.
             this.setState({messages, unreadAnchorId: undefined, unreadCount: 0});
@@ -1135,12 +1160,23 @@ export class ZulipChatElement extends HTMLElement {
                     content,
                 });
             } else {
-                await this.client.sendMessage({
+                let outgoing: SendMessageParams = {
                     type: "channel",
                     channel: scope.channel,
                     topic: scope.topic ?? "",
                     content,
-                });
+                };
+                if (this.beforeSend !== undefined) {
+                    // Host hook can rewrite the params (DLP / PII /
+                    // formatting) or cancel the send by returning null.
+                    // We await to support async rewrites — e.g. remote
+                    // moderation lookups — but keep the loop tight so
+                    // typing feedback doesn't feel sticky.
+                    const result = await this.beforeSend(outgoing);
+                    if (result === null) return;
+                    outgoing = result;
+                }
+                await this.client.sendMessage(outgoing);
             }
         } catch (error) {
             this.setState({error: describeError(error)});
