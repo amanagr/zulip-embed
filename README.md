@@ -222,6 +222,48 @@ In React / Flutter / RN pass `new DemoTransport()` where you would
 pass a live transport. The demo transport bundles seeded messages and
 an echo bot — perfect for storybooks, tests, and offline development.
 
+## Verified releases
+
+Every tagged release publishes a signed npm package (npm provenance +
+Sigstore) and a subresource-integrity (SRI) manifest covering every
+file a browser is likely to load from `unpkg` or your own CDN. Pin the
+SRI hash in your `<script>` tag so a compromised CDN can't slip a
+rewritten bundle past the browser:
+
+```html
+<script
+    type="module"
+    src="https://unpkg.com/zulip-embed@VERSION/dist/zulip-embed.iife.js"
+    integrity="sha256-…"
+    crossorigin="anonymous"
+></script>
+```
+
+Hashes for the current release live in the table below. The release
+workflow splices them in automatically when a tag is cut
+([scripts/release.mjs](./scripts/release.mjs) computes the values,
+[`.github/workflows/release.yml`](./.github/workflows/release.yml)
+commits them back to the tag). The raw `dist/INTEGRITY.json` manifest
+is published as a workflow artifact on each run.
+
+<!-- sri:start -->
+
+| Entry                           | Size (gz) | SRI hash    |
+| ------------------------------- | --------- | ----------- |
+| `zulip-embed.iife.js` (unpkg)   | —         | `sha256-…`  |
+| `zulip-embed/chat`              | —         | `sha256-…`  |
+| `zulip-embed/channel-list`      | —         | `sha256-…`  |
+| `zulip-embed/topic-list`        | —         | `sha256-…`  |
+| `zulip-embed/announcement`      | —         | `sha256-…`  |
+| `zulip-embed/agent`             | —         | `sha256-…`  |
+| `zulip-embed/demo`              | —         | `sha256-…`  |
+
+<!-- sri:end -->
+
+Hashes above are refreshed on every tagged release. For unreleased
+`main`, run `pnpm build && node scripts/release.mjs` locally and read
+`dist/INTEGRITY.md`.
+
 ## Bundle subpaths
 
 The default entry (`zulip-embed`) imports everything and registers every
