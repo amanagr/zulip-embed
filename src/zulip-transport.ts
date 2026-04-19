@@ -151,6 +151,8 @@ export class ZulipTransport implements Transport {
             event_types: JSON.stringify(["message"]),
             narrow: JSON.stringify(buildNarrow(this.scope)),
             apply_markdown: "true",
+            client_gravatar: "true",
+            include_subscribers: "false",
         };
         const response = await this.request("POST", "/api/v1/register", body);
         return registerResponseSchema.parse(response);
@@ -219,18 +221,36 @@ export class ZulipTransport implements Transport {
 
         const response = await fetch(url.toString(), init);
         if (!response.ok) {
-            throw new Error(`HTTP ${String(response.status)} from ${path}`);
+            throw new Error(await describeHttpError(response, path));
         }
         return response.json();
     }
 }
 
-function buildNarrow(scope: ScopeFilter): Array<{operator: string; operand: string}> {
-    const narrow: Array<{operator: string; operand: string}> = [
-        {operator: "stream", operand: scope.channel},
-    ];
+async function describeHttpError(response: Response, path: string): Promise<string> {
+    // Zulip returns JSON like {"result": "error", "msg": "Invalid narrow operator: foo", "code": "BAD_REQUEST"}.
+    // Surface that msg directly so the chat banner is actionable.
+    const status = String(response.status);
+    try {
+        const body = (await response.json()) as {msg?: unknown; code?: unknown};
+        const msg = typeof body.msg === "string" ? body.msg : undefined;
+        if (msg !== undefined && msg !== "") {
+            return `HTTP ${status} from ${path}: ${msg}`;
+        }
+    } catch {
+        // Response wasn't JSON; fall through to the bare status line.
+    }
+    return `HTTP ${status} from ${path}`;
+}
+
+function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
+    // Zulip's /register is strict about the narrow shape and only accepts the
+    // two-element-array form on several versions; the object form works on
+    // /messages but fails on /register. Use the wire format that works
+    // everywhere.
+    const narrow: Array<[string, string]> = [["stream", scope.channel]];
     if (scope.topic !== undefined && scope.topic !== "") {
-        narrow.push({operator: "topic", operand: scope.topic});
+        narrow.push(["topic", scope.topic]);
     }
     return narrow;
 }
