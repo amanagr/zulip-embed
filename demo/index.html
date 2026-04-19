@@ -558,7 +558,9 @@
 
             <section>
                 <h2>Installation</h2>
-                <p style="color: var(--page-muted); margin-top: 0">Two integration paths:</p>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Three integration paths — pick the one that matches your stack.
+                </p>
                 <div class="grid">
                     <div class="panel">
                         <h3>One-line script tag</h3>
@@ -581,6 +583,21 @@ import "@zulip/embed";
 
 // Or use the headless SDK directly:
 import {ZulipClient, ZulipTransport} from "@zulip/embed";</code></pre>
+                    </div>
+
+                    <div class="panel">
+                        <h3>React wrapper</h3>
+                        <pre><code>pnpm add @zulip/embed @zulip/react
+
+import {ZulipChat} from "@zulip/react";
+
+&lt;ZulipChat
+  server="https://chat.example.com"
+  email="you@example.com"
+  apiKey={process.env.ZULIP_KEY}
+  channel="general"
+  brandName="Acme Support"
+/&gt;</code></pre>
                     </div>
                 </div>
             </section>
