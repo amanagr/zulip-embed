@@ -122,12 +122,37 @@ pnpm build        # produces dist/zulip-embed.js (ESM) and dist/zulip-embed.iife
 The headless SDK and the Web Component are split so framework bindings
 (React, Vue, SwiftUI, Compose) can reuse the same transport layer.
 
+## Native mobile &amp; desktop (Flutter)
+
+A first-class Flutter package lives at [`packages/flutter/`](./packages/flutter/).
+No WebView — pure Dart widgets talking to the Zulip REST API.
+
+```dart
+import 'package:zulip_embed/zulip_embed.dart';
+
+ZulipChat(
+  transport: ZulipTransport(
+    serverUrl: Uri.parse('https://chat.example.com'),
+    email: 'you@example.com',
+    apiKey: '...',
+  ),
+  channel: 'general',
+  topic: 'welcome',
+)
+```
+
+The [`example/`](./packages/flutter/example/) app is compiled for Flutter
+web as part of CI and published under `/flutter/` on the demo site, so you
+can click through a real Flutter build right from the landing page.
+
 ## Roadmap
 
 - [x] Tier 1 — Web Component with demo + live transports
+- [x] Tier 3 — Flutter package with native widgets
 - [ ] Tier 2 — React bindings and a styled component library
 - [ ] Tier 2 — JWT SSO handoff + scoped API keys
 - [ ] Tier 3 — React Native, SwiftUI, Compose SDKs
+- [ ] Publish `zulip_embed` to pub.dev + DartPad snippets in docs
 - [ ] Reactions, threads, file uploads, presence
 - [ ] Sanitized rendering of server HTML (DOMPurify)
 
