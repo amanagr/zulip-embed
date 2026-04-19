@@ -180,6 +180,9 @@ of these:
 - **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — how the transport,
   scope, and event pipeline fit together. Read this before building a
   custom headless integration.
+- **[`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md)** — practical
+  cheat sheet for common integration failures (error codes, CSP,
+  bundle-size surprises, styling).
 - **[`jwt.md`](./jwt.md)** — deep dive on minting tokens.
 - **[React hook quickstart](../README.md#track-2--react)** — if you
   want to build your own UI with `useZulipChat`.
