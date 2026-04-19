@@ -40,6 +40,20 @@ class ZulipTransport implements Transport {
   // the full reaction set on every event, matching the TS transport.
   final Map<int, Map<String, Set<int>>> _reactionState = {};
 
+  // Typing participants for the current scope, keyed by user id. Zulip
+  // emits op=start/stop per user; we maintain the aggregate so UI
+  // consumers get the whole list on every change.
+  final Map<int, TypingUser> _typingUsers = {};
+
+  // Cached stream_id per channel name. The /typing endpoint requires
+  // an id, not a name, and /get_stream_id is cheap but pointless to
+  // hit on every keystroke.
+  final Map<String, int> _streamIdCache = {};
+
+  // Captured scope from the most recent connect() so typing events can
+  // filter to messages the viewer can see.
+  ScopeFilter? _scope;
+
   static Uri _normalize(Uri url) {
     // Reject anything that isn't http/https — file://, chrome-extension://,
     // relative URIs, and so on should never reach the Zulip REST calls,
@@ -103,11 +117,13 @@ class ZulipTransport implements Transport {
           'update_message',
           'delete_message',
           'reaction',
+          'typing',
         ]),
         'narrow': jsonEncode(narrow),
         'apply_markdown': 'false',
         'client_gravatar': 'true',
       });
+      _scope = scope;
       _queueId = register['queue_id'] as String;
       _lastEventId = (register['last_event_id'] as num).toInt();
       onEvent(const ConnectionEvent(ConnectionStatus.connected));
@@ -270,6 +286,89 @@ class ZulipTransport implements Transport {
           userId: (evt['user_id'] as num?)?.toInt() ?? 0,
         );
         onEvent(ReactionEvent(messageId: id, reactions: reactions));
+      case 'typing':
+        _dispatchTyping(evt, onEvent);
+    }
+  }
+
+  void _dispatchTyping(
+    Map<String, dynamic> evt,
+    ZulipEventListener onEvent,
+  ) {
+    // Typing events are Zulip direct-message pings on older servers and
+    // stream pings on modern ones. We only care about the sender and
+    // the start/stop op — the channel/topic are implicit in the scope
+    // we registered. Drop events that don't match our current scope so
+    // out-of-band pings for other narrows never fire the indicator.
+    final scope = _scope;
+    if (scope == null) return;
+    final messageType = evt['message_type'] as String?;
+    if (messageType != null && messageType != 'stream' && messageType != 'channel') {
+      return;
+    }
+    final streamId = (evt['stream_id'] as num?)?.toInt();
+    if (streamId != null) {
+      final cached = _streamIdCache[scope.channel];
+      if (cached != null && cached != streamId) return;
+    }
+    final topic = evt['topic'] as String?;
+    if (scope.topic != null && topic != null && topic != scope.topic) return;
+
+    final sender = evt['sender'];
+    if (sender is! Map<String, dynamic>) return;
+    final userId = (sender['user_id'] as num?)?.toInt();
+    if (userId == null || userId == _userId) return;
+    final fullName = sender['full_name'] as String? ?? 'Someone';
+
+    final op = evt['op'] as String?;
+    if (op == 'start') {
+      _typingUsers[userId] = TypingUser(userId: userId, fullName: fullName);
+    } else if (op == 'stop') {
+      _typingUsers.remove(userId);
+    } else {
+      return;
+    }
+    onEvent(TypingEvent(List.unmodifiable(_typingUsers.values)));
+  }
+
+  @override
+  Future<void> sendTyping({
+    required TypingOp op,
+    required ScopeFilter scope,
+  }) async {
+    // Best-effort ping — typing is a nicety, never a blocking call.
+    // Swallow every failure, including the /get_stream_id lookup,
+    // rather than surfacing transient network hiccups as errors on the
+    // composer.
+    try {
+      final streamId = await _resolveStreamId(scope.channel);
+      if (streamId == null) return;
+      final body = <String, String>{
+        'op': op == TypingOp.start ? 'start' : 'stop',
+        'stream_id': '$streamId',
+      };
+      if (scope.topic != null) {
+        body['topic'] = scope.topic!;
+      }
+      await _postForm('/api/v1/typing', body);
+    } catch (_) {
+      // Best-effort: swallow.
+    }
+  }
+
+  Future<int?> _resolveStreamId(String channel) async {
+    final cached = _streamIdCache[channel];
+    if (cached != null) return cached;
+    try {
+      final uri = _endpoint('/api/v1/get_stream_id', {'stream': channel});
+      final resp = await _http.get(uri, headers: _authHeaders);
+      if (resp.statusCode >= 400) return null;
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final id = (body['stream_id'] as num?)?.toInt();
+      if (id != null) _streamIdCache[channel] = id;
+      return id;
+    } catch (_) {
+      return null;
     }
   }
 

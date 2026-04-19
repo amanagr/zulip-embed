@@ -20,4 +20,12 @@ abstract class Transport {
   });
 
   Future<Message> sendMessage(SendMessageParams params);
+
+  /// Fire a typing ping for [scope]. Best-effort — transports without
+  /// typing support (snapshot, demo) inherit the default no-op and the
+  /// composer's debounced emitter doesn't need to feature-detect.
+  Future<void> sendTyping({
+    required TypingOp op,
+    required ScopeFilter scope,
+  }) async {}
 }

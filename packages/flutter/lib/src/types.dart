@@ -83,6 +83,15 @@ class User {
 
 enum ConnectionStatus { disconnected, connecting, connected, error }
 
+enum TypingOp { start, stop }
+
+@immutable
+class TypingUser {
+  const TypingUser({required this.userId, required this.fullName});
+  final int userId;
+  final String fullName;
+}
+
 @immutable
 class ScopeFilter {
   const ScopeFilter({required this.channel, this.topic});
@@ -143,4 +152,9 @@ class ReactionEvent extends ZulipEvent {
 class ErrorEvent extends ZulipEvent {
   const ErrorEvent(this.message);
   final String message;
+}
+
+class TypingEvent extends ZulipEvent {
+  const TypingEvent(this.users);
+  final List<TypingUser> users;
 }
