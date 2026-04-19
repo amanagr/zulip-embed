@@ -1,6 +1,6 @@
 import {describe, expect, test} from "vitest";
 
-import {renderMessage, sanitizeHtml} from "../src/render.ts";
+import {renderMessage, renderMessages, sanitizeHtml} from "../src/render.ts";
 import type {Message} from "../src/types.ts";
 
 function htmlMessage(content: string): Message {
@@ -104,6 +104,57 @@ describe("renderMessage", () => {
         const message = htmlMessage("<p>Hello <strong>world</strong></p>");
         const node = renderMessage(message, false, {serverOrigin: "https://chat.example.com"});
         expect(node.querySelector(".message-content strong")?.textContent).toBe("world");
+    });
+
+    test("inserts an unread separator above the anchor message", () => {
+        const container = document.createElement("div");
+        const messages: Message[] = [
+            {...htmlMessage("<p>a</p>"), id: 1},
+            {...htmlMessage("<p>b</p>"), id: 2},
+            {...htmlMessage("<p>c</p>"), id: 3},
+        ];
+        renderMessages(container, messages, {unreadAnchorId: 2});
+        const children = [...container.children];
+        // Expect: msg1, separator, msg2, msg3
+        expect(children.length).toBe(4);
+        expect((children[0] as HTMLElement).dataset["messageId"]).toBe("1");
+        expect((children[1] as HTMLElement).classList.contains("unread-separator")).toBe(true);
+        expect((children[2] as HTMLElement).dataset["messageId"]).toBe("2");
+        expect((children[3] as HTMLElement).dataset["messageId"]).toBe("3");
+    });
+
+    test("does not insert a separator when the anchor is the first message", () => {
+        const container = document.createElement("div");
+        const messages: Message[] = [
+            {...htmlMessage("<p>a</p>"), id: 1},
+            {...htmlMessage("<p>b</p>"), id: 2},
+        ];
+        renderMessages(container, messages, {unreadAnchorId: 1});
+        expect(container.querySelector(".unread-separator")).toBeNull();
+    });
+
+    test("omits the separator when the anchor does not match any message", () => {
+        const container = document.createElement("div");
+        const messages: Message[] = [
+            {...htmlMessage("<p>a</p>"), id: 1},
+            {...htmlMessage("<p>b</p>"), id: 2},
+        ];
+        renderMessages(container, messages, {unreadAnchorId: 999});
+        expect(container.querySelector(".unread-separator")).toBeNull();
+    });
+
+    test("repositions the separator across re-renders", () => {
+        const container = document.createElement("div");
+        const messages: Message[] = [
+            {...htmlMessage("<p>a</p>"), id: 1},
+            {...htmlMessage("<p>b</p>"), id: 2},
+            {...htmlMessage("<p>c</p>"), id: 3},
+        ];
+        renderMessages(container, messages, {unreadAnchorId: 2});
+        expect(container.querySelectorAll(".unread-separator").length).toBe(1);
+        // Clear the anchor — separator should be gone on the next call.
+        renderMessages(container, messages, {});
+        expect(container.querySelector(".unread-separator")).toBeNull();
     });
 
     test("shows reaction pills and calls onToggleReaction", () => {

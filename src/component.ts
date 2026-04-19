@@ -45,6 +45,12 @@ interface ComponentState {
     // Pagination state for loading older messages as the user scrolls up.
     hasMore: boolean;
     loadingOlder: boolean;
+    // ID of the first message the viewer hasn't seen since they last had
+    // the feed pinned to the bottom. Undefined when fully caught up.
+    // Drives the "new messages" separator + jump-to-bottom pill.
+    unreadAnchorId: number | undefined;
+    // Count of messages at or below the unread anchor — shown on the pill.
+    unreadCount: number;
 }
 
 export class ZulipChatElement extends HTMLElement {
@@ -60,9 +66,12 @@ export class ZulipChatElement extends HTMLElement {
         loading: true,
         hasMore: false,
         loadingOlder: false,
+        unreadAnchorId: undefined,
+        unreadCount: 0,
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
+    private newMessagesPillEl: HTMLButtonElement | undefined;
     private composerInputEl: HTMLTextAreaElement | undefined;
     private composerSendEl: HTMLButtonElement | undefined;
     private headerChannelEl: HTMLElement | undefined;
@@ -119,7 +128,7 @@ export class ZulipChatElement extends HTMLElement {
         root.append(this.buildHeader());
         this.errorBannerEl = this.buildErrorBanner();
         root.append(this.errorBannerEl);
-        root.append(this.buildFeed());
+        root.append(this.buildFeedWrap());
         root.append(this.buildComposer());
         root.append(this.buildFooter());
 
@@ -191,7 +200,10 @@ export class ZulipChatElement extends HTMLElement {
         return banner;
     }
 
-    private buildFeed(): HTMLElement {
+    private buildFeedWrap(): HTMLElement {
+        const wrap = document.createElement("div");
+        wrap.className = "feed-wrap";
+
         const feed = document.createElement("div");
         feed.className = "feed";
         feed.setAttribute("role", "log");
@@ -200,7 +212,24 @@ export class ZulipChatElement extends HTMLElement {
             this.handleFeedScroll();
         });
         this.feedEl = feed;
-        return feed;
+        wrap.append(feed);
+
+        // "N new messages" jump-to-bottom pill — hidden by default and
+        // only shown while an unread anchor is set (i.e. the user was
+        // scrolled away when new messages arrived).
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "new-messages-pill";
+        pill.hidden = true;
+        pill.textContent = "New messages";
+        pill.addEventListener("click", () => {
+            this.markAllRead();
+            if (this.feedEl) scrollToBottom(this.feedEl);
+        });
+        this.newMessagesPillEl = pill;
+        wrap.append(pill);
+
+        return wrap;
     }
 
     private handleFeedScroll(): void {
@@ -218,6 +247,19 @@ export class ZulipChatElement extends HTMLElement {
         ) {
             void this.loadOlderMessages();
         }
+
+        // Viewer scrolled back down to the bottom — treat as "caught up"
+        // and clear the unread separator + pill on the next render.
+        if (this.state.unreadAnchorId !== undefined && isNearBottom(feed)) {
+            this.markAllRead();
+        }
+    }
+
+    private markAllRead(): void {
+        if (this.state.unreadAnchorId === undefined && this.state.unreadCount === 0) {
+            return;
+        }
+        this.setState({unreadAnchorId: undefined, unreadCount: 0});
     }
 
     private async loadOlderMessages(): Promise<void> {
@@ -349,6 +391,8 @@ export class ZulipChatElement extends HTMLElement {
             loading: true,
             hasMore: false,
             loadingOlder: false,
+            unreadAnchorId: undefined,
+            unreadCount: 0,
         });
 
         let transport: Transport;
@@ -452,12 +496,27 @@ export class ZulipChatElement extends HTMLElement {
 
     private appendMessage(message: Message): void {
         const stickToBottom = this.feedEl ? isNearBottom(this.feedEl) : true;
-        this.setState({messages: [...this.state.messages, message]});
-        if (stickToBottom && this.feedEl) {
-            requestAnimationFrame(() => {
-                if (this.feedEl) scrollToBottom(this.feedEl);
-            });
+        const messages = [...this.state.messages, message];
+        if (stickToBottom) {
+            // Viewer is caught up — no unread state to accumulate.
+            this.setState({messages, unreadAnchorId: undefined, unreadCount: 0});
+            if (this.feedEl) {
+                requestAnimationFrame(() => {
+                    if (this.feedEl) scrollToBottom(this.feedEl);
+                });
+            }
+            return;
         }
+        // Viewer is scrolled away; mark this message (and subsequent ones)
+        // as unread. Don't clobber an existing anchor — it should remain
+        // pinned to the first message missed so the separator doesn't
+        // crawl downward as more messages arrive.
+        const unreadAnchorId = this.state.unreadAnchorId ?? message.id;
+        this.setState({
+            messages,
+            unreadAnchorId,
+            unreadCount: this.state.unreadCount + 1,
+        });
     }
 
     private updateMessage(
@@ -486,7 +545,17 @@ export class ZulipChatElement extends HTMLElement {
     private deleteMessage(id: number): void {
         const next = this.state.messages.filter((m) => m.id !== id);
         if (next.length === this.state.messages.length) return;
-        this.setState({messages: next});
+        // If the unread anchor just vanished, promote the next unread
+        // message to anchor (or clear the state entirely if none remain).
+        let unreadAnchorId = this.state.unreadAnchorId;
+        let unreadCount = this.state.unreadCount;
+        if (unreadAnchorId === id) {
+            const anchorIdx = this.state.messages.findIndex((m) => m.id === id);
+            const replacement = anchorIdx >= 0 ? next[anchorIdx] : undefined;
+            unreadAnchorId = replacement?.id;
+            unreadCount = replacement === undefined ? 0 : Math.max(0, unreadCount - 1);
+        }
+        this.setState({messages: next, unreadAnchorId, unreadCount});
     }
 
     private updateReactions(id: number, reactions: Reaction[]): void {
@@ -527,8 +596,11 @@ export class ZulipChatElement extends HTMLElement {
             currentUserId: this.client?.getCurrentUserId(),
         };
         if (this.hasAttribute("read-only") || this.hasAttribute("snapshot-url")) {
+            // Read-only + snapshot modes don't accumulate unread state or
+            // mutate messages, so no separator or action handlers.
             return context;
         }
+        context.unreadAnchorId = this.state.unreadAnchorId;
         context.onToggleReaction = (m, e) => {
             this.handleToggleReaction(m, e);
         };
@@ -612,6 +684,23 @@ export class ZulipChatElement extends HTMLElement {
                     banner.hidden = true;
                 }
                 this.feedEl.prepend(banner);
+            }
+        }
+
+        if (this.newMessagesPillEl) {
+            const show =
+                this.state.unreadAnchorId !== undefined &&
+                !this.hasAttribute("read-only") &&
+                !this.hasAttribute("snapshot-url");
+            if (show) {
+                const n = this.state.unreadCount;
+                this.newMessagesPillEl.textContent =
+                    n > 0
+                        ? `${String(n)} new ${n === 1 ? "message" : "messages"} ↓`
+                        : "New messages ↓";
+                this.newMessagesPillEl.hidden = false;
+            } else {
+                this.newMessagesPillEl.hidden = true;
             }
         }
 

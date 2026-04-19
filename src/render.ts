@@ -14,6 +14,10 @@ export interface RenderContext {
     onToggleReaction?: ((message: Message, emoji: string) => void) | undefined;
     // Emitted when the viewer clicks the "add reaction" affordance.
     onAddReaction?: ((message: Message) => void) | undefined;
+    // ID of the first message the viewer hasn't seen yet. When set, the
+    // renderer inserts a horizontal "new messages" divider immediately
+    // before the matching message.
+    unreadAnchorId?: number | undefined;
 }
 
 // Per-DOM-node snapshot of what we last rendered for a given message, so
@@ -74,8 +78,9 @@ export function renderMessages(
         return;
     }
 
-    // Remove any non-message children (empty-state placeholder, loader).
-    // Banners are added back by the component after this call returns.
+    // Remove any non-message children (empty-state placeholder, loader,
+    // prior unread separator). Banners + separator are re-added below /
+    // by the component after this call returns.
     for (const child of [...container.children]) {
         const el = child as HTMLElement;
         if (el.dataset["messageId"] === undefined) el.remove();
@@ -88,11 +93,35 @@ export function renderMessages(
         if (id !== undefined) existing.set(id, el);
     }
 
+    // Determine where (if anywhere) to place the unread separator. Only
+    // show it if the anchor id actually matches a message we're rendering
+    // and isn't the very first message (no point in a separator with
+    // nothing above it).
+    let unreadAnchorIndex = -1;
+    if (context.unreadAnchorId !== undefined) {
+        unreadAnchorIndex = messages.findIndex((m) => m.id === context.unreadAnchorId);
+        if (unreadAnchorIndex <= 0) unreadAnchorIndex = -1;
+    }
+
     let prevSenderId: number | undefined;
     let prevNode: ChildNode | null = null;
-    for (const message of messages) {
+    for (const [index, message] of messages.entries()) {
+        // The separator counts as "a different sender above" for spacing
+        // purposes — force a full avatar/meta on the message right after.
+        const sameSender =
+            index === unreadAnchorIndex ? false : prevSenderId === message.senderId;
+
+        if (index === unreadAnchorIndex) {
+            const separator = buildUnreadSeparator();
+            const expectedAfter: ChildNode | null =
+                prevNode === null ? container.firstChild : prevNode.nextSibling;
+            if (expectedAfter !== separator) {
+                container.insertBefore(separator, expectedAfter);
+            }
+            prevNode = separator;
+        }
+
         const key = String(message.id);
-        const sameSender = prevSenderId === message.senderId;
         let node = existing.get(key);
         if (node === undefined) {
             node = renderMessage(message, sameSender, context);
@@ -121,6 +150,19 @@ export function renderMessages(
     // Anything left over is a message that was deleted or moved out of
     // view — drop it.
     for (const leftover of existing.values()) leftover.remove();
+}
+
+function buildUnreadSeparator(): HTMLElement {
+    const el = document.createElement("div");
+    el.className = "unread-separator";
+    el.dataset["unreadSeparator"] = "";
+    el.setAttribute("role", "separator");
+    el.setAttribute("aria-label", "New messages");
+    const label = document.createElement("span");
+    label.className = "unread-separator-label";
+    label.textContent = "New messages";
+    el.append(label);
+    return el;
 }
 
 export function renderMessage(
