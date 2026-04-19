@@ -295,8 +295,10 @@ class ZulipTransport implements Transport {
     required List<String> recipients,
     required String content,
   }) async {
+    // Wire format: use 'private' (legacy) not 'direct' — Zulip < 9 rejects
+    // the newer alias. See CLAUDE.md "wire format is the one exception."
     final body = await _postForm('/api/v1/messages', {
-      'type': 'direct',
+      'type': 'private',
       'to': jsonEncode(recipients),
       'content': content,
     });
@@ -552,7 +554,10 @@ class ZulipTransport implements Transport {
           final canonical = [...userIds]..sort();
           final body = <String, String>{
             'op': op == TypingOp.start ? 'start' : 'stop',
-            'type': 'direct',
+            // Wire format: use 'private' (legacy) not 'direct' — Zulip < 9
+            // rejects the newer alias. See CLAUDE.md "wire format is the
+            // one exception."
+            'type': 'private',
             'to': jsonEncode(canonical),
           };
           await _postForm('/api/v1/typing', body);
