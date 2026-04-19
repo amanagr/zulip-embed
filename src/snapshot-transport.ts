@@ -38,6 +38,23 @@ const messageSchema = z.object({
     reactions: z.array(reactionSchema),
 });
 
+const channelSchema = z.object({
+    channelId: z.number(),
+    name: z.string(),
+    description: z.string(),
+    color: z.string().optional(),
+    pinToTop: z.boolean(),
+    isMuted: z.boolean(),
+    unreadCount: z.number(),
+});
+
+const topicSchema = z.object({
+    name: z.string(),
+    maxMessageId: z.number(),
+    unreadCount: z.number(),
+    isResolved: z.boolean(),
+});
+
 const snapshotSchema = z.object({
     version: z.literal(1),
     generatedAt: z.number(),
@@ -45,6 +62,12 @@ const snapshotSchema = z.object({
     channel: z.string(),
     topic: z.string().optional(),
     messages: z.array(messageSchema),
+    // Optional directory of subscribed channels and per-channel topic
+    // lists. Populated by scripts/fetch-channels-topics-snapshot.mjs so
+    // standalone channel-list / topic-list components mounted with
+    // snapshot-url can render real chat.zulip.org navigation data.
+    channels: z.array(channelSchema).optional(),
+    topics: z.record(z.string(), z.array(topicSchema)).optional(),
 });
 
 export interface SnapshotFile {
@@ -56,6 +79,12 @@ export interface SnapshotFile {
     channel: string;
     topic: string | undefined;
     messages: Message[];
+    // Optional navigation data — present when the snapshot was produced
+    // by fetch-channels-topics-snapshot.mjs. Lets a SnapshotTransport-backed
+    // channel-list / topic-list render real subscription state without
+    // shipping credentials to the browser.
+    channels?: Channel[];
+    topics?: Record<string, Topic[]>;
 }
 
 export interface SnapshotTransportOptions {
@@ -78,6 +107,10 @@ export class SnapshotTransport implements Transport {
     private readonly inline: SnapshotFile | undefined;
     private messages: Message[] = [];
     private onEvent: ZulipEventListener | undefined;
+    // Cached parsed snapshot so list* calls can resolve without a second
+    // fetch. Populated by connect() or by an upfront fetchDirectory() when
+    // the list components call list{Channels,Topics} before ever connecting.
+    private directory: SnapshotFile | undefined;
 
     constructor(options: SnapshotTransportOptions) {
         this.url = options.data === undefined ? validateSnapshotUrl(options.url) : options.url;
@@ -89,6 +122,7 @@ export class SnapshotTransport implements Transport {
         this.onEvent = onEvent;
         try {
             const file = this.inline ?? (await this.fetchSnapshot());
+            this.directory = file;
             this.messages = filterToScope(file.messages, this.scope);
             onEvent({type: "connection", status: "connected"});
         } catch (error) {
@@ -144,15 +178,36 @@ export class SnapshotTransport implements Transport {
         return Promise.resolve();
     }
 
-    listChannels(): Promise<Channel[]> {
-        // Snapshots are a single pre-baked window; they don't describe
-        // subscription state. Return empty so a channel-list mounted on
-        // top of a snapshot renders an empty state rather than fake data.
-        return Promise.resolve([]);
+    async listChannels(): Promise<Channel[]> {
+        // Snapshots produced by fetch-channels-topics-snapshot.mjs include
+        // the viewer's subscribed channels; older (message-only) snapshots
+        // don't, in which case we return [] and the component renders an
+        // empty state rather than fake data.
+        const file = await this.ensureDirectory();
+        const channels = file?.channels;
+        return channels ? [...channels] : [];
     }
 
-    listTopics(_channel: string): Promise<Topic[]> {
-        return Promise.resolve([]);
+    async listTopics(channel: string): Promise<Topic[]> {
+        const file = await this.ensureDirectory();
+        const topics = file?.topics?.[channel];
+        return topics ? [...topics] : [];
+    }
+
+    private async ensureDirectory(): Promise<SnapshotFile | undefined> {
+        if (this.directory) return this.directory;
+        if (this.inline) {
+            this.directory = this.inline;
+            return this.directory;
+        }
+        try {
+            this.directory = await this.fetchSnapshot();
+            return this.directory;
+        } catch {
+            // Swallow — listChannels/listTopics callers render empty
+            // state on failure; the error banner lives in connect().
+            return undefined;
+        }
     }
 
     getCurrentUserId(): number | undefined {
@@ -227,12 +282,36 @@ function parseSnapshot(raw: unknown): SnapshotFile {
         throw new Error(`Invalid snapshot payload: ${parsed.error.message}`);
     }
     const data = parsed.data;
+    const channels = data.channels?.map((c) => ({
+        channelId: c.channelId,
+        name: c.name,
+        description: c.description,
+        color: c.color,
+        pinToTop: c.pinToTop,
+        isMuted: c.isMuted,
+        unreadCount: c.unreadCount,
+    }));
+    const topics = data.topics
+        ? Object.fromEntries(
+              Object.entries(data.topics).map(([channel, rows]) => [
+                  channel,
+                  rows.map((t) => ({
+                      name: t.name,
+                      maxMessageId: t.maxMessageId,
+                      unreadCount: t.unreadCount,
+                      isResolved: t.isResolved,
+                  })),
+              ]),
+          )
+        : undefined;
     return {
         version: 1,
         generatedAt: data.generatedAt,
         server: data.server,
         channel: data.channel,
         topic: data.topic,
+        ...(channels ? {channels} : {}),
+        ...(topics ? {topics} : {}),
         messages: data.messages.map((m) => ({
             id: m.id,
             senderId: m.senderId,
