@@ -55,6 +55,8 @@ jobs:
           cp -R packages/flutter/example/build/web/. site/flutter/
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
