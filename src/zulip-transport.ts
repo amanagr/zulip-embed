@@ -395,7 +395,10 @@ export class ZulipTransport implements Transport {
             body["to"] = params.channel;
             body["topic"] = params.topic;
         } else {
-            body["type"] = "direct";
+            // Wire value is "private" for the same back-compat reason —
+            // Zulip < 9 rejects the newer "direct" alias on /messages.
+            // See CLAUDE.md "wire format is the one exception."
+            body["type"] = "private";
             body["to"] = JSON.stringify(params.recipients);
         }
         const response = await this.request("POST", "/api/v1/messages", body);
@@ -411,7 +414,9 @@ export class ZulipTransport implements Transport {
             // DM-with-same-group-in-different-order don't fight.
             const body: Record<string, string> = {
                 op,
-                type: "direct",
+                // Legacy wire value — Zulip < 9 rejects "direct" on /typing.
+                // See CLAUDE.md "wire format is the one exception."
+                type: "private",
                 to: JSON.stringify(normalized.userIds),
             };
             try {

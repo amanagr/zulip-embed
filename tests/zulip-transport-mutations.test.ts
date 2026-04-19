@@ -149,7 +149,9 @@ describe("ZulipTransport — mutations", () => {
             ([url, init]) => url.includes("/api/v1/messages") && init?.method === "POST",
         );
         const body = new URLSearchParams(postCall![1]!.body as string);
-        expect(body.get("type")).toBe("direct");
+        // Wire value is "private" — legacy form Zulip < 9 requires. See
+        // CLAUDE.md "wire format is the one exception."
+        expect(body.get("type")).toBe("private");
         expect(JSON.parse(body.get("to")!)).toEqual(["a@x", "b@x"]);
         await transport.close();
     });
