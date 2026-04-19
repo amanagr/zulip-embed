@@ -29,6 +29,14 @@ export const COMPONENT_STYLES = `
     line-height: var(--zc-line-height);
     color: var(--zc-color-text);
     box-sizing: border-box;
+    /* Default host size. External CSS (e.g. a rule like
+     * zulip-chat { height: 420px } in the hosting page) overrides
+     * this, and the .root below fills the host with height: 100%
+     * so its children (feed, composer) lay out inside the host's
+     * box instead of overflowing past it. */
+    height: var(--zc-height);
+    width: 100%;
+    max-height: var(--zc-max-height);
 }
 
 :host([theme="dark"]) {
@@ -61,9 +69,8 @@ button {
     border: 1px solid var(--zc-color-border);
     border-radius: var(--zc-radius);
     overflow: hidden;
-    height: var(--zc-height);
+    height: 100%;
     width: 100%;
-    max-height: var(--zc-max-height);
 }
 
 :host([mode="floating"]) {
