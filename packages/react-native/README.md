@@ -2,11 +2,11 @@
 
 React Native wrappers + headless SDK for Zulip.
 
-> **Status — `0.8.0-alpha` preview.** The RN package is an
-> **alpha preview** of the v0.8 surface. It is intentionally narrower
+> **Status — `0.9.0-alpha` preview.** The RN package is an
+> **alpha preview** of the v0.9 surface. It is intentionally narrower
 > than the web and Flutter packages: messages render as plain text
 > (no Markdown / mentions / reactions UI), and some `Transport`
-> capabilities (typing, reactions, edit/delete) are not wired into
+> capabilities (reactions, edit/delete) are not wired into
 > `<ZulipChatScreen>` yet. The headless `ZulipClient` works end-to-end;
 > the widget is a minimal reference implementation you are expected to
 > fork or skin.
@@ -16,7 +16,8 @@ React Native wrappers + headless SDK for Zulip.
 ## What's in the box
 
 - `<ZulipChatScreen>` — a `FlatList` + `TextInput` + `KeyboardAvoidingView`
-  chat screen. Plain-text rendering. Light + dark themes.
+  chat screen. Plain-text rendering. Light + dark themes. Typing
+  indicators above the composer + outbound typing pings on keystroke.
 - `ZulipClient` — the full headless client re-exported from
   `zulip-embed`. Works in RN out of the box because it is DOM-free.
 - `DemoTransport`, `ZulipTransport` — transports re-exported from
@@ -25,21 +26,28 @@ React Native wrappers + headless SDK for Zulip.
 - Typed re-exports of every public domain type (`Message`,
   `ScopeFilter`, `SendMessageParams`, …) so apps depend on one package.
 
-## What's **not** in the box (yet)
+## Feature status
 
-These ship in the web and Flutter packages but are not in this
-alpha preview:
+Per-feature parity against the web `<zulip-chat>` element. "Wired"
+means the built-in `<ZulipChatScreen>` surfaces it; everything is
+addressable through the headless `ZulipClient` regardless.
 
-- Markdown / rich-text rendering. `message.content` is surfaced via a
-  minimal `stripHtml()` and rendered as `<Text>`.
-- Reaction picker UI. (Reactions on incoming messages are parsed but
-  not displayed.)
-- Typing indicators, edit/delete UI, message-action menu.
-- Channel list / topic list / DM list / announcement widgets.
+| Feature                                     | `<ZulipChatScreen>`                    | Headless `ZulipClient`                   |
+| ------------------------------------------- | -------------------------------------- | ---------------------------------------- |
+| Live feed                                   | Wired                                  | Wired                                    |
+| Send message                                | Wired                                  | Wired                                    |
+| Light + dark themes                         | Wired                                  | n/a                                      |
+| Typing indicators (inbound)                 | Wired                                  | Wired                                    |
+| Typing pings (outbound)                     | Wired                                  | Wired                                    |
+| Markdown / rich-text rendering              | Not yet — plain text via `stripHtml()` | Raw HTML surfaced as `message.content`   |
+| Reactions UI                                | Not yet                                | Wired (`addReaction` / `removeReaction`) |
+| Edit / delete UI                            | Not yet                                | Wired                                    |
+| Message-action menu                         | Not yet                                | n/a                                      |
+| Channel / topic / DM / announcement widgets | Not yet                                | Wired (headless transport methods)       |
 
-These are tracked for v1.0 — see the roadmap in the root
-[`README.md`](../../README.md). For now, consumers who need any of
-these should use the headless `ZulipClient` + build their own UI on
+Items marked "Not yet" are tracked for v1.0 — see the roadmap in the
+root [`README.md`](../../README.md). For now, consumers who need any
+of them should use the headless `ZulipClient` + build their own UI on
 top, or the web `<zulip-chat>` element inside a `WebView`.
 
 ## Install

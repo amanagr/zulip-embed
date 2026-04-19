@@ -21,7 +21,16 @@ import {
 } from "react-native";
 
 import {stripHtml} from "./strip-html.js";
-import type {Message, ScopeFilter, Transport, ZulipRNTheme} from "./types.js";
+import {formatTypingLabel} from "./typing-label.js";
+import type {
+    Message,
+    ScopeFilter,
+    Transport,
+    TypingUser,
+    ZulipEvent,
+    ZulipEventListener,
+    ZulipRNTheme,
+} from "./types.js";
 import {ZulipClient, LIGHT_THEME} from "./types.js";
 
 // Alpha-preview notice: surfaces the 0.8.0-rc.0-alpha status of this
@@ -37,8 +46,8 @@ function showAlphaNoticeOnce(): void {
     if (typeof __DEV__ !== "boolean" || !__DEV__) return;
     // eslint-disable-next-line no-console
     console.warn(
-        "[zulip-embed-react-native] 0.8.0-rc.0-alpha preview: plain-text " +
-            "rendering only, reactions/typing/message-action UI not yet wired. " +
+        "[zulip-embed-react-native] 0.9.0-alpha preview: plain-text " +
+            "rendering only, reactions/message-action UI not yet wired. " +
             "See https://github.com/amanagr/zulip-embed/tree/main/packages/react-native#readme",
     );
 }
@@ -62,7 +71,18 @@ interface Snapshot {
     messages: Message[];
     connecting: boolean;
     error: string | undefined;
+    typingUsers: TypingUser[];
 }
+
+// Match the web `<zulip-chat>` element's typing-send cadence so the
+// server sees the same keep-alive pattern across platforms.
+// - `start` is re-sent every TYPING_REFRESH_MS while the viewer is
+//   actively typing so the server keeps the indicator alive (Zulip
+//   expires pings after ~10s).
+// - After TYPING_IDLE_MS of no keystrokes, we emit `stop` on the
+//   viewer's behalf.
+const TYPING_REFRESH_MS = 8000;
+const TYPING_IDLE_MS = 5000;
 
 export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement {
     showAlphaNoticeOnce();
@@ -82,18 +102,75 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
         messages: [],
         connecting: true,
         error: undefined,
+        typingUsers: [],
     });
     const [draft, setDraft] = useState<string>("");
 
+    // Outbound typing-ping bookkeeping. Mirrors the timers the web
+    // `<zulip-chat>` element keeps: one interval re-sends `start` while
+    // the viewer is actively keystroking, and a single-shot timer fires
+    // `stop` after TYPING_IDLE_MS of silence. Stored in refs so they
+    // survive re-renders and we don't retrigger effect cleanup on every
+    // draft change.
+    const typingActiveRef = useRef<boolean>(false);
+    const typingRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const typingIdleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const scopeRef = useRef<ScopeFilter>(props.scope);
+    scopeRef.current = props.scope;
+
+    // Best-effort fire-and-forget ping. Typing notifications are non-
+    // critical UX — a dropped send must never surface as a user-visible
+    // error the way a failed `sendMessage` does.
+    const sendTypingPing = useCallback(
+        (op: "start" | "stop") => {
+            client.sendTyping(op, scopeRef.current).catch(() => undefined);
+        },
+        [client],
+    );
+
+    const stopTypingPings = useCallback(
+        (opts: {silent?: boolean} = {}) => {
+            if (typingIdleRef.current !== null) {
+                clearTimeout(typingIdleRef.current);
+                typingIdleRef.current = null;
+            }
+            if (typingRefreshRef.current !== null) {
+                clearInterval(typingRefreshRef.current);
+                typingRefreshRef.current = null;
+            }
+            if (typingActiveRef.current) {
+                typingActiveRef.current = false;
+                if (opts.silent !== true) sendTypingPing("stop");
+            }
+        },
+        [sendTypingPing],
+    );
+
     useEffect(() => {
-        const unsubscribe = client.subscribe(() => {
+        const onEvent: ZulipEventListener = (event: ZulipEvent) => {
             const state = client.getState();
-            setSnapshot({
+            if (event.type === "typing") {
+                // Never show the local viewer in their own indicator.
+                const selfId = client.getCurrentUserId();
+                const others =
+                    selfId === undefined
+                        ? event.users
+                        : event.users.filter((u) => u.userId !== selfId);
+                setSnapshot((prev) => ({
+                    ...prev,
+                    typingUsers: others,
+                }));
+                return;
+            }
+            setSnapshot((prev) => ({
+                ...prev,
                 messages: state.messages,
                 connecting: state.status === "connecting" || state.status === "idle",
                 error: state.status === "error" ? "Connection failed" : undefined,
-            });
-        });
+            }));
+        };
+        const unsubscribe = client.subscribe(onEvent);
         client.connect().catch((err: unknown) => {
             setSnapshot((prev) => ({
                 ...prev,
@@ -102,15 +179,52 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
             }));
         });
         return () => {
+            // Clear typing timers silently on unmount — the connection is
+            // going away, so sending `stop` here would race the teardown.
+            stopTypingPings({silent: true});
             unsubscribe();
             void client.close();
         };
-    }, [client]);
+    }, [client, stopTypingPings]);
+
+    // Called on every composer keystroke. Sends a `start` ping the
+    // first time (and refreshes every TYPING_REFRESH_MS while the user
+    // keeps typing) and schedules a `stop` after TYPING_IDLE_MS of
+    // silence. No-op in read-only mode since there is no composer.
+    const onDraftChange = useCallback(
+        (next: string) => {
+            setDraft(next);
+            if (props.readOnly === true) return;
+            if (next.trim().length === 0) {
+                // Empty composer after a keystroke (e.g. backspace-to-
+                // empty) behaves like an explicit stop.
+                stopTypingPings();
+                return;
+            }
+            if (!typingActiveRef.current) {
+                typingActiveRef.current = true;
+                sendTypingPing("start");
+                typingRefreshRef.current = setInterval(() => {
+                    if (typingActiveRef.current) sendTypingPing("start");
+                }, TYPING_REFRESH_MS);
+            }
+            if (typingIdleRef.current !== null) {
+                clearTimeout(typingIdleRef.current);
+            }
+            typingIdleRef.current = setTimeout(() => {
+                stopTypingPings();
+            }, TYPING_IDLE_MS);
+        },
+        [props.readOnly, sendTypingPing, stopTypingPings],
+    );
 
     const onSend = useCallback(async () => {
         const content = draft.trim();
         if (content === "") return;
         setDraft("");
+        // Stop typing before the network call so teammates don't see a
+        // stale "Alice is typing" linger after the message lands.
+        stopTypingPings();
         try {
             await client.sendMessage(content);
         } catch (err: unknown) {
@@ -119,7 +233,9 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
                 error: err instanceof Error ? err.message : String(err),
             }));
         }
-    }, [client, draft]);
+    }, [client, draft, stopTypingPings]);
+
+    const typingLabel = formatTypingLabel(snapshot.typingUsers);
 
     const headerLabel = buildHeaderLabel(props.scope, props.brandName);
 
@@ -130,9 +246,7 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
         >
             <View style={styles.header}>
                 <Text style={styles.headerText}>{headerLabel}</Text>
-                {snapshot.connecting ? (
-                    <Text style={styles.headerStatus}>connecting…</Text>
-                ) : null}
+                {snapshot.connecting ? <Text style={styles.headerStatus}>connecting…</Text> : null}
             </View>
 
             {snapshot.error !== undefined ? (
@@ -149,12 +263,22 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
                 renderItem={({item}) => <MessageRow message={item} theme={theme} />}
             />
 
+            {typingLabel !== undefined ? (
+                <View
+                    style={styles.typingRow}
+                    accessibilityLiveRegion="polite"
+                    accessibilityRole="text"
+                >
+                    <Text style={styles.typingText}>{typingLabel}</Text>
+                </View>
+            ) : null}
+
             {props.readOnly !== true ? (
                 <View style={styles.composer}>
                     <TextInput
                         style={styles.input}
                         value={draft}
-                        onChangeText={setDraft}
+                        onChangeText={onDraftChange}
                         placeholder="Write a message…"
                         placeholderTextColor={theme.muted}
                         multiline
@@ -173,13 +297,7 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
     );
 }
 
-function MessageRow({
-    message,
-    theme,
-}: {
-    message: Message;
-    theme: ZulipRNTheme;
-}): React.ReactElement {
+function MessageRow({message, theme}: {message: Message; theme: ZulipRNTheme}): React.ReactElement {
     const styles = useMemo(() => makeStyles(theme), [theme]);
     return (
         <View style={styles.messageRow}>
@@ -215,7 +333,6 @@ function buildHeaderLabel(scope: ScopeFilter, brandName: string | undefined): st
     }
     return `#${normalized.channel}`;
 }
-
 
 function makeStyles(theme: ZulipRNTheme) {
     return StyleSheet.create({
@@ -282,6 +399,16 @@ function makeStyles(theme: ZulipRNTheme) {
             color: theme.text,
             fontSize: 14,
             lineHeight: 20,
+        },
+        typingRow: {
+            paddingHorizontal: 16,
+            paddingVertical: 4,
+            backgroundColor: theme.surface,
+        },
+        typingText: {
+            color: theme.muted,
+            fontSize: 12,
+            fontStyle: "italic",
         },
         composer: {
             flexDirection: "row",

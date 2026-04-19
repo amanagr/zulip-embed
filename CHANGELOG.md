@@ -6,10 +6,10 @@ project adheres to semantic versioning.
 
 ## 0.9.0 — 2026-04-19
 
-Sprint 5 release. Unblocks the remaining 1.0-track surface on the agent
-side: `startAgentReply` now accepts `DmScope` (both 1:1 and group), so
-agent streaming works against DM conversations with identical
-local-echo, broadcast-cap, and abort semantics as channel scopes.
+Sprint 5 release. Unblocks two 1.0-track surfaces: `startAgentReply`
+now accepts `DmScope` (both 1:1 and group) on the agent side, and the
+React Native widget grows first-class typing indicators. Both are
+additive over `0.8.0` — no breaking surface changes.
 
 ### Added
 
@@ -22,11 +22,21 @@ local-echo, broadcast-cap, and abort semantics as channel scopes.
   (`AGENT_REPLY_ABORT_TOOL_ID`) all behave identically to the channel
   path. The provisional local-echo `message` event is emitted as a
   `DirectMessage` so the client's DM narrow accepts it into state.
-- **Test coverage** — five new cases in `tests/agent-reply.test.ts`
-  exercise the DM path: 1:1 routing, group routing (three-participant
-  DM), streamed-token broadcast debouncing, abort semantics, and the
-  provisional `message` event round-tripping through the client's
-  in-scope predicate.
+- **Agent-reply DM test coverage** — five new cases in
+  `tests/agent-reply.test.ts` exercise the DM path: 1:1 routing,
+  group routing (three-participant DM), streamed-token broadcast
+  debouncing, abort semantics, and the provisional `message` event
+  round-tripping through the client's in-scope predicate.
+- **RN typing indicators** —
+  `zulip-embed-react-native@0.9.0-alpha`'s `<ZulipChatScreen>` now
+  renders an inbound typing row above the composer
+  ("Alice is typing" / "Alice and Bob are typing" / "Several people
+  are typing") and emits outbound `start` / `stop` typing pings on
+  keystroke, matching the cadence of the web element
+  (`TYPING_REFRESH_MS=8s`, `TYPING_IDLE_MS=5s`). Self is filtered from
+  the inbound indicator; pings are suppressed in `readOnly` mode and
+  on unmount. See the updated feature-status matrix in
+  [`packages/react-native/README.md`](./packages/react-native/README.md).
 
 ### Changed
 
@@ -38,7 +48,11 @@ local-echo, broadcast-cap, and abort semantics as channel scopes.
 
 ### Fixed
 
-- No user-visible bug fixes since `0.8.0`.
+- **RN ambient types.** `packages/react-native/src/zulip-embed.d.ts`
+  was a stale pre-0.8 declaration shim that, via TypeScript declaration
+  merging, masked real `ZulipClient` methods and gave `TypingEvent`
+  the wrong shape. Rewritten to mirror the published `dist/*.d.ts`
+  surface so RN consumers see the same type surface as web.
 
 ### Dependencies
 
