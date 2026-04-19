@@ -45,6 +45,7 @@ const OBSERVED_ATTRIBUTES = [
     "auth-token",
     "channel",
     "topic",
+    "dm-user-ids",
     "theme",
     "mode",
     "open",
@@ -65,6 +66,7 @@ const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "auth-token",
     "channel",
     "topic",
+    "dm-user-ids",
 ]);
 
 const CHAT_BUBBLE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
@@ -595,10 +597,17 @@ export class ZulipChatElement extends HTMLElement {
     // Composer placeholder reflects the current scope so users always
     // know where their message will land. Mirrors Zulip's own composer:
     //     Message #general > welcome
+    //     Message user1, user2
     private composerPlaceholder(): string {
-        const channel = this.getAttribute("channel") ?? "general";
-        const topic = this.getAttribute("topic");
-        if (topic !== null && topic !== "") {
+        const scope = this.readScope();
+        const normalized = "kind" in scope ? scope : {kind: "channel" as const, ...scope};
+        if (normalized.kind === "dm") {
+            if (normalized.userIds.length === 0) return "Message direct";
+            return `Message direct (${String(normalized.userIds.length)})`;
+        }
+        const channel = normalized.channel;
+        const topic = normalized.topic;
+        if (topic !== undefined && topic !== "") {
             return `Message #${channel} > ${topic}`;
         }
         return `Message #${channel}`;
@@ -887,9 +896,19 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private readScope(): ScopeFilter {
+        const dmAttr = this.getAttribute("dm-user-ids");
+        if (dmAttr !== null && dmAttr.trim() !== "") {
+            const userIds = dmAttr
+                .split(",")
+                .map((part) => Number.parseInt(part.trim(), 10))
+                .filter((n) => Number.isFinite(n));
+            if (userIds.length > 0) {
+                return {kind: "dm", userIds};
+            }
+        }
         const channel = this.getAttribute("channel") ?? "general";
         const topic = this.getAttribute("topic") ?? undefined;
-        return {channel, topic};
+        return {kind: "channel", channel, topic};
     }
 
     private appendMessage(message: Message): void {
@@ -1230,12 +1249,29 @@ export class ZulipChatElement extends HTMLElement {
                     content,
                 });
             } else {
-                let outgoing: SendMessageParams = {
-                    type: "channel",
-                    channel: scope.channel,
-                    topic: scope.topic ?? "",
-                    content,
-                };
+                const normalized =
+                    "kind" in scope ? scope : {kind: "channel" as const, ...scope};
+                let outgoing: SendMessageParams;
+                if (normalized.kind === "dm") {
+                    const viewerId = this.client.getCurrentUserId();
+                    const recipientIds = normalized.userIds.filter(
+                        (id) => viewerId === undefined || id !== viewerId,
+                    );
+                    const recipients =
+                        recipientIds.length > 0 ? recipientIds : normalized.userIds;
+                    outgoing = {
+                        type: "direct",
+                        recipients: recipients.map(String),
+                        content,
+                    };
+                } else {
+                    outgoing = {
+                        type: "channel",
+                        channel: normalized.channel,
+                        topic: normalized.topic ?? "",
+                        content,
+                    };
+                }
                 if (this.beforeSend !== undefined) {
                     // Host hook can rewrite the params (DLP / PII /
                     // formatting) or cancel the send by returning null.
@@ -1319,6 +1355,8 @@ export class ZulipChatElement extends HTMLElement {
     private applyStateToDom(): void {
         if (!this.attachedToDom) return;
         const scope = this.readScope();
+        const normalizedScope =
+            "kind" in scope ? scope : {kind: "channel" as const, ...scope};
         const brandName = this.getAttribute("brand-name");
         const brandLogo = this.getAttribute("brand-logo");
 
@@ -1326,18 +1364,32 @@ export class ZulipChatElement extends HTMLElement {
             // brand-name overrides the channel label so adopters can bill
             // the widget as "Acme Support" instead of "#general". The
             // leading "#" glyph comes from the ::before pseudo, which we
-            // suppress via data-brand-name when a brand name is set.
+            // suppress via data-brand-name when a brand name is set or
+            // when the scope is a DM (since there is no channel name to
+            // render — we just show "Direct" and let the recipient list
+            // land on the topic row).
             if (brandName !== null && brandName !== "") {
                 this.headerChannelEl.textContent = brandName;
                 this.headerChannelEl.dataset["brandName"] = "1";
+            } else if (normalizedScope.kind === "dm") {
+                this.headerChannelEl.textContent = "Direct";
+                this.headerChannelEl.dataset["brandName"] = "1";
             } else {
-                this.headerChannelEl.textContent = scope.channel;
+                this.headerChannelEl.textContent = normalizedScope.channel;
                 delete this.headerChannelEl.dataset["brandName"];
             }
         }
         if (this.headerTopicEl) {
-            this.headerTopicEl.textContent = scope.topic ?? "";
-            this.headerTopicEl.hidden = scope.topic === undefined;
+            if (normalizedScope.kind === "dm") {
+                this.headerTopicEl.textContent =
+                    normalizedScope.userIds.length > 0
+                        ? `${String(normalizedScope.userIds.length)} participants`
+                        : "";
+                this.headerTopicEl.hidden = normalizedScope.userIds.length === 0;
+            } else {
+                this.headerTopicEl.textContent = normalizedScope.topic ?? "";
+                this.headerTopicEl.hidden = normalizedScope.topic === undefined;
+            }
         }
         if (this.headerBrandLogoEl) {
             // Only set src when we've validated the URL; an invalid value

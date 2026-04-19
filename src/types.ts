@@ -287,7 +287,43 @@ export interface ZulipConfirmationResponseEventDetail {
     payloadSig: string;
 }
 
-export interface ScopeFilter {
+// Discriminated union identifying either a channel/topic narrow or a
+// direct-message conversation. Historically this was a flat object with
+// `{channel, topic?}`; the legacy shape is still accepted by `normalizeScope`
+// below for one release, with a deprecation warning logged once per caller.
+//
+// Callers migrating to DMs pick [DmScope] instead: `userIds` is the sorted
+// list of user ids identifying the conversation (one-on-one: two ids;
+// group DM: three or more). The transport layer normalizes the order
+// before building the Zulip narrow so snapshot equality is stable
+// regardless of how the caller spelled the list.
+export type ScopeFilter = ChannelScope | DmScope | LegacyChannelScope;
+
+export interface ChannelScope {
+    kind: "channel";
     channel: string;
     topic?: string | undefined;
 }
+
+export interface DmScope {
+    kind: "dm";
+    // Sorted list of user ids identifying the DM conversation. Always
+    // includes the viewer's own id so the narrow resolves the same way
+    // on every peer's feed. Transports canonicalize (dedupe + sort) on
+    // construction, but consumers should pass a pre-sorted list so
+    // downstream equality checks work without a helper call.
+    userIds: number[];
+}
+
+// Legacy flat shape retained for back-compat. Treated equivalent to a
+// `{kind: "channel", ...}` ChannelScope by `normalizeScope`. Removed in
+// a future major release.
+export interface LegacyChannelScope {
+    channel: string;
+    topic?: string | undefined;
+}
+
+// Canonical form handed to transport internals. Never has `LegacyChannelScope`
+// — `normalizeScope` has already widened it to `ChannelScope` by the time
+// a transport sees it.
+export type NormalizedScope = ChannelScope | DmScope;

@@ -219,7 +219,7 @@ export class ZulipTopicListElement extends HTMLElement {
     }
 
     private async createTransport(channel: string): Promise<Transport> {
-        const scope: ScopeFilter = {channel};
+        const scope: ScopeFilter = {kind: "channel", channel};
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
             // Dynamic import so live-only topic lists don't pull in the

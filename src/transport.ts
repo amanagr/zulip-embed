@@ -8,6 +8,18 @@ import type {
     ZulipEventListener,
 } from "./types.ts";
 
+// A single bucketed DM conversation. `users` is the set of participants
+// other than the viewer (or the viewer alone for a DM-to-self). Sorted
+// by userId for stable keys. Consumers drive the DM picker off this
+// shape directly — `lastMessageId` is stable across sessions, so UI
+// code can use it for `selected` comparisons without reaching into the
+// message feed.
+export interface DirectMessageConversation {
+    users: User[];
+    lastMessageId: number;
+    lastMessageTime: number;
+}
+
 export interface ReactionParams {
     messageId: number;
     emoji: string;
@@ -53,6 +65,14 @@ export interface Transport {
     sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
     listChannels(): Promise<Channel[]>;
     listTopics(channel: string): Promise<Topic[]>;
+    // List the viewer's recent DM conversations, sorted most-recent
+    // first. Optional because read-only transports that don't model
+    // DMs (the GitHub-Action-baked SnapshotTransport when the source
+    // feed was a channel) can skip implementing it; the DM element
+    // gracefully degrades to an empty state. `ZulipTransport` and
+    // `DemoTransport` implement it; `SnapshotTransport` implements it
+    // but returns [] when the snapshot carries no DirectMessages.
+    listDirectMessageConversations?(): Promise<DirectMessageConversation[]>;
     // Fetches a single message by id, or resolves undefined if the viewer
     // can't see it (unsubscribed channel, deleted message, etc.). Used by
     // <zulip-announcement>; optional so read-only transports that can't

@@ -2,12 +2,16 @@
 // into zulip-embed directly.
 export type {
     Channel,
+    ChannelScope,
     ConnectionStatus,
+    DirectMessageConversation,
+    DmScope,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
     Message,
     MessageType,
+    NormalizedScope,
     ReactionParams,
     Reaction,
     ScopeFilter,

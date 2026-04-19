@@ -19,17 +19,21 @@ export {ZulipAnnouncementElement, registerZulipAnnouncementElement} from "./anno
 export type {
     Channel,
     ChannelMessage,
+    ChannelScope,
     CodeMessagePart,
     ConfirmationMessagePart,
     ConnectionEvent,
     ConnectionStatus,
     DirectMessage,
+    DmScope,
     ErrorCode,
     ErrorEvent,
+    LegacyChannelScope,
     Message,
     MessagePart,
     MessagePartAuthor,
     MessageType,
+    NormalizedScope,
     Reaction,
     ReactionEvent,
     ScopeFilter,
@@ -48,7 +52,9 @@ export type {
     ZulipEventListener,
     ZulipMessageEventDetail,
 } from "./types.ts";
+export {canonicalUserIds, isChannelScope, isDmScope, normalizeScope} from "./scope.ts";
 export type {
+    DirectMessageConversation,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,

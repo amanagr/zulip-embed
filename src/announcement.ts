@@ -300,7 +300,7 @@ export class ZulipAnnouncementElement extends HTMLElement {
         // channel filter. Transports tolerate this because fetchMessage
         // is scope-agnostic (the server returns any message the viewer
         // can see; the snapshot searches the full file).
-        const scope: ScopeFilter = {channel: "general"};
+        const scope: ScopeFilter = {kind: "channel", channel: "general"};
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
             const {SnapshotTransport} = await import("./snapshot-transport.ts");

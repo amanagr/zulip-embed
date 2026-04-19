@@ -1,6 +1,9 @@
 import {z} from "zod";
 
+import {bucketDirectMessages} from "./dm-bucket.ts";
+import {normalizeScope} from "./scope.ts";
 import type {
+    DirectMessageConversation,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
@@ -12,6 +15,7 @@ import type {
     Channel,
     ErrorCode,
     Message,
+    NormalizedScope,
     Reaction,
     ScopeFilter,
     SendMessageParams,
@@ -20,6 +24,8 @@ import type {
     User,
     ZulipEventListener,
 } from "./types.ts";
+
+export {bucketDirectMessages};
 
 export interface ZulipTransportOptions {
     serverUrl: string;
@@ -166,7 +172,7 @@ export class ZulipTransport implements Transport {
     // awaits ensureAuthHeader(), which resolves as soon as auth is ready.
     private authHeader: string | undefined;
     private readonly authTokenExchange: Promise<void>;
-    private readonly scope: ScopeFilter;
+    private readonly scope: NormalizedScope;
     private readonly historyLimit: number;
     private queueId: string | undefined;
     private lastEventId: number;
@@ -198,7 +204,7 @@ export class ZulipTransport implements Transport {
 
     constructor(options: ZulipTransportOptions) {
         this.serverUrl = validateServerUrl(options.serverUrl);
-        this.scope = options.scope;
+        this.scope = normalizeScope(options.scope);
         this.historyLimit = options.historyLimit ?? 50;
         this.lastEventId = -1;
         this.currentUserPromise = new Promise<User>((resolve, reject) => {
@@ -285,7 +291,8 @@ export class ZulipTransport implements Transport {
         scope: ScopeFilter,
         options: GetMessagesOptions = {},
     ): Promise<GetMessagesResult> {
-        const narrow = buildNarrow(scope);
+        const normalized = normalizeScope(scope);
+        const narrow = buildNarrow(normalized);
         // Anchor semantics: for pagination we anchor on the oldest id we
         // already have and ask for num_before messages strictly older.
         // Zulip includes the anchor in its response, so we strip it below
@@ -396,10 +403,29 @@ export class ZulipTransport implements Transport {
     }
 
     async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
+        const normalized = normalizeScope(scope);
+        if (normalized.kind === "dm") {
+            // DM typing pings to /api/v1/typing use `to` with a JSON
+            // array of user ids. The SDK layer canonicalizes the list
+            // (sorted, deduped) so a DM-with-self and
+            // DM-with-same-group-in-different-order don't fight.
+            const body: Record<string, string> = {
+                op,
+                type: "direct",
+                to: JSON.stringify(normalized.userIds),
+            };
+            try {
+                await this.request("POST", "/api/v1/typing", body);
+            } catch {
+                // Best-effort — old servers return 400 on unfamiliar
+                // parameters; typing is a hint, not a hard requirement.
+            }
+            return;
+        }
         // Channel typing requires the numeric stream_id, not the name.
         // Cache per channel: the caller's scope is stable across a
         // session, so we only resolve the id on the first typing ping.
-        const streamId = await this.resolveChannelId(scope.channel);
+        const streamId = await this.resolveChannelId(normalized.channel);
         if (streamId === undefined) return;
         const body: Record<string, string> = {
             op,
@@ -409,7 +435,7 @@ export class ZulipTransport implements Transport {
             // sendMessage() above.
             type: "stream",
             stream_id: String(streamId),
-            topic: scope.topic ?? "",
+            topic: normalized.topic ?? "",
         };
         try {
             await this.request("POST", "/api/v1/typing", body);
@@ -458,6 +484,29 @@ export class ZulipTransport implements Transport {
                 isResolved,
             };
         });
+    }
+
+    async listDirectMessageConversations(): Promise<DirectMessageConversation[]> {
+        // Derive from recent /messages rather than a dedicated endpoint:
+        // Zulip's REST API doesn't ship a "list my DM threads" call on
+        // every supported version, but narrowing /messages on an empty
+        // pm-with filter returns every DM the viewer can see. We cap at
+        // 200 messages — enough to surface ~dozens of distinct threads
+        // without paginating.
+        const params = {
+            anchor: "newest",
+            num_before: "200",
+            num_after: "0",
+            // Wire operator is "is" with value "dm" — Zulip accepts both
+            // "dm" and "private" on modern servers; "private" is the
+            // legacy spelling that still works on Zulip < 9.
+            narrow: JSON.stringify([["is", "private"]]),
+        };
+        const response = await this.request("GET", "/api/v1/messages", params);
+        const parsed = messagesResponseSchema.safeParse(response);
+        if (!parsed.success) return [];
+        const messages = parsed.data.messages.map(convertMessage);
+        return bucketDirectMessages(messages, this.currentUserId);
     }
 
     async fetchMessage(messageId: number): Promise<Message | undefined> {
@@ -907,7 +956,16 @@ function classifyThrownError(error: unknown): ClassifiedError {
     return new ClassifiedError(describeError(error), "unknown");
 }
 
-function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
+function buildNarrow(scope: NormalizedScope): Array<[string, string]> {
+    if (scope.kind === "dm") {
+        // Wire operator is "pm-with" (not "dm") for Zulip < 9 compat —
+        // the legacy operator is still accepted on every supported
+        // server, same rationale as "stream" vs. "channel" above.
+        // The value is a comma-separated list of user ids; Zulip's
+        // server parses these in any order but we pass sorted for
+        // deterministic caching upstream.
+        return [["pm-with", scope.userIds.join(",")]];
+    }
     // Two-element-array form because /register rejects the object form on
     // several Zulip versions. Operator is "stream" (not "channel") because
     // Zulip < 9 doesn't know the "channel" alias; every supported server

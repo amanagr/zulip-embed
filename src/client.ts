@@ -3,7 +3,9 @@ import {
     type AgentReplyHandle,
     type StartAgentReplyOptions,
 } from "./agent-reply.ts";
+import {normalizeScope} from "./scope.ts";
 import type {
+    DirectMessageConversation,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
@@ -16,6 +18,7 @@ import type {
     ConnectionStatus,
     Message,
     MessagePart,
+    NormalizedScope,
     ScopeFilter,
     SendMessageParams,
     Topic,
@@ -48,7 +51,7 @@ export interface ClientState {
 // Sprint 4 when the component moves to a pure view over ClientState.
 export class ZulipClient {
     private readonly transport: Transport;
-    private readonly scope: ScopeFilter;
+    private readonly scope: NormalizedScope;
     private readonly listeners = new Set<ZulipEventListener>();
     private readonly stateListeners = new Set<() => void>();
     private state: ClientState = {messages: [], status: "idle"};
@@ -56,7 +59,7 @@ export class ZulipClient {
 
     constructor(options: ZulipClientOptions) {
         this.transport = options.transport;
-        this.scope = options.scope;
+        this.scope = normalizeScope(options.scope);
     }
 
     async connect(): Promise<void> {
@@ -107,12 +110,31 @@ export class ZulipClient {
 
     // Overloaded sendMessage. String form targets the active scope —
     // convenient default for RN / React hosts that already fixed their
-    // channel/topic at mount time. Params form still works for
-    // DM sends or cross-scope posts.
+    // channel/topic (or DM recipients) at mount time. Params form still
+    // works for cross-scope posts or when the host wants to pin exact
+    // channel/topic or recipient emails.
     sendMessage(content: string): Promise<void>;
     sendMessage(params: SendMessageParams): Promise<void>;
     async sendMessage(input: string | SendMessageParams): Promise<void> {
         if (typeof input === "string") {
+            if (this.scope.kind === "dm") {
+                // DM: translate viewer-less id list into the recipients form.
+                // We exclude the viewer's own id so the server doesn't bounce
+                // a "you can't DM yourself" unless the viewer genuinely is
+                // the only participant (self-DM).
+                const viewerId = this.transport.getCurrentUserId?.();
+                const recipientIds = this.scope.userIds.filter(
+                    (id) => viewerId === undefined || id !== viewerId,
+                );
+                const recipients =
+                    recipientIds.length > 0 ? recipientIds : this.scope.userIds;
+                await this.transport.sendMessage({
+                    type: "direct",
+                    recipients: recipients.map(String),
+                    content: input,
+                });
+                return;
+            }
             await this.transport.sendMessage({
                 type: "channel",
                 channel: this.scope.channel,
@@ -165,6 +187,11 @@ export class ZulipClient {
     async listTopics(channel: string): Promise<Topic[]> {
         if (this.transport.listTopics === undefined) return [];
         return this.transport.listTopics(channel);
+    }
+
+    async listDirectMessageConversations(): Promise<DirectMessageConversation[]> {
+        if (this.transport.listDirectMessageConversations === undefined) return [];
+        return this.transport.listDirectMessageConversations();
     }
 
     async fetchMessage(messageId: number): Promise<Message | undefined> {
@@ -289,10 +316,25 @@ export class ZulipClient {
     }
 
     private isInScope(message: Message): boolean {
-        if (message.type !== "channel") return false;
-        if (message.channelName !== this.scope.channel) return false;
-        if (this.scope.topic !== undefined && message.topic !== this.scope.topic) {
-            return false;
+        if (this.scope.kind === "channel") {
+            if (message.type !== "channel") return false;
+            if (message.channelName !== this.scope.channel) return false;
+            if (this.scope.topic !== undefined && message.topic !== this.scope.topic) {
+                return false;
+            }
+            return true;
+        }
+        // DM scope: message recipients (plus the sender) must be exactly
+        // the same set as this.scope.userIds. We canonicalize both sides
+        // the same way the transport does on construction so ordering /
+        // duplicate ids can't cause a false negative.
+        if (message.type !== "direct") return false;
+        const messageIds = new Set<number>();
+        for (const u of message.recipients) messageIds.add(u.userId);
+        messageIds.add(message.senderId);
+        if (messageIds.size !== this.scope.userIds.length) return false;
+        for (const id of this.scope.userIds) {
+            if (!messageIds.has(id)) return false;
         }
         return true;
     }

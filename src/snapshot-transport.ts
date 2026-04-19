@@ -1,6 +1,9 @@
 import {z} from "zod";
 
+import {bucketDirectMessages} from "./dm-bucket.ts";
+import {normalizeScope} from "./scope.ts";
 import type {
+    DirectMessageConversation,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
@@ -11,6 +14,7 @@ import type {
 import type {
     Channel,
     Message,
+    NormalizedScope,
     ScopeFilter,
     SendMessageParams,
     Topic,
@@ -124,7 +128,7 @@ export interface SnapshotTransportOptions {
 // at runtime. No credentials ever reach the browser.
 export class SnapshotTransport implements Transport {
     private readonly url: string;
-    private readonly scope: ScopeFilter;
+    private readonly scope: NormalizedScope;
     private readonly inline: SnapshotFile | undefined;
     private messages: Message[] = [];
     private onEvent: ZulipEventListener | undefined;
@@ -135,7 +139,7 @@ export class SnapshotTransport implements Transport {
 
     constructor(options: SnapshotTransportOptions) {
         this.url = options.data === undefined ? validateSnapshotUrl(options.url) : options.url;
-        this.scope = options.scope;
+        this.scope = normalizeScope(options.scope);
         this.inline = options.data;
     }
 
@@ -164,7 +168,7 @@ export class SnapshotTransport implements Transport {
     }
 
     async getMessages(
-        _scope: ScopeFilter,
+        scope: ScopeFilter,
         options: GetMessagesOptions = {},
     ): Promise<GetMessagesResult> {
         // Snapshots are a fixed window — there is no backlog to paginate
@@ -172,6 +176,15 @@ export class SnapshotTransport implements Transport {
         // loader by reporting hasMore=false.
         if (options.beforeId !== undefined) {
             return Promise.resolve({messages: [], hasMore: false});
+        }
+        // If the caller passes a scope that differs from the transport's
+        // constructor scope (e.g. <zulip-dm-list> pointing a DM narrow at
+        // a snapshot originally opened for a channel), refilter on the
+        // fly — the full message set is already cached on `directory`.
+        const normalized = normalizeScope(scope);
+        if (!scopesEqual(normalized, this.scope) && this.directory) {
+            const refiltered = filterToScope(this.directory.messages, normalized);
+            return Promise.resolve({messages: refiltered, hasMore: false});
         }
         return Promise.resolve({messages: [...this.messages], hasMore: false});
     }
@@ -217,6 +230,17 @@ export class SnapshotTransport implements Transport {
         const file = await this.ensureDirectory();
         const topics = file?.topics?.[channel];
         return topics ? [...topics] : [];
+    }
+
+    async listDirectMessageConversations(): Promise<DirectMessageConversation[]> {
+        // Snapshots are anonymous reads — no current-viewer filter, so
+        // pass `undefined` to `bucketDirectMessages`. Every DM in the
+        // snapshot (if any) ends up bucketed on the full sender+recipient
+        // set. Older snapshot files that only carry channel messages
+        // naturally yield an empty list.
+        const file = await this.ensureDirectory();
+        if (!file) return [];
+        return bucketDirectMessages(file.messages, undefined);
     }
 
     async fetchMessage(messageId: number): Promise<Message | undefined> {
@@ -303,13 +327,45 @@ function validateSnapshotUrl(raw: string): string {
     return parsed.toString();
 }
 
-function filterToScope(messages: Message[], scope: ScopeFilter): Message[] {
+function filterToScope(messages: Message[], scope: NormalizedScope): Message[] {
+    if (scope.kind === "channel") {
+        return messages.filter((m) => {
+            if (m.type !== "channel") return false;
+            if (m.channelName !== scope.channel) return false;
+            if (scope.topic !== undefined && m.topic !== scope.topic) return false;
+            return true;
+        });
+    }
+    // DM scope: the canonical userIds include the viewer, but snapshots
+    // don't have a logged-in viewer. Match DMs whose full participant
+    // set (sender + recipients) equals `scope.userIds`. Canonicalize
+    // `scope.userIds` into a Set for O(n) membership checks.
+    const expected = new Set<number>(scope.userIds);
     return messages.filter((m) => {
-        if (m.type !== "channel") return false;
-        if (m.channelName !== scope.channel) return false;
-        if (scope.topic !== undefined && m.topic !== scope.topic) return false;
+        if (m.type !== "direct") return false;
+        const participants = new Set<number>([m.senderId]);
+        for (const r of m.recipients) participants.add(r.userId);
+        if (participants.size !== expected.size) return false;
+        for (const id of expected) {
+            if (!participants.has(id)) return false;
+        }
         return true;
     });
+}
+
+function scopesEqual(a: NormalizedScope, b: NormalizedScope): boolean {
+    if (a.kind !== b.kind) return false;
+    if (a.kind === "channel" && b.kind === "channel") {
+        return a.channel === b.channel && a.topic === b.topic;
+    }
+    if (a.kind === "dm" && b.kind === "dm") {
+        if (a.userIds.length !== b.userIds.length) return false;
+        for (let i = 0; i < a.userIds.length; i++) {
+            if (a.userIds[i] !== b.userIds[i]) return false;
+        }
+        return true;
+    }
+    return false;
 }
 
 // Full schema validation on load. Every field that flows into the DOM

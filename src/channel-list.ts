@@ -257,7 +257,7 @@ export class ZulipChannelListElement extends HTMLElement {
     private async createTransport(): Promise<Transport> {
         // listChannels is scope-agnostic, but Transport ctors need a
         // scope. Use a throwaway "general" — no messages are fetched.
-        const scope: ScopeFilter = {channel: "general"};
+        const scope: ScopeFilter = {kind: "channel", channel: "general"};
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
             // Dynamic import so live-only channel lists don't pull in the

@@ -121,12 +121,7 @@ export function ZulipChatScreen(props: ZulipChatScreenProps): React.ReactElement
         }
     }, [client, draft]);
 
-    const headerLabel =
-        props.brandName !== undefined && props.brandName !== ""
-            ? props.brandName
-            : props.scope.topic !== undefined
-              ? `#${props.scope.channel} › ${props.scope.topic}`
-              : `#${props.scope.channel}`;
+    const headerLabel = buildHeaderLabel(props.scope, props.brandName);
 
     return (
         <KeyboardAvoidingView
@@ -202,6 +197,23 @@ function formatTimestamp(unix: number): string {
     const hh = String(d.getHours()).padStart(2, "0");
     const mm = String(d.getMinutes()).padStart(2, "0");
     return `${hh}:${mm}`;
+}
+
+// Header label handles both scope shapes — the discriminated form
+// introduced in 0.8 and the legacy flat form. DM scopes read the
+// participant count rather than a channel name; the caller can pass
+// `brandName` to override the default label entirely.
+function buildHeaderLabel(scope: ScopeFilter, brandName: string | undefined): string {
+    if (brandName !== undefined && brandName !== "") return brandName;
+    const normalized = "kind" in scope ? scope : {kind: "channel" as const, ...scope};
+    if (normalized.kind === "dm") {
+        if (normalized.userIds.length === 0) return "Direct";
+        return `Direct (${String(normalized.userIds.length)})`;
+    }
+    if (normalized.topic !== undefined && normalized.topic !== "") {
+        return `#${normalized.channel} \u203a ${normalized.topic}`;
+    }
+    return `#${normalized.channel}`;
 }
 
 

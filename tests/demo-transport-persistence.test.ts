@@ -90,11 +90,13 @@ describe("DemoTransport — persistence & scope", () => {
         await transport.close();
     });
 
-    test("sendMessage to a non-active channel still appears in history (no filter)", async () => {
-        // DemoTransport has no scope filter on getMessages today — the
-        // params scope is ignored. Pin this so a future "respect scope
-        // in getMessages" change shows up as a regression and forces a
-        // conscious decision about the demo behavior.
+    test("getMessages respects the scope param and hides out-of-scope messages", async () => {
+        // As of the 0.8 ScopeFilter widening, DemoTransport filters
+        // getMessages by the query scope so a DM narrow doesn't leak
+        // channel messages (and vice versa). This pins the new
+        // filter-in-demo behavior — the inverse of the pre-0.8 canary
+        // that deliberately returned the stray message so callers were
+        // forced to filter themselves.
         const transport = new DemoTransport({
             scope: {channel: "general", topic: "hello"},
             autoReply: false,
@@ -107,10 +109,13 @@ describe("DemoTransport — persistence & scope", () => {
             content: "stray",
         });
         const page = await transport.getMessages({channel: "general", topic: "hello"});
-        // Current behavior: stray message is in the returned list even
-        // though the query scope is 'general'. Callers (component) are
-        // expected to filter.
-        expect(page.messages.some((m) => m.content === "stray")).toBe(true);
+        // The stray message lives under a different channel, so asking
+        // for the 'general/hello' narrow must not return it.
+        expect(page.messages.some((m) => m.content === "stray")).toBe(false);
+        // But the same message IS persisted — asking for its own narrow
+        // surfaces it, which distinguishes "filtered" from "lost".
+        const otherPage = await transport.getMessages({channel: "other-channel", topic: ""});
+        expect(otherPage.messages.some((m) => m.content === "stray")).toBe(true);
         await transport.close();
     });
 

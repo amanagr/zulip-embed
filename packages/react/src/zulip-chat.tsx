@@ -34,9 +34,13 @@ export interface ZulipChatProps {
     authToken?: string;
 
     // Scope: channel is required for live mode; topic is optional —
-    // omitting it shows all topics in the channel.
+    // omitting it shows all topics in the channel. Pass `dmUserIds`
+    // (a sorted list including the viewer's own id) to point the widget
+    // at a direct-message conversation instead. The three are mutually
+    // exclusive — dmUserIds wins when both are set.
     channel?: string;
     topic?: string;
+    dmUserIds?: readonly number[];
 
     // Demo transport — seeded messages + echo bot, no network needed.
     demo?: boolean;
@@ -89,6 +93,17 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             applyAttr(el, "auth-token", props.authToken);
             applyAttr(el, "channel", props.channel);
             applyAttr(el, "topic", props.topic);
+            // Comma-join the user id list so the underlying element can
+            // parse it the same way it would from hand-written HTML. An
+            // empty / undefined list removes the attribute entirely so
+            // the channel scope takes over.
+            applyAttr(
+                el,
+                "dm-user-ids",
+                props.dmUserIds && props.dmUserIds.length > 0
+                    ? props.dmUserIds.join(",")
+                    : undefined,
+            );
             applyAttr(el, "demo-variant", props.demoVariant);
             applyAttr(el, "snapshot-url", props.snapshotUrl);
             applyAttr(el, "theme", props.theme);
@@ -106,6 +121,9 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             props.authToken,
             props.channel,
             props.topic,
+            // Join to a stable string so the effect only re-runs when
+            // the list content changes, not on every parent re-render.
+            props.dmUserIds === undefined ? undefined : props.dmUserIds.join(","),
             props.demo,
             props.demoVariant,
             props.snapshotUrl,

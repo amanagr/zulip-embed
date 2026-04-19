@@ -1,6 +1,8 @@
+import {normalizeScope} from "./scope.ts";
 import type {Transport} from "./transport.ts";
 import type {
     MessagePart,
+    NormalizedScope,
     ScopeFilter,
     SendMessageParams,
     TextMessagePart,
@@ -120,17 +122,37 @@ export function createAgentReplyHandle(deps: AgentReplyDeps): AgentReplyHandle {
     let resolvedMessageId: number | undefined;
     const {provisionalContent} = initialPartsState(options);
 
+    // Agent replies are channel-only for now — streamed edits only make
+    // sense against a stable message-id surface, and DM narrowing adds
+    // complications (ordering, membership) that aren't worth the
+    // surface area. Reject DM scopes up front so the caller sees a
+    // clean error rather than a downstream send-time failure.
+    const normalized = normalizeScope(scope);
+    if (normalized.kind !== "channel") {
+        const reason = "startAgentReply does not support DM scopes yet";
+        const handle: AgentReplyHandle = {
+            messageId: Promise.reject(new Error(reason)),
+            appendToken: () => {},
+            appendEvent: () => {},
+            finish: () => Promise.reject(new Error(reason)),
+            abort: () => Promise.resolve(),
+        };
+        handle.messageId.catch(() => {});
+        return handle;
+    }
+    const narrowChannel = normalized.channel;
+    const narrowTopic = normalized.topic;
     const sendParams: SendMessageParams =
-        scope.topic !== undefined
+        narrowTopic !== undefined
             ? {
                   type: "channel",
-                  channel: scope.channel,
-                  topic: scope.topic,
+                  channel: narrowChannel,
+                  topic: narrowTopic,
                   content: provisionalContent,
               }
             : {
                   type: "channel",
-                  channel: scope.channel,
+                  channel: narrowChannel,
                   topic: "",
                   content: provisionalContent,
               };
@@ -146,7 +168,7 @@ export function createAgentReplyHandle(deps: AgentReplyDeps): AgentReplyHandle {
         void emitInitialMessage({
             emit,
             getCurrentUser: deps.getCurrentUser,
-            scope,
+            normalizedScope: normalized,
             options,
             messageId: result.messageId,
             content: provisionalContent,
@@ -335,12 +357,13 @@ function flatten(parts: readonly MessagePart[]): string {
 async function emitInitialMessage(args: {
     emit: ZulipEventListener;
     getCurrentUser: (() => Promise<User>) | undefined;
-    scope: ScopeFilter;
+    normalizedScope: NormalizedScope;
     options: StartAgentReplyOptions;
     messageId: number;
     content: string;
 }): Promise<void> {
-    const {emit, getCurrentUser, scope, options, messageId, content} = args;
+    const {emit, getCurrentUser, normalizedScope, options, messageId, content} =
+        args;
     // Best-effort senderId lookup. Agents speak through the connected
     // viewer's credentials on Zulip, so the backing message is "from
     // the viewer" on the wire; we override the display name + avatar
@@ -370,8 +393,12 @@ async function emitInitialMessage(args: {
             parts: [],
             reactions: [],
             type: "channel",
-            channelName: scope.channel,
-            topic: scope.topic ?? "",
+            channelName:
+                normalizedScope.kind === "channel" ? normalizedScope.channel : "",
+            topic:
+                normalizedScope.kind === "channel"
+                    ? normalizedScope.topic ?? ""
+                    : "",
         },
     });
 }

@@ -1,5 +1,7 @@
-import {DEMO_GUEST_USER, seedMessages} from "./demo-data.ts";
+import {DEMO_GUEST_USER, DEMO_USERS, seedMessages} from "./demo-data.ts";
+import {normalizeScope} from "./scope.ts";
 import type {
+    DirectMessageConversation,
     EditMessageParams,
     GetMessagesOptions,
     GetMessagesResult,
@@ -9,7 +11,9 @@ import type {
 } from "./transport.ts";
 import type {
     Channel,
+    DirectMessage,
     Message,
+    NormalizedScope,
     Reaction,
     ScopeFilter,
     SendMessageParams,
@@ -26,7 +30,7 @@ export interface DemoTransportOptions {
 }
 
 export class DemoTransport implements Transport {
-    private readonly scope: ScopeFilter;
+    private readonly scope: NormalizedScope;
     private readonly autoReply: boolean;
     private readonly autoReplyDelayMs: number;
     private readonly readOnly: boolean;
@@ -38,11 +42,26 @@ export class DemoTransport implements Transport {
     private fakeTypingHandle: ReturnType<typeof setTimeout> | undefined;
 
     constructor(options: DemoTransportOptions) {
-        this.scope = options.scope;
+        this.scope = normalizeScope(options.scope);
         this.autoReply = options.autoReply ?? true;
         this.autoReplyDelayMs = options.autoReplyDelayMs ?? 1500;
         this.readOnly = options.readOnly ?? false;
-        this.messages = seedMessages(options.scope.channel, options.scope.topic);
+        // Channel scopes seed a fake feed; DM scopes share a synthetic
+        // DM fixture so the demo renders out-of-the-box when adopters
+        // mount a DM conversation.
+        if (this.scope.kind === "channel") {
+            this.messages = seedMessages(this.scope.channel, this.scope.topic);
+        } else {
+            this.messages = seedDirectMessages(this.scope.userIds);
+        }
+        // Include the global DM fixtures so listDirectMessageConversations
+        // has multiple threads to surface even when the scope is a
+        // channel. `_nextId` still advances past the highest seen id.
+        for (const extra of GLOBAL_DM_FIXTURES) {
+            if (!this.messages.some((m) => m.id === extra.id)) {
+                this.messages.push(extra);
+            }
+        }
         this.nextId = this.messages.reduce((max, m) => (m.id > max ? m.id : max), 0) + 1;
     }
 
@@ -64,15 +83,23 @@ export class DemoTransport implements Transport {
     }
 
     async getMessages(
-        _scope: ScopeFilter,
+        scope: ScopeFilter,
         options: GetMessagesOptions = {},
     ): Promise<GetMessagesResult> {
         const limit = options.limit ?? 20;
+        const normalized = normalizeScope(scope);
         // Sorted oldest-first. For paginated demo requests we synthesize
         // filler history on the fly so the scroll-up gesture has something
         // to load; seeded messages are returned on the first page only.
         if (options.beforeId === undefined) {
-            return Promise.resolve({messages: [...this.messages], hasMore: true});
+            const filtered = this.messages.filter((m) => inScope(m, normalized));
+            return Promise.resolve({messages: filtered, hasMore: true});
+        }
+        // Synthesized history only makes sense for channel scopes; DM
+        // history has no filler generator, so DM pagination just stops
+        // at the seeded set.
+        if (normalized.kind === "dm") {
+            return Promise.resolve({messages: [], hasMore: false});
         }
         const anchor = options.beforeId;
         const historyBatch = this.buildDemoHistory(anchor, limit);
@@ -91,6 +118,11 @@ export class DemoTransport implements Transport {
     ): {messages: Message[]; hasMore: boolean} {
         const FLOOR_ID = 1;
         if (anchorId <= FLOOR_ID) {
+            return {messages: [], hasMore: false};
+        }
+        // Only channel scopes reach here; `getMessages` short-circuits
+        // DM scopes above so we know `this.scope` is a ChannelScope.
+        if (this.scope.kind !== "channel") {
             return {messages: [], hasMore: false};
         }
         const channel = this.scope.channel;
@@ -263,11 +295,14 @@ export class DemoTransport implements Transport {
     async listChannels(): Promise<Channel[]> {
         // Single seeded channel matching the demo feed. Advertised with a
         // small unread count so the channel-list badge renders out-of-box
-        // in demo mode.
+        // in demo mode. For DM scopes, fall back to "general" — a plain
+        // `<zulip-channel-list>` dropped next to a DM-scoped `<zulip-chat>`
+        // still has something to render.
+        const name = this.scope.kind === "channel" ? this.scope.channel : "general";
         return Promise.resolve([
             {
                 channelId: 1,
-                name: this.scope.channel,
+                name,
                 description: "In-memory demo channel",
                 color: "#7f56d9",
                 pinToTop: true,
@@ -275,6 +310,53 @@ export class DemoTransport implements Transport {
                 unreadCount: 0,
             },
         ]);
+    }
+
+    async listDirectMessageConversations(): Promise<DirectMessageConversation[]> {
+        const viewer = DEMO_GUEST_USER.userId;
+        const buckets = new Map<
+            string,
+            {users: Map<number, User>; lastMessage: DirectMessage}
+        >();
+        for (const message of this.messages) {
+            if (message.type !== "direct") continue;
+            const participants = new Map<number, User>();
+            if (message.senderId !== viewer) {
+                participants.set(message.senderId, {
+                    userId: message.senderId,
+                    email: message.senderEmail,
+                    fullName: message.senderFullName,
+                    avatarUrl: message.avatarUrl,
+                });
+            }
+            for (const recipient of message.recipients) {
+                if (recipient.userId === viewer) continue;
+                participants.set(recipient.userId, recipient);
+            }
+            if (participants.size === 0) {
+                participants.set(message.senderId, {
+                    userId: message.senderId,
+                    email: message.senderEmail,
+                    fullName: message.senderFullName,
+                    avatarUrl: message.avatarUrl,
+                });
+            }
+            const key = [...participants.keys()].sort((a, b) => a - b).join(",");
+            const existing = buckets.get(key);
+            if (existing === undefined || message.id > existing.lastMessage.id) {
+                buckets.set(key, {users: participants, lastMessage: message});
+            }
+        }
+        const rows: DirectMessageConversation[] = [];
+        for (const bucket of buckets.values()) {
+            rows.push({
+                users: [...bucket.users.values()].sort((a, b) => a.userId - b.userId),
+                lastMessageId: bucket.lastMessage.id,
+                lastMessageTime: bucket.lastMessage.timestamp,
+            });
+        }
+        rows.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
+        return Promise.resolve(rows);
     }
 
     async listTopics(channel: string): Promise<Topic[]> {
@@ -365,6 +447,132 @@ const SAMPLE_AUTHORS: Array<{id: number; name: string; email: string}> = [
     {id: 13, name: "Cordelia, Lear's daughter", email: "cordelia@zulip.com"},
     {id: 15, name: "Prospero from The Tempest", email: "prospero@zulip.com"},
 ];
+
+// Three demo DM threads: one-on-one with Iago, one-on-one with Cordelia,
+// and a three-way with Hamlet + Prospero. Ids start at 9000 to sit
+// comfortably above the channel seed range so `nextId` starts clean.
+const GLOBAL_DM_FIXTURES: DirectMessage[] = buildGlobalDmFixtures();
+
+function buildGlobalDmFixtures(): DirectMessage[] {
+    const viewer = DEMO_GUEST_USER.userId;
+    const lookup = (id: number): User => {
+        const found = DEMO_USERS.find((u) => u.userId === id);
+        return (
+            found ?? {
+                userId: id,
+                email: `user${String(id)}@example.com`,
+                fullName: `User ${String(id)}`,
+                avatarUrl: "",
+            }
+        );
+    };
+    const iago = lookup(11);
+    const hamlet = lookup(12);
+    const cordelia = lookup(13);
+    const prospero = lookup(15);
+    const now = Date.now();
+    return [
+        {
+            id: 9001,
+            senderId: iago.userId,
+            senderFullName: iago.fullName,
+            senderEmail: iago.email,
+            avatarUrl: iago.avatarUrl,
+            timestamp: now - 1000 * 60 * 60 * 2,
+            content: "Hey — quick question about the deploy tonight?",
+            contentIsHtml: false,
+            type: "direct",
+            recipients: [iago, {...DEMO_GUEST_USER}],
+            reactions: [],
+        },
+        {
+            id: 9002,
+            senderId: viewer,
+            senderFullName: DEMO_GUEST_USER.fullName,
+            senderEmail: DEMO_GUEST_USER.email,
+            avatarUrl: DEMO_GUEST_USER.avatarUrl,
+            timestamp: now - 1000 * 60 * 60,
+            content: "Sounds good, let's sync on that tomorrow.",
+            contentIsHtml: false,
+            type: "direct",
+            recipients: [cordelia],
+            reactions: [],
+        },
+        {
+            id: 9003,
+            senderId: hamlet.userId,
+            senderFullName: hamlet.fullName,
+            senderEmail: hamlet.email,
+            avatarUrl: hamlet.avatarUrl,
+            timestamp: now - 1000 * 60 * 15,
+            content: "Prospero shipped the redesign — thoughts?",
+            contentIsHtml: false,
+            type: "direct",
+            recipients: [hamlet, prospero, {...DEMO_GUEST_USER}],
+            reactions: [],
+        },
+    ];
+}
+
+// Seed a synthetic DM thread when the scope was explicitly a DM. A
+// couple of messages so the feed isn't empty on first mount.
+function seedDirectMessages(userIds: number[]): Message[] {
+    const viewer = DEMO_GUEST_USER.userId;
+    const others = userIds.filter((id) => id !== viewer);
+    const peers: User[] = others.map((id) => {
+        const found = DEMO_USERS.find((u) => u.userId === id);
+        return (
+            found ?? {
+                userId: id,
+                email: `user${String(id)}@example.com`,
+                fullName: `User ${String(id)}`,
+                avatarUrl: "",
+            }
+        );
+    });
+    if (peers.length === 0) return [];
+    const now = Date.now();
+    const primary = peers[0]!;
+    return [
+        {
+            id: 9100,
+            senderId: primary.userId,
+            senderFullName: primary.fullName,
+            senderEmail: primary.email,
+            avatarUrl: primary.avatarUrl,
+            timestamp: now - 1000 * 60 * 10,
+            content: "Welcome to the DM demo — any messages you send will echo.",
+            contentIsHtml: false,
+            type: "direct",
+            recipients: [...peers, {...DEMO_GUEST_USER}],
+            reactions: [],
+        },
+    ];
+}
+
+// Predicate used by `getMessages` to constrain the flat message log to
+// the active narrow. Channel scopes match on channelName + optional
+// topic; DM scopes match on the canonical participant set.
+function inScope(message: Message, scope: NormalizedScope): boolean {
+    if (scope.kind === "channel") {
+        if (message.type !== "channel") return false;
+        if (message.channelName !== scope.channel) return false;
+        if (scope.topic !== undefined && message.topic !== scope.topic) {
+            return false;
+        }
+        return true;
+    }
+    if (message.type !== "direct") return false;
+    const participants = new Set<number>([message.senderId]);
+    for (const r of message.recipients) participants.add(r.userId);
+    const expected = new Set<number>(scope.userIds);
+    expected.add(DEMO_GUEST_USER.userId);
+    if (participants.size !== expected.size) return false;
+    for (const id of expected) {
+        if (!participants.has(id)) return false;
+    }
+    return true;
+}
 
 function buildReply(incoming: string): string {
     const trimmed = incoming.trim();
