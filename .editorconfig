@@ -1,0 +1,18 @@
+root = true
+
+[*]
+end_of_line = lf
+charset = utf-8
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cjs,cts,js,json,mjs,mts,ts}]
+max_line_length = 100
+
+[*.{md,yaml,yml}]
+indent_size = 2
+
+[package.json]
+indent_size = 2

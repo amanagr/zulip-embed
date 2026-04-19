@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Zulip Embed — Developer Preview</title>
+        <link rel="icon" href="data:," />
+        <style>
+            :root {
+                --page-bg: #f6f7fb;
+                --page-text: #111827;
+                --page-muted: #6b7280;
+                --card-bg: #ffffff;
+                --card-border: #e5e7eb;
+                --accent: #6172f3;
+                --code-bg: #0f172a;
+                --code-text: #e2e8f0;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    Roboto,
+                    sans-serif;
+                background: var(--page-bg);
+                color: var(--page-text);
+                line-height: 1.55;
+            }
+
+            .page {
+                max-width: 1100px;
+                margin: 0 auto;
+                padding: 48px 24px 120px;
+            }
+
+            header.hero h1 {
+                margin: 0 0 12px;
+                font-size: 38px;
+                letter-spacing: -0.02em;
+            }
+
+            header.hero p {
+                margin: 0 0 8px;
+                color: var(--page-muted);
+                max-width: 640px;
+                font-size: 16px;
+            }
+
+            .badges {
+                display: inline-flex;
+                gap: 8px;
+                margin-top: 16px;
+            }
+
+            .badge {
+                background: #eef2ff;
+                color: #3730a3;
+                border-radius: 999px;
+                padding: 4px 12px;
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            section {
+                margin-top: 48px;
+            }
+
+            h2 {
+                font-size: 20px;
+                margin: 0 0 16px;
+            }
+
+            .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+                gap: 24px;
+            }
+
+            .panel {
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 16px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .panel h3 {
+                margin: 0;
+                font-size: 15px;
+            }
+
+            .panel p {
+                margin: 0;
+                color: var(--page-muted);
+                font-size: 13px;
+            }
+
+            .panel .chat-slot {
+                margin-top: 8px;
+            }
+
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                align-items: end;
+                margin-top: 16px;
+                padding: 16px;
+                background: #eef2ff;
+                border-radius: 12px;
+                border: 1px solid #e0e7ff;
+            }
+
+            .field {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                font-size: 12px;
+            }
+
+            .field label {
+                color: var(--page-muted);
+                font-weight: 500;
+            }
+
+            .field input,
+            .field select {
+                padding: 6px 10px;
+                border: 1px solid var(--card-border);
+                border-radius: 6px;
+                background: white;
+                font: inherit;
+            }
+
+            button.primary {
+                background: var(--accent);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+
+            pre {
+                background: var(--code-bg);
+                color: var(--code-text);
+                padding: 16px;
+                border-radius: 12px;
+                font-size: 13px;
+                overflow: auto;
+            }
+
+            code {
+                font-family:
+                    ui-monospace,
+                    SFMono-Regular,
+                    Menlo,
+                    monospace;
+            }
+
+            .footer-note {
+                margin-top: 48px;
+                text-align: center;
+                color: var(--page-muted);
+                font-size: 13px;
+            }
+
+            zulip-chat {
+                width: 100%;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="page">
+            <header class="hero">
+                <h1>Zulip Embed</h1>
+                <p>
+                    Drop Zulip chat into any site as a framework-agnostic Web Component — one tag,
+                    Shadow DOM isolation, themeable via CSS variables, Apache-2.0 licensed.
+                </p>
+                <div class="badges">
+                    <span class="badge">v0.1 · developer preview</span>
+                    <span class="badge">Apache-2.0</span>
+                    <span class="badge">demo mode · no server required</span>
+                </div>
+            </header>
+
+            <section>
+                <h2>Live previews</h2>
+                <div class="grid">
+                    <div class="panel">
+                        <h3>Inline · light theme</h3>
+                        <p>Runs entirely in your browser with seeded messages and an echo bot.</p>
+                        <div class="chat-slot">
+                            <zulip-chat
+                                demo
+                                channel="general"
+                                topic="welcome"
+                                theme="light"
+                                mode="inline"
+                            ></zulip-chat>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>Inline · dark theme</h3>
+                        <p>Only the <code>theme</code> attribute changed — every other token adapts.</p>
+                        <div class="chat-slot">
+                            <zulip-chat
+                                demo
+                                channel="support"
+                                topic="first message"
+                                theme="dark"
+                                mode="inline"
+                            ></zulip-chat>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Custom connection</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Point the component at a real Zulip server. Your credentials stay in your
+                    browser — requests go directly to the server you enter.
+                </p>
+                <div class="controls">
+                    <div class="field">
+                        <label for="server">Server URL</label>
+                        <input id="server" type="url" placeholder="https://chat.example.com" />
+                    </div>
+                    <div class="field">
+                        <label for="email">Email</label>
+                        <input id="email" type="email" placeholder="you@example.com" />
+                    </div>
+                    <div class="field">
+                        <label for="api-key">API key</label>
+                        <input id="api-key" type="password" placeholder="zulip API key" />
+                    </div>
+                    <div class="field">
+                        <label for="channel">Channel</label>
+                        <input id="channel" type="text" value="general" />
+                    </div>
+                    <div class="field">
+                        <label for="topic">Topic (optional)</label>
+                        <input id="topic" type="text" placeholder="general chat" />
+                    </div>
+                    <div class="field">
+                        <label for="theme">Theme</label>
+                        <select id="theme">
+                            <option value="light">light</option>
+                            <option value="dark">dark</option>
+                        </select>
+                    </div>
+                    <button id="connect" class="primary" type="button">Connect</button>
+                </div>
+                <div class="panel" style="margin-top: 16px">
+                    <h3>Live instance</h3>
+                    <p>Configure and click Connect above, or stay in demo mode below.</p>
+                    <div class="chat-slot" id="live-slot">
+                        <zulip-chat
+                            demo
+                            channel="general"
+                            topic="your turn"
+                            theme="light"
+                            mode="inline"
+                            id="live-chat"
+                        ></zulip-chat>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Installation</h2>
+                <p style="color: var(--page-muted); margin-top: 0">Two integration paths:</p>
+                <div class="grid">
+                    <div class="panel">
+                        <h3>One-line script tag</h3>
+<pre><code>&lt;script type="module"
+  src="https://unpkg.com/@zulip/embed"&gt;&lt;/script&gt;
+
+&lt;zulip-chat
+  server="https://chat.example.com"
+  email="you@example.com"
+  api-key="..."
+  channel="general"&gt;&lt;/zulip-chat&gt;</code></pre>
+                    </div>
+
+                    <div class="panel">
+                        <h3>npm package</h3>
+<pre><code>pnpm add @zulip/embed
+
+// Registers &lt;zulip-chat&gt; on import.
+import "@zulip/embed";
+
+// Or use the headless SDK directly:
+import {ZulipClient, ZulipTransport} from "@zulip/embed";</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Floating messenger</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Pinned to the bottom-right of the viewport, like an Intercom messenger.
+                </p>
+            </section>
+
+            <p class="footer-note">
+                Built on the Zulip open-source chat platform ·
+                <a href="https://github.com/zulip/zulip">zulip/zulip</a>
+            </p>
+        </div>
+
+        <zulip-chat
+            demo
+            channel="design"
+            topic="floating widget"
+            theme="light"
+            mode="floating"
+        ></zulip-chat>
+
+        <script type="module" src="./main.ts"></script>
+    </body>
+</html>
