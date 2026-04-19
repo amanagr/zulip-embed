@@ -20,6 +20,7 @@ import {
     View,
 } from "react-native";
 
+import {stripHtml} from "./strip-html.js";
 import type {Message, ScopeFilter, Transport, ZulipRNTheme} from "./types.js";
 import {ZulipClient, LIGHT_THEME} from "./types.js";
 
@@ -183,21 +184,6 @@ function formatTimestamp(unix: number): string {
     return `${hh}:${mm}`;
 }
 
-// Core transports return message.content as HTML when contentIsHtml is
-// true. RN can't render HTML safely without a native bridge, so we
-// strip tags and decode the three entities Zulip commonly emits. For
-// richer rendering, a host app can wrap ZulipChatScreen and render the
-// raw content string through their preferred Markdown/HTML view.
-function stripHtml(raw: string): string {
-    return raw
-        .replace(/<[^>]*>/g, "")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .trim();
-}
 
 function makeStyles(theme: ZulipRNTheme) {
     return StyleSheet.create({
