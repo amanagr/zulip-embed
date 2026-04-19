@@ -4,6 +4,91 @@ All notable changes to `zulip-embed` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to semantic versioning.
 
+## 0.8.0-rc.0 — 2026-04-19
+
+Sprint 4 release: surface area + distribution. First release candidate;
+unchanged API contract from 0.6 except where noted.
+
+### Added
+
+- **Subpath entries.** `zulip-embed/chat`, `/channel-list`,
+  `/topic-list`, `/agent`, `/demo`, `/element`, `/all` each register
+  exactly the custom elements or SDK helpers they name. The default
+  `.` entry stays the register-everything shim for back-compat.
+- **Per-subpath gzip budgets.** `scripts/bundle-check.mjs` walks each
+  entry's static transitive graph and fails CI on regressions. Wired
+  into GitHub Pages deploy.
+- **`.github/workflows/release.yml`.** Topological `pnpm publish` to
+  npm (`zulip-embed` → `-react` → `-react-native`). Dry-run by default
+  from the Actions UI; `v*` tag push runs live after `NPM_TOKEN` is
+  provisioned.
+
+### Changed
+
+- **Package name for the React wrapper is `zulip-embed-react`** (was
+  `@zulip/react` in the internal 0.4 draft). React Native is
+  `zulip-embed-react-native`. Unscoped because the `@zulip` npm scope
+  is not controlled by this project.
+- **Dynamic transport loading.** `<zulip-chat>`, `<zulip-channel-list>`,
+  and `<zulip-topic-list>` lazy-load `DemoTransport`,
+  `SnapshotTransport`, `ZulipTransport`, and `createEmojiPicker` on
+  first demand. A live-mode embed no longer pays for the demo fixture
+  surface, and vice versa. Net effect on static per-subpath gzip:
+  `/chat` 66KB → 55KB, `/channel-list` 32KB → 4KB, `/topic-list`
+  32KB → 4KB.
+
+### Notes
+
+- First RC to be published to the npm registry. Consumers should
+  expect a follow-up RC once the registry round-trip surfaces any
+  `exports` / `types` resolution quirks.
+
+## 0.6.0 — 2026-04-19
+
+Sprint 3 release: agent-native primitives.
+
+### Added
+
+- **`Message.parts?: MessagePart[]`** — discriminated union of
+  `text` / `code` / `tool_call` / `tool_result` / `confirmation`
+  variants. `renderContent` prefers `parts` over `content` when
+  present.
+- **`ZulipClient.startAgentReply`** — streaming primitive that
+  local-echoes tokens at 60fps and broadcasts edits at ≤4Hz via a
+  trailing-edge 250ms debounce. Abort lands a terminal edit with a
+  sentinel `tool_result`. Transport gained `sendMessageWithId()` for
+  synchronous id handoff.
+- **`ConfirmationMessagePart`** — inline confirm-before-tool-call
+  widget with idempotent double-click guard. Re-emits a composed
+  `zulip-confirmation-response` `CustomEvent` on the host.
+- **`Message.author`** — `{kind: "human" | "agent", agentModel?}`.
+  Agent-authored rows get a gradient avatar and "AI" badge.
+- **Flutter parity** for Sprint 1 discriminated unions.
+
+## 0.4.0 — 2026-04-19
+
+Sprint 2 release: events + React hook.
+
+### Added
+
+- **`zulip-embed-react` package** — `useZulipChat(transport, scope)`
+  hook, `<ZulipChat>` / `<ZulipChannelList>` / `<ZulipTopicList>`
+  wrappers, and headless `ZulipClient` passthrough.
+- **`ZulipClient` event API** — subscribe/unsubscribe model for
+  `message` / `message-update` / `message-delete` / `reaction` /
+  `connection-change` / `error` events, plus typed host CustomEvents.
+- **`<zulip-channel-list>` and `<zulip-topic-list>`** — standalone
+  custom elements with demo + snapshot + live modes.
+- **Compose bar parity** with the Zulip web app (bold / italic /
+  code / link / quote / list / spoiler / mention / emoji picker).
+- **Open-in-Zulip message actions** — kebab dropdown with
+  configurable `message-actions` attribute.
+- **React Native package** (`zulip-embed-react-native`) — subset
+  of the Web Component: plain-text message list, compose, typing.
+- **KaTeX lazy math rendering, spoiler reveal, syntax highlighting.**
+- **Snapshot transport** — read-only embeds backed by a baked JSON
+  file. Used for the chat.zulip.org #announce feed on the demo site.
+
 ## 0.2.0 — 2026-04-19
 
 Sprint 1 release: auth + types foundation.
