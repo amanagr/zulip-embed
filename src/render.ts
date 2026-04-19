@@ -1066,6 +1066,23 @@ function resolveUrl(url: string, serverOrigin: string | undefined): string | und
 
 export function scrollToBottom(feed: HTMLElement): void {
     feed.scrollTop = feed.scrollHeight;
+    // Avatar images and embedded media load asynchronously. Each one
+    // that settles grows `scrollHeight`, which leaves the feed visually
+    // "in the middle" even though we pinned scrollTop just now. Re-pin
+    // once per pending image load as long as the user hasn't scrolled
+    // away in the meantime. One-shot listeners, so this is O(pending
+    // images) and self-cleans.
+    const pending = feed.querySelectorAll<HTMLImageElement>("img");
+    for (const img of pending) {
+        if (img.complete) continue;
+        const onLoad = (): void => {
+            img.removeEventListener("load", onLoad);
+            img.removeEventListener("error", onLoad);
+            if (isNearBottom(feed)) feed.scrollTop = feed.scrollHeight;
+        };
+        img.addEventListener("load", onLoad);
+        img.addEventListener("error", onLoad);
+    }
 }
 
 export function isNearBottom(feed: HTMLElement, threshold = 80): boolean {

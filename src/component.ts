@@ -14,7 +14,6 @@ import {
     type MessageActionHostContext,
 } from "./message-actions.ts";
 import {
-    EMOJI_GLYPHS,
     isNearBottom,
     renderMessages,
     scrollToBottom,
@@ -1038,8 +1037,12 @@ export class ZulipChatElement extends HTMLElement {
             picker.close();
             return;
         }
-        picker.open(anchor, (emojiName) => {
-            const glyph = EMOJI_GLYPHS[emojiName] ?? `:${emojiName}:`;
+        // Use the glyph the picker already has on hand — the local
+        // EMOJI_GLYPHS fallback only covers ~20 common emojis, so for
+        // anything else (squid, banana, …) it would paste `:name:`
+        // literal text into the composer instead of the rendered
+        // character.
+        picker.open(anchor, (_emojiName, glyph) => {
             insertAtCursor(input, glyph);
         });
     }

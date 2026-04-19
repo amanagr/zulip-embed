@@ -1,0 +1,657 @@
+---
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+---
+
+<StarlightPage
+    frontmatter={{
+        title: "Theming playground",
+        description:
+            "Tune every CSS custom property on a live <zulip-chat> widget and copy the resulting snippet into your own page.",
+        template: "splash",
+        hero: {
+            title: "Theming playground",
+            tagline:
+                "Every knob drives a plain CSS custom property. Tweak, copy the snippet, paste — the widget on your site will render identically.",
+        },
+    }}
+>
+    <div class="pg">
+        <aside class="pg-controls">
+            <div class="pg-field">
+                <label for="pg-brand-name">Brand name</label>
+                <input
+                    id="pg-brand-name"
+                    type="text"
+                    value="Acme Support"
+                    maxlength="40"
+                />
+            </div>
+            <div class="pg-field">
+                <label for="pg-brand-logo">Brand logo URL</label>
+                <input
+                    id="pg-brand-logo"
+                    type="url"
+                    value="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+                />
+            </div>
+
+            <div class="pg-colors">
+                <div class="pg-field">
+                    <label for="pg-accent">Accent</label>
+                    <input id="pg-accent" type="color" value="#6172f3" />
+                </div>
+                <div class="pg-field">
+                    <label for="pg-bg">Background</label>
+                    <input id="pg-bg" type="color" value="#ffffff" />
+                </div>
+                <div class="pg-field">
+                    <label for="pg-surface">Surface</label>
+                    <input id="pg-surface" type="color" value="#f7f7f9" />
+                </div>
+                <div class="pg-field">
+                    <label for="pg-text">Text</label>
+                    <input id="pg-text" type="color" value="#111827" />
+                </div>
+            </div>
+
+            <div class="pg-field">
+                <label for="pg-radius"
+                    >Corner radius (<span id="pg-radius-val">12</span>px)</label
+                >
+                <input
+                    id="pg-radius"
+                    type="range"
+                    min="0"
+                    max="28"
+                    step="1"
+                    value="12"
+                />
+            </div>
+            <div class="pg-field">
+                <label for="pg-height"
+                    >Height (<span id="pg-height-val">560</span>px)</label
+                >
+                <input
+                    id="pg-height"
+                    type="range"
+                    min="360"
+                    max="760"
+                    step="10"
+                    value="560"
+                />
+            </div>
+            <div class="pg-field">
+                <label for="pg-font-size"
+                    >Font size (<span id="pg-font-size-val">14</span>px)</label
+                >
+                <input
+                    id="pg-font-size"
+                    type="range"
+                    min="12"
+                    max="18"
+                    step="1"
+                    value="14"
+                />
+            </div>
+            <div class="pg-field">
+                <label for="pg-font-family">Font family</label>
+                <select id="pg-font-family">
+                    <option
+                        value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+                        >System</option
+                    >
+                    <option value="'Inter', system-ui, sans-serif">Inter</option>
+                    <option value="Georgia, 'Times New Roman', serif">
+                        Serif
+                    </option>
+                    <option
+                        value="ui-monospace, SFMono-Regular, Menlo, monospace"
+                        >Monospace</option
+                    >
+                </select>
+            </div>
+            <div class="pg-field">
+                <label for="pg-theme">Theme</label>
+                <select id="pg-theme">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+
+            <div class="pg-field">
+                <label>Quick presets</label>
+                <div class="pg-preset-row">
+                    <button type="button" class="pg-preset" data-preset="default"
+                        >Default</button
+                    >
+                    <button type="button" class="pg-preset" data-preset="zulip"
+                        >Zulip blue</button
+                    >
+                    <button type="button" class="pg-preset" data-preset="forest"
+                        >Forest</button
+                    >
+                    <button type="button" class="pg-preset" data-preset="sunset"
+                        >Sunset</button
+                    >
+                    <button
+                        type="button"
+                        class="pg-preset"
+                        data-preset="midnight">Midnight</button
+                    >
+                </div>
+            </div>
+
+            <div class="pg-share">
+                <button type="button" id="pg-share-btn" class="pg-share-btn"
+                    >Copy shareable link</button
+                >
+            </div>
+        </aside>
+
+        <div class="pg-preview">
+            <zulip-chat
+                id="pg-chat"
+                demo
+                channel="general"
+                topic="welcome"
+                theme="light"
+                brand-name="Acme Support"
+                brand-logo="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+            ></zulip-chat>
+        </div>
+    </div>
+
+    <h3 class="pg-snippet-title">Copy this into your page</h3>
+    <div class="pg-snippet-wrap">
+        <button type="button" class="pg-copy-btn" id="pg-copy-btn">Copy</button>
+        <pre class="pg-snippet"><code id="pg-snippet"></code></pre>
+    </div>
+</StarlightPage>
+
+<style>
+    .pg {
+        display: grid;
+        grid-template-columns: minmax(260px, 340px) 1fr;
+        gap: 1.5rem;
+        margin-block: 2rem;
+    }
+    @media (max-width: 54rem) {
+        .pg {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .pg-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 0.9rem;
+        padding: 1.25rem;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 12px;
+        background: var(--sl-color-bg-sidebar);
+    }
+
+    .pg-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        font-size: 0.82rem;
+    }
+    .pg-field label {
+        font-weight: 600;
+        color: var(--sl-color-text);
+    }
+    .pg-field input[type="text"],
+    .pg-field input[type="url"],
+    .pg-field select {
+        padding: 0.4rem 0.55rem;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 7px;
+        background: var(--sl-color-bg);
+        color: var(--sl-color-text);
+        font: inherit;
+    }
+    .pg-field input[type="color"] {
+        width: 100%;
+        height: 2rem;
+        padding: 0;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 7px;
+        background: transparent;
+        cursor: pointer;
+    }
+    .pg-field input[type="range"] {
+        width: 100%;
+        accent-color: var(--sl-color-accent);
+    }
+
+    .pg-colors {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+    }
+
+    .pg-preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+    .pg-preset {
+        padding: 0.25rem 0.7rem;
+        border: 1px solid var(--sl-color-hairline);
+        background: var(--sl-color-bg);
+        color: var(--sl-color-text);
+        border-radius: 999px;
+        font-size: 0.78rem;
+        cursor: pointer;
+        transition:
+            background 120ms ease,
+            border-color 120ms ease;
+    }
+    .pg-preset:hover {
+        background: var(--sl-color-accent-low);
+        border-color: var(--sl-color-accent);
+    }
+
+    .pg-share {
+        margin-top: 0.5rem;
+    }
+    .pg-share-btn {
+        width: 100%;
+        padding: 0.5rem 0.85rem;
+        border: 1px solid var(--sl-color-accent);
+        background: var(--sl-color-accent-low);
+        color: var(--sl-color-text);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 120ms ease;
+    }
+    .pg-share-btn:hover {
+        background: var(--sl-color-accent);
+        color: var(--sl-color-white);
+    }
+    .pg-share-btn.copied {
+        background: #16a34a;
+        border-color: #16a34a;
+        color: white;
+    }
+
+    .pg-preview {
+        min-height: 480px;
+    }
+    .pg-preview zulip-chat {
+        width: 100%;
+        min-height: 480px;
+        display: block;
+    }
+
+    .pg-snippet-title {
+        margin-block: 1.5rem 0.5rem;
+        font-size: 0.85rem;
+        color: var(--sl-color-text-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }
+
+    .pg-snippet-wrap {
+        position: relative;
+    }
+    .pg-snippet {
+        padding: 1.1rem 1.25rem;
+        background: var(--sl-color-bg-inline-code);
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 12px;
+        overflow: auto;
+        font-family: var(--sl-font-mono);
+        font-size: 0.82rem;
+        line-height: 1.55;
+        color: var(--sl-color-text);
+        margin: 0;
+    }
+    .pg-snippet code {
+        background: transparent;
+        padding: 0;
+        font-size: inherit;
+        white-space: pre;
+    }
+    .pg-copy-btn {
+        position: absolute;
+        top: 0.7rem;
+        right: 0.7rem;
+        padding: 0.25rem 0.75rem;
+        border: 1px solid var(--sl-color-hairline);
+        background: var(--sl-color-bg);
+        color: var(--sl-color-text);
+        border-radius: 6px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 120ms ease;
+    }
+    .pg-copy-btn:hover {
+        border-color: var(--sl-color-accent);
+        color: var(--sl-color-accent);
+    }
+    .pg-copy-btn.copied {
+        background: #16a34a;
+        border-color: #16a34a;
+        color: white;
+    }
+</style>
+
+<script>
+    // The playground runs fully client-side — the <zulip-chat> element was
+    // registered globally by the head script in astro.config.mjs, so we
+    // just drive its CSS variables + attributes from the controls.
+
+    interface Preset {
+        accent: string;
+        bg: string;
+        surface: string;
+        text: string;
+        theme: "light" | "dark";
+    }
+
+    const PRESETS: Record<string, Preset> = {
+        default: {
+            accent: "#6172f3",
+            bg: "#ffffff",
+            surface: "#f7f7f9",
+            text: "#111827",
+            theme: "light",
+        },
+        zulip: {
+            accent: "#2b59ff",
+            bg: "#ffffff",
+            surface: "#eef2ff",
+            text: "#0f172a",
+            theme: "light",
+        },
+        forest: {
+            accent: "#16a34a",
+            bg: "#f7fbf7",
+            surface: "#e8f5e9",
+            text: "#14532d",
+            theme: "light",
+        },
+        sunset: {
+            accent: "#f97316",
+            bg: "#fffaf5",
+            surface: "#fff2e4",
+            text: "#7c2d12",
+            theme: "light",
+        },
+        midnight: {
+            accent: "#818cf8",
+            bg: "#0f172a",
+            surface: "#1e293b",
+            text: "#f8fafc",
+            theme: "dark",
+        },
+    };
+
+    function $<T extends HTMLElement>(id: string): T {
+        const el = document.getElementById(id);
+        if (el === null) {
+            throw new Error(`Missing #${id}`);
+        }
+        return el as T;
+    }
+
+    const chat = $<HTMLElement>("pg-chat");
+    const brandName = $<HTMLInputElement>("pg-brand-name");
+    const brandLogo = $<HTMLInputElement>("pg-brand-logo");
+    const accent = $<HTMLInputElement>("pg-accent");
+    const bg = $<HTMLInputElement>("pg-bg");
+    const surface = $<HTMLInputElement>("pg-surface");
+    const text = $<HTMLInputElement>("pg-text");
+    const radius = $<HTMLInputElement>("pg-radius");
+    const radiusVal = $<HTMLElement>("pg-radius-val");
+    const height = $<HTMLInputElement>("pg-height");
+    const heightVal = $<HTMLElement>("pg-height-val");
+    const fontSize = $<HTMLInputElement>("pg-font-size");
+    const fontSizeVal = $<HTMLElement>("pg-font-size-val");
+    const fontFamily = $<HTMLSelectElement>("pg-font-family");
+    const theme = $<HTMLSelectElement>("pg-theme");
+    const snippetEl = $<HTMLElement>("pg-snippet");
+    const copyBtn = $<HTMLButtonElement>("pg-copy-btn");
+    const shareBtn = $<HTMLButtonElement>("pg-share-btn");
+
+    function escapeAttr(s: string): string {
+        return s
+            .replaceAll("&", "&amp;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("<", "&lt;");
+    }
+
+    interface State {
+        brandName: string;
+        brandLogo: string;
+        accent: string;
+        bg: string;
+        surface: string;
+        text: string;
+        radius: string;
+        height: string;
+        fontSize: string;
+        fontFamily: string;
+        theme: string;
+    }
+
+    function currentState(): State {
+        return {
+            brandName: brandName.value.trim(),
+            brandLogo: brandLogo.value.trim(),
+            accent: accent.value,
+            bg: bg.value,
+            surface: surface.value,
+            text: text.value,
+            radius: radius.value,
+            height: height.value,
+            fontSize: fontSize.value,
+            fontFamily: fontFamily.value,
+            theme: theme.value,
+        };
+    }
+
+    function apply(): void {
+        const s = currentState();
+        chat.style.setProperty("--zc-color-accent", s.accent);
+        chat.style.setProperty("--zc-color-bg", s.bg);
+        chat.style.setProperty("--zc-color-surface", s.surface);
+        chat.style.setProperty("--zc-color-text", s.text);
+        chat.style.setProperty("--zc-radius", `${s.radius}px`);
+        chat.style.setProperty("--zc-height", `${s.height}px`);
+        chat.style.setProperty("--zc-font-size", `${s.fontSize}px`);
+        chat.style.setProperty("--zc-font-family", s.fontFamily);
+        chat.setAttribute("theme", s.theme);
+
+        if (s.brandName === "") {
+            chat.removeAttribute("brand-name");
+        } else {
+            chat.setAttribute("brand-name", s.brandName);
+        }
+        if (s.brandLogo === "") {
+            chat.removeAttribute("brand-logo");
+        } else {
+            chat.setAttribute("brand-logo", s.brandLogo);
+        }
+
+        radiusVal.textContent = s.radius;
+        heightVal.textContent = s.height;
+        fontSizeVal.textContent = s.fontSize;
+
+        snippetEl.textContent = buildSnippet(s);
+        writeHash(s);
+    }
+
+    function buildSnippet(s: State): string {
+        const attrs = [
+            `theme="${escapeAttr(s.theme)}"`,
+            'channel="general"',
+            'topic="welcome"',
+        ];
+        if (s.brandName !== "") {
+            attrs.push(`brand-name="${escapeAttr(s.brandName)}"`);
+        }
+        if (s.brandLogo !== "") {
+            attrs.push(`brand-logo="${escapeAttr(s.brandLogo)}"`);
+        }
+        const styleLines = [
+            `    --zc-color-accent: ${s.accent};`,
+            `    --zc-color-bg: ${s.bg};`,
+            `    --zc-color-surface: ${s.surface};`,
+            `    --zc-color-text: ${s.text};`,
+            `    --zc-radius: ${s.radius}px;`,
+            `    --zc-height: ${s.height}px;`,
+            `    --zc-font-size: ${s.fontSize}px;`,
+            `    --zc-font-family: ${s.fontFamily};`,
+        ].join("\n");
+        return [
+            "<zulip-chat",
+            `  ${attrs.join("\n  ")}`,
+            '  server="https://chat.example.com"',
+            '  auth-token="<short-lived JWT from your backend>"',
+            '  style="',
+            styleLines,
+            '  "',
+            "></zulip-chat>",
+        ].join("\n");
+    }
+
+    // URL state — write the current settings as `#k=v&k=v` on every
+    // change so shared links reproduce the theme. The hash is kept short
+    // by omitting values that match the "default" preset.
+    function writeHash(s: State): void {
+        const params = new URLSearchParams();
+        const def = PRESETS["default"];
+        if (s.accent !== def.accent) params.set("a", s.accent);
+        if (s.bg !== def.bg) params.set("bg", s.bg);
+        if (s.surface !== def.surface) params.set("s", s.surface);
+        if (s.text !== def.text) params.set("t", s.text);
+        if (s.radius !== "12") params.set("r", s.radius);
+        if (s.height !== "560") params.set("h", s.height);
+        if (s.fontSize !== "14") params.set("fs", s.fontSize);
+        if (fontFamily.selectedIndex !== 0) {
+            params.set("ff", String(fontFamily.selectedIndex));
+        }
+        if (s.theme !== "light") params.set("th", s.theme);
+        if (s.brandName !== "Acme Support") params.set("bn", s.brandName);
+        if (
+            s.brandLogo !==
+            "https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+        ) {
+            params.set("bl", s.brandLogo);
+        }
+        const next = params.toString();
+        const target = next === "" ? " " : `#${next}`;
+        // Avoid triggering a navigation on every slider tick.
+        history.replaceState(
+            null,
+            "",
+            `${location.pathname}${location.search}${target}`,
+        );
+    }
+
+    function readHash(): void {
+        const raw = location.hash.replace(/^#/, "");
+        if (raw === "") return;
+        const p = new URLSearchParams(raw);
+        const set = (el: HTMLInputElement | HTMLSelectElement, k: string): void => {
+            const v = p.get(k);
+            if (v !== null) el.value = v;
+        };
+        set(accent, "a");
+        set(bg, "bg");
+        set(surface, "s");
+        set(text, "t");
+        set(radius, "r");
+        set(height, "h");
+        set(fontSize, "fs");
+        const ff = p.get("ff");
+        if (ff !== null) {
+            const idx = Number.parseInt(ff, 10);
+            if (!Number.isNaN(idx) && idx >= 0 && idx < fontFamily.options.length) {
+                fontFamily.selectedIndex = idx;
+            }
+        }
+        set(theme, "th");
+        set(brandName, "bn");
+        set(brandLogo, "bl");
+    }
+
+    const inputs: (HTMLInputElement | HTMLSelectElement)[] = [
+        brandName,
+        brandLogo,
+        accent,
+        bg,
+        surface,
+        text,
+        radius,
+        height,
+        fontSize,
+        fontFamily,
+        theme,
+    ];
+    for (const input of inputs) {
+        input.addEventListener("input", apply);
+        input.addEventListener("change", apply);
+    }
+
+    for (const btn of document.querySelectorAll<HTMLButtonElement>(".pg-preset")) {
+        btn.addEventListener("click", () => {
+            const key = btn.dataset["preset"] ?? "default";
+            const preset = PRESETS[key] ?? PRESETS["default"];
+            accent.value = preset.accent;
+            bg.value = preset.bg;
+            surface.value = preset.surface;
+            text.value = preset.text;
+            theme.value = preset.theme;
+            apply();
+        });
+    }
+
+    copyBtn.addEventListener("click", async () => {
+        const content = snippetEl.textContent ?? "";
+        await writeClipboard(content);
+        flashCopied(copyBtn, "Copied!");
+    });
+
+    shareBtn.addEventListener("click", async () => {
+        await writeClipboard(location.href);
+        flashCopied(shareBtn, "Link copied!");
+    });
+
+    async function writeClipboard(value: string): Promise<void> {
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            const ta = document.createElement("textarea");
+            ta.value = value;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                document.execCommand("copy");
+            } finally {
+                document.body.removeChild(ta);
+            }
+        }
+    }
+
+    function flashCopied(btn: HTMLButtonElement, label: string): void {
+        const original = btn.textContent ?? "Copy";
+        btn.textContent = label;
+        btn.classList.add("copied");
+        window.setTimeout(() => {
+            btn.textContent = original;
+            btn.classList.remove("copied");
+        }, 1600);
+    }
+
+    readHash();
+    apply();
+</script>

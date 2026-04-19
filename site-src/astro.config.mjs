@@ -7,6 +7,32 @@ import starlight from "@astrojs/starlight";
 // Pages (/<repo>/) and on custom domains (/ only).
 const base = process.env["SITE_BASE"] ?? "/";
 
+// Astro does NOT auto-prefix absolute-path links in markdown with the
+// configured `base`. That means `[auth](/guides/auth/)` in a `.md` file
+// emits `href="/guides/auth/"` on Pages, which lands at the Pages root
+// instead of the per-repo subpath. Walk the mdast and prefix `/foo/`
+// URLs with the base ourselves. `/http(s)`, `//cdn`, `#anchor`, and
+// `mailto:` / `tel:` links are left alone.
+const basePrefix = base.replace(/\/$/, "");
+function remarkPrefixInternalLinks() {
+    const shouldPrefix = (url) =>
+        typeof url === "string" &&
+        url.startsWith("/") &&
+        !url.startsWith("//") &&
+        !url.startsWith(basePrefix + "/");
+
+    const walk = (node) => {
+        if (node === null || node === undefined) return;
+        if (node.type === "link" && shouldPrefix(node.url)) {
+            node.url = basePrefix + node.url;
+        }
+        if (Array.isArray(node.children)) {
+            for (const child of node.children) walk(child);
+        }
+    };
+    return (tree) => walk(tree);
+}
+
 export default defineConfig({
     site: "https://amanagr.github.io",
     base,
@@ -14,6 +40,9 @@ export default defineConfig({
     // Emit straight to ../site so the existing Pages workflow's upload
     // step keeps pointing at the same directory.
     outDir: "../site",
+    markdown: {
+        remarkPlugins: [remarkPrefixInternalLinks],
+    },
     integrations: [
         starlight({
             title: "zulip-embed",
@@ -42,6 +71,7 @@ export default defineConfig({
             ],
             sidebar: [
                 {label: "Introduction", slug: "index"},
+                {label: "Playground", link: "/playground/"},
                 {
                     label: "Guides",
                     items: [

@@ -19,6 +19,9 @@ site-src/public/zulip-embed.js.map
 site-src/public/chunks
 site-src/public/entries
 
+# Claude Code agent sandboxes (transient worktrees, never committed)
+.claude/worktrees/
+
 # Dart / Flutter
 .dart_tool/
 .flutter-plugins

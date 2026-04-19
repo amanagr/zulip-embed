@@ -33,7 +33,14 @@ const DEFAULT_RECENTS = [
 ];
 
 export interface EmojiPickerHandle {
-    open(anchor: HTMLElement, onPick: (emojiName: string) => void): void;
+    // `onPick` receives both the short name (`tada`) and the rendered
+    // glyph (`🎉`). Callers that want to paste the glyph into a
+    // composer should use the second arg directly — looking the name up
+    // in a small local dict would miss most of the picker's dataset.
+    open(
+        anchor: HTMLElement,
+        onPick: (emojiName: string, glyph: string) => void,
+    ): void;
     close(): void;
     isOpen(): boolean;
     // Returns the picker element for positioning / test inspection.
@@ -78,7 +85,9 @@ export function createEmojiPicker(
     footer.textContent = " ";
     panel.append(footer);
 
-    let currentOnPick: ((emojiName: string) => void) | undefined;
+    let currentOnPick:
+        | ((emojiName: string, glyph: string) => void)
+        | undefined;
     // Section header <-> scroll target map so clicking a category tab
     // jumps to the right slice of the grid.
     const sectionTops = new Map<string, HTMLElement>();
@@ -169,7 +178,7 @@ export function createEmojiPicker(
             currentOnPick = undefined;
             bumpRecent(entry.name);
             close();
-            pick?.(entry.name);
+            pick?.(entry.name, entry.glyph);
         });
         return btn;
     }
@@ -232,7 +241,10 @@ export function createEmojiPicker(
         capture: true,
     });
 
-    function open(anchor: HTMLElement, onPick: (emojiName: string) => void): void {
+    function open(
+        anchor: HTMLElement,
+        onPick: (emojiName: string, glyph: string) => void,
+    ): void {
         currentOnPick = onPick;
         panel.hidden = false;
         searchInput.value = "";

@@ -62,6 +62,32 @@ describe("emoji picker", () => {
         expect(picker.isOpen()).toBe(false);
     });
 
+    test("onPick receives both the emoji name and its glyph", () => {
+        // Regression test: the composer path pastes the glyph verbatim
+        // into the textarea, so the picker must surface it directly —
+        // a name-only callback would force callers to keep a tiny
+        // local fallback dict and miss most of the dataset.
+        const {shadow, container} = makeHost();
+        const picker = createEmojiPicker(shadow, container);
+        const anchor = document.createElement("button");
+        container.append(anchor);
+
+        let pickedName: string | undefined;
+        let pickedGlyph: string | undefined;
+        picker.open(anchor, (name, glyph) => {
+            pickedName = name;
+            pickedGlyph = glyph;
+        });
+
+        const tada = picker
+            .element()
+            .querySelector<HTMLButtonElement>('[data-emoji-name="tada"]');
+        tada?.click();
+
+        expect(pickedName).toBe("tada");
+        expect(pickedGlyph).toBe("🎉");
+    });
+
     test("outside click closes the picker", () => {
         const {shadow, container} = makeHost();
         const picker = createEmojiPicker(shadow, container);

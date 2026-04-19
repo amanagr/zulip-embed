@@ -91,7 +91,7 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
       theme="light"
     ></zulip-chat>
     ```
-    [Full HTML / CDN guide →](/frameworks/html/)
+    <a href={`${import.meta.env.BASE_URL}frameworks/html/`}>Full HTML / CDN guide →</a>
   </TabItem>
   <TabItem label="React">
     ```tsx
@@ -109,7 +109,7 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
       );
     }
     ```
-    [Full React guide →](/frameworks/react/)
+    <a href={`${import.meta.env.BASE_URL}frameworks/react/`}>Full React guide →</a>
   </TabItem>
   <TabItem label="React Native">
     ```tsx
@@ -125,7 +125,7 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
       );
     }
     ```
-    [Full React Native guide →](/frameworks/react-native/)
+    <a href={`${import.meta.env.BASE_URL}frameworks/react-native/`}>Full React Native guide →</a>
   </TabItem>
   <TabItem label="Flutter">
     ```dart
@@ -137,7 +137,7 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
       scope: const ChannelScope(channel: 'support'),
     )
     ```
-    [Full Flutter guide →](/frameworks/flutter/)
+    <a href={`${import.meta.env.BASE_URL}frameworks/flutter/`}>Full Flutter guide →</a>
   </TabItem>
   <TabItem label="Headless">
     ```ts
@@ -151,7 +151,7 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
     await client.connect();
     client.subscribe((event) => render(event));
     ```
-    [Full headless guide →](/frameworks/headless/)
+    <a href={`${import.meta.env.BASE_URL}frameworks/headless/`}>Full headless guide →</a>
   </TabItem>
 </Tabs>
 
@@ -166,11 +166,11 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
   <Card title="Theme with CSS variables" icon="seti:css">
     Every color, radius, font, and size is a `--zc-*` custom property.
     Match your product's design system without writing a shadow-DOM
-    stylesheet. [Theming reference →](/reference/theming/)
+    stylesheet. <a href={`${import.meta.env.BASE_URL}reference/theming/`}>Theming reference →</a>
   </Card>
   <Card title="Agent-native" icon="seti:graphql">
     Streaming tokens, tool-call messages, and inline confirmation
-    widgets land with first-class UI. [Agents reference →](/reference/agents/)
+    widgets land with first-class UI. <a href={`${import.meta.env.BASE_URL}reference/agents/`}>Agents reference →</a>
   </Card>
   <Card title="Headless when you need it" icon="seti:typescript">
     Skip the widget and drive the transport directly — build a custom
@@ -199,9 +199,9 @@ import {Card, CardGrid, Tabs, TabItem, LinkCard} from "@astrojs/starlight/compon
 
 ## Further reading
 
-<LinkCard title="Quickstart" description="Five-minute setup from npm install to live chat." href="/guides/quickstart/" />
-<LinkCard title="Auth (JWT)" description="Short-lived JWT handoff and the /api/internal/jwt/fetch_api_key flow." href="/guides/auth/" />
-<LinkCard title="Custom events" description="Every CustomEvent, the detail shape, when it fires." href="/reference/events/" />
-<LinkCard title="Theming" description="Every --zc-* CSS custom property and theming attribute." href="/reference/theming/" />
-<LinkCard title="Agents & AI" description="startAgentReply, MessagePart, and confirmation widgets." href="/reference/agents/" />
-<LinkCard title="Troubleshooting" description="Error codes, CSP gotchas, common connectivity failures." href="/guides/troubleshooting/" />
+<LinkCard title="Quickstart" description="Five-minute setup from npm install to live chat." href={`${import.meta.env.BASE_URL}guides/quickstart/`} />
+<LinkCard title="Auth (JWT)" description="Short-lived JWT handoff and the /api/internal/jwt/fetch_api_key flow." href={`${import.meta.env.BASE_URL}guides/auth/`} />
+<LinkCard title="Custom events" description="Every CustomEvent, the detail shape, when it fires." href={`${import.meta.env.BASE_URL}reference/events/`} />
+<LinkCard title="Theming" description="Every --zc-* CSS custom property and theming attribute." href={`${import.meta.env.BASE_URL}reference/theming/`} />
+<LinkCard title="Agents & AI" description="startAgentReply, MessagePart, and confirmation widgets." href={`${import.meta.env.BASE_URL}reference/agents/`} />
+<LinkCard title="Troubleshooting" description="Error codes, CSP gotchas, common connectivity failures." href={`${import.meta.env.BASE_URL}guides/troubleshooting/`} />
