@@ -185,6 +185,67 @@
                 width: 100%;
                 height: 280px;
             }
+
+            .playground {
+                display: grid;
+                grid-template-columns: minmax(260px, 340px) 1fr;
+                gap: 24px;
+                background: var(--card-bg);
+                border: 1px solid var(--card-border);
+                border-radius: 16px;
+                padding: 20px;
+            }
+
+            @media (max-width: 860px) {
+                .playground {
+                    grid-template-columns: 1fr;
+                }
+            }
+
+            .playground-controls {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .playground-controls .field input[type="color"] {
+                padding: 0;
+                height: 32px;
+                width: 100%;
+                background: transparent;
+            }
+
+            .playground-controls .field input[type="range"] {
+                width: 100%;
+            }
+
+            .preset-row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .preset {
+                border: 1px solid var(--card-border);
+                background: #f9fafb;
+                border-radius: 999px;
+                padding: 4px 10px;
+                font-size: 12px;
+                cursor: pointer;
+            }
+
+            .preset:hover {
+                background: #eef2ff;
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+            .snippet-title {
+                margin: 20px 0 8px;
+                font-size: 14px;
+                color: var(--page-muted);
+                font-weight: 500;
+            }
         </style>
     </head>
     <body>
@@ -294,27 +355,148 @@
             </section>
 
             <section>
+                <h2>Theming playground</h2>
+                <p style="color: var(--page-muted); margin-top: 0">
+                    Every knob below is a plain CSS custom property or attribute. Tweak them live,
+                    then copy the snippet that appears underneath — paste it into your own page and
+                    the widget renders the same way without any JS glue.
+                </p>
+                <div class="playground">
+                    <div class="playground-controls">
+                        <div class="field">
+                            <label for="pg-brand-name">Brand name</label>
+                            <input
+                                id="pg-brand-name"
+                                type="text"
+                                value="Acme Support"
+                                maxlength="40"
+                            />
+                        </div>
+                        <div class="field">
+                            <label for="pg-brand-logo">Brand logo URL</label>
+                            <input
+                                id="pg-brand-logo"
+                                type="url"
+                                value="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+                            />
+                        </div>
+                        <div class="field">
+                            <label for="pg-accent">Accent color</label>
+                            <input id="pg-accent" type="color" value="#6172f3" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-bg">Background</label>
+                            <input id="pg-bg" type="color" value="#ffffff" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-surface">Surface</label>
+                            <input id="pg-surface" type="color" value="#f7f7f9" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-text">Text color</label>
+                            <input id="pg-text" type="color" value="#111827" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-radius">Corner radius (<span id="pg-radius-val">12</span>px)</label>
+                            <input id="pg-radius" type="range" min="0" max="28" step="1" value="12" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-height">Height (<span id="pg-height-val">560</span>px)</label>
+                            <input id="pg-height" type="range" min="360" max="760" step="10" value="560" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-font-size">Font size (<span id="pg-font-size-val">14</span>px)</label>
+                            <input id="pg-font-size" type="range" min="12" max="18" step="1" value="14" />
+                        </div>
+                        <div class="field">
+                            <label for="pg-font-family">Font family</label>
+                            <select id="pg-font-family">
+                                <option value="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+                                    System
+                                </option>
+                                <option value="'Inter', system-ui, sans-serif">Inter</option>
+                                <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                                <option value="ui-monospace, SFMono-Regular, Menlo, monospace">
+                                    Monospace
+                                </option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="pg-theme">Theme</label>
+                            <select id="pg-theme">
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                        </div>
+                        <div class="field presets">
+                            <label>Quick presets</label>
+                            <div class="preset-row">
+                                <button type="button" class="preset" data-preset="default">
+                                    Default
+                                </button>
+                                <button type="button" class="preset" data-preset="zulip">
+                                    Zulip blue
+                                </button>
+                                <button type="button" class="preset" data-preset="forest">
+                                    Forest
+                                </button>
+                                <button type="button" class="preset" data-preset="sunset">
+                                    Sunset
+                                </button>
+                                <button type="button" class="preset" data-preset="midnight">
+                                    Midnight
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="playground-preview">
+                        <div class="chat-slot">
+                            <zulip-chat
+                                id="pg-chat"
+                                demo
+                                channel="general"
+                                topic="welcome"
+                                theme="light"
+                                mode="inline"
+                                brand-name="Acme Support"
+                                brand-logo="https://zulip.com/static/images/logo/zulip-icon-128x128.png"
+                            ></zulip-chat>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="snippet-title">Copy this into your page</h3>
+                <pre><code id="pg-snippet"></code></pre>
+            </section>
+
+            <section>
                 <h2>Channel &amp; topic pickers</h2>
                 <p style="color: var(--page-muted); margin-top: 0">
-                    Standalone list components you can compose into your own navigation. Each fires
-                    a <code>channel-selected</code> / <code>topic-selected</code>
-                    CustomEvent on click.
+                    Standalone list components you can compose into your own navigation, fed by the
+                    same chat.zulip.org snapshot the announce feed uses — every row below is a real
+                    subscribed channel or live topic. Each fires a
+                    <code>channel-selected</code> / <code>topic-selected</code> CustomEvent on
+                    click.
                 </p>
                 <div class="grid">
                     <div class="panel">
                         <h3>&lt;zulip-channel-list&gt;</h3>
                         <p>Subscribed channels with color dot, pin, mute, and unread badge.</p>
                         <div class="chat-slot">
-                            <zulip-channel-list demo theme="light"></zulip-channel-list>
+                            <zulip-channel-list
+                                snapshot-url="./snapshots/chat-zulip-channels.json"
+                                theme="light"
+                            ></zulip-channel-list>
                         </div>
                     </div>
                     <div class="panel">
-                        <h3>&lt;zulip-topic-list channel="general"&gt;</h3>
+                        <h3>&lt;zulip-topic-list channel="announce"&gt;</h3>
                         <p>Topics inside a channel, newest-first, with resolved markers.</p>
                         <div class="chat-slot">
                             <zulip-topic-list
-                                demo
-                                channel="general"
+                                snapshot-url="./snapshots/chat-zulip-channels.json"
+                                channel="announce"
                                 theme="light"
                             ></zulip-topic-list>
                         </div>

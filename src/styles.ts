@@ -188,6 +188,25 @@ button {
     margin-right: 2px;
 }
 
+/* Suppress the "#" glyph when the host passes brand-name — the header
+ * is now labeling the product, not a channel. */
+.header-channel[data-brand-name]::before {
+    content: "";
+    margin-right: 0;
+}
+
+.header-brand-logo {
+    width: var(--zc-brand-logo-size, 24px);
+    height: var(--zc-brand-logo-size, 24px);
+    border-radius: var(--zc-brand-logo-radius, 6px);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.header-brand-logo[hidden] {
+    display: none;
+}
+
 .header-topic {
     font-size: 12px;
     color: var(--zc-color-muted);

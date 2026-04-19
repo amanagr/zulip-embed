@@ -30,6 +30,8 @@ const OBSERVED_ATTRIBUTES = [
     "open",
     "read-only",
     "katex-css",
+    "brand-logo",
+    "brand-name",
 ] as const;
 
 const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
@@ -101,6 +103,7 @@ export class ZulipChatElement extends HTMLElement {
     private composerSendEl: HTMLButtonElement | undefined;
     private headerChannelEl: HTMLElement | undefined;
     private headerTopicEl: HTMLElement | undefined;
+    private headerBrandLogoEl: HTMLImageElement | undefined;
     private statusDotEl: HTMLElement | undefined;
     private errorBannerEl: HTMLElement | undefined;
     private typingIndicatorEl: HTMLElement | undefined;
@@ -135,8 +138,14 @@ export class ZulipChatElement extends HTMLElement {
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
         if (!this.attachedToDom || oldValue === newValue) return;
-        if (!REINIT_ATTRIBUTES.has(name)) return;
-        void this.bootstrapClient();
+        if (REINIT_ATTRIBUTES.has(name)) {
+            void this.bootstrapClient();
+            return;
+        }
+        // Presentation-only attributes (brand-logo, brand-name, theme,
+        // read-only, etc.) shouldn't tear down the connection, but they
+        // do need a DOM refresh so the header picks up the new value.
+        this.applyStateToDom();
     }
 
     open(): void {
@@ -204,6 +213,15 @@ export class ZulipChatElement extends HTMLElement {
         dot.setAttribute("role", "status");
         this.statusDotEl = dot;
         header.append(dot);
+
+        const logo = document.createElement("img");
+        logo.className = "header-brand-logo";
+        logo.alt = "";
+        logo.hidden = true;
+        logo.decoding = "async";
+        logo.loading = "lazy";
+        this.headerBrandLogoEl = logo;
+        header.append(logo);
 
         const textWrap = document.createElement("div");
         textWrap.className = "header-text";
@@ -880,13 +898,40 @@ export class ZulipChatElement extends HTMLElement {
     private applyStateToDom(): void {
         if (!this.attachedToDom) return;
         const scope = this.readScope();
+        const brandName = this.getAttribute("brand-name");
+        const brandLogo = this.getAttribute("brand-logo");
 
         if (this.headerChannelEl) {
-            this.headerChannelEl.textContent = scope.channel;
+            // brand-name overrides the channel label so adopters can bill
+            // the widget as "Acme Support" instead of "#general". The
+            // leading "#" glyph comes from the ::before pseudo, which we
+            // suppress via data-brand-name when a brand name is set.
+            if (brandName !== null && brandName !== "") {
+                this.headerChannelEl.textContent = brandName;
+                this.headerChannelEl.dataset["brandName"] = "1";
+            } else {
+                this.headerChannelEl.textContent = scope.channel;
+                delete this.headerChannelEl.dataset["brandName"];
+            }
         }
         if (this.headerTopicEl) {
             this.headerTopicEl.textContent = scope.topic ?? "";
             this.headerTopicEl.hidden = scope.topic === undefined;
+        }
+        if (this.headerBrandLogoEl) {
+            // Only set src when we've validated the URL; an invalid value
+            // hides the <img> rather than letting the browser try to load
+            // an attacker-controlled data:/javascript: URI.
+            const safeLogo = brandLogo === null ? "" : sanitizeBrandLogoUrl(brandLogo);
+            if (safeLogo === "") {
+                this.headerBrandLogoEl.removeAttribute("src");
+                this.headerBrandLogoEl.hidden = true;
+            } else {
+                if (this.headerBrandLogoEl.getAttribute("src") !== safeLogo) {
+                    this.headerBrandLogoEl.src = safeLogo;
+                }
+                this.headerBrandLogoEl.hidden = false;
+            }
         }
         if (this.statusDotEl) {
             this.statusDotEl.dataset["status"] = this.state.status;
@@ -993,6 +1038,26 @@ function stripHtmlToText(html: string): string {
 }
 
 // Build the "Alice is typing" / "Alice and Bob are typing" / "Several
+// Accept brand-logo only when it's a safe absolute http(s) URL or a
+// relative path the browser will resolve against the page. Same threat
+// model as validateSnapshotUrl: data:/javascript:/file: URIs would
+// otherwise become an injection vector the embed host rarely scrutinizes.
+function sanitizeBrandLogoUrl(raw: string): string {
+    const trimmed = raw.trim();
+    if (trimmed === "") return "";
+    if (trimmed.startsWith("//")) return "";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+            return parsed.toString();
+        }
+    } catch {
+        return "";
+    }
+    return "";
+}
+
 // people are typing" label shown above the composer. Returns undefined
 // when no one else is typing so the caller can hide the row entirely.
 function formatTypingLabel(users: TypingUser[]): string | undefined {
