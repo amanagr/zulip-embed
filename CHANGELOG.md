@@ -4,6 +4,55 @@ All notable changes to `zulip-embed` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the
 project adheres to semantic versioning.
 
+## 0.9.0 — 2026-04-19
+
+Sprint 5 release. Unblocks the remaining 1.0-track surface on the agent
+side: `startAgentReply` now accepts `DmScope` (both 1:1 and group), so
+agent streaming works against DM conversations with identical
+local-echo, broadcast-cap, and abort semantics as channel scopes.
+
+### Added
+
+- **DM-aware agent-reply streaming.** `ZulipClient.startAgentReply` and
+  the underlying `createAgentReplyHandle` now accept a DM `ScopeFilter`
+  alongside channel scopes. The provisional send routes to
+  `type: "direct"` on the wire with the canonicalized recipient id list
+  (viewer filtered out for group DMs, kept for self-DMs), and the
+  streamed-edit loop, 4 Hz broadcast cap, and abort sentinel
+  (`AGENT_REPLY_ABORT_TOOL_ID`) all behave identically to the channel
+  path. The provisional local-echo `message` event is emitted as a
+  `DirectMessage` so the client's DM narrow accepts it into state.
+- **Test coverage** — five new cases in `tests/agent-reply.test.ts`
+  exercise the DM path: 1:1 routing, group routing (three-participant
+  DM), streamed-token broadcast debouncing, abort semantics, and the
+  provisional `message` event round-tripping through the client's
+  in-scope predicate.
+
+### Changed
+
+- **`startAgentReply` no longer rejects DM scopes.** The 0.8.0-era
+  guard that returned a no-op handle with a "DM scopes not supported"
+  rejection is gone. Callers that passed a DM scope and caught the
+  rejection should remove that code path — the handle now resolves
+  normally.
+
+### Fixed
+
+- No user-visible bug fixes since `0.8.0`.
+
+### Dependencies
+
+- No dependency changes.
+
+### Package versions
+
+- `zulip-embed` → `0.9.0`
+- `zulip-embed-react` → `0.9.0`
+- `zulip-embed-react-native` → `0.9.0-alpha`
+- `zulip_embed` (Flutter) → `0.9.0` (no source changes — the Flutter
+  client does not expose `startAgentReply`, so parity is a no-op for
+  this release)
+
 ## 0.8.0 — 2026-04-19
 
 Sprint 4/5 release. Ships the DM surface (`<zulip-dm-list>` +
