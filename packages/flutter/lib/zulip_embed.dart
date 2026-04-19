@@ -16,7 +16,7 @@ library;
 
 export 'src/client.dart';
 export 'src/demo_transport.dart';
-export 'src/format.dart' show avatarColor, formatTime, initialsFor;
+export 'src/format.dart' show AvatarColor, avatarColor, avatarGradient, formatTime, initialsFor;
 export 'src/snapshot_transport.dart';
 export 'src/theme.dart';
 export 'src/transport.dart';

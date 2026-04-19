@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 
+class AvatarColor {
+  const AvatarColor({required this.start, required this.end});
+
+  final Color start;
+  final Color end;
+
+  Color get solid => start;
+
+  LinearGradient get gradient => LinearGradient(
+        colors: [start, end],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
+}
+
 String formatTime(DateTime timestamp, {DateTime? now}) {
   final reference = now ?? DateTime.now();
   final sameDay = reference.year == timestamp.year &&
@@ -23,22 +38,29 @@ String initialsFor(String name) {
       .toUpperCase();
 }
 
-const List<Color> _avatarPalette = [
-  Color(0xFFEF4444),
-  Color(0xFFF97316),
-  Color(0xFFEAB308),
-  Color(0xFF22C55E),
-  Color(0xFF14B8A6),
-  Color(0xFF3B82F6),
-  Color(0xFF8B5CF6),
-  Color(0xFFEC4899),
-];
+const int _avatarHueCount = 12;
+const double _avatarHueStep = 360 / _avatarHueCount;
+const double _avatarHueOffset = 40;
+const double _avatarSaturation = 0.68;
+const double _avatarLightnessStart = 0.55;
+const double _avatarLightnessEnd = 0.42;
 
-Color avatarColor(String name) {
-  if (name.isEmpty) return _avatarPalette.first;
+int _hashName(String name) {
+  if (name.isEmpty) return 0;
   var hash = 0;
   for (final c in name.codeUnits) {
     hash = (hash * 31 + c) & 0x7FFFFFFF;
   }
-  return _avatarPalette[hash % _avatarPalette.length];
+  return hash;
 }
+
+AvatarColor avatarGradient(String name) {
+  final bucket = _hashName(name) % _avatarHueCount;
+  final h1 = (bucket * _avatarHueStep) % 360;
+  final h2 = (h1 + _avatarHueOffset) % 360;
+  final start = HSLColor.fromAHSL(1, h1, _avatarSaturation, _avatarLightnessStart).toColor();
+  final end = HSLColor.fromAHSL(1, h2, _avatarSaturation, _avatarLightnessEnd).toColor();
+  return AvatarColor(start: start, end: end);
+}
+
+Color avatarColor(String name) => avatarGradient(name).solid;
