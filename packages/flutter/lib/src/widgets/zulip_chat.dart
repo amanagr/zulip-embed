@@ -1,0 +1,297 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../client.dart';
+import '../theme.dart';
+import '../transport.dart';
+import '../types.dart';
+import 'composer.dart';
+import 'message_list.dart';
+
+/// Top-level Flutter widget that renders a Zulip conversation.
+///
+/// The widget owns its own [ZulipClient] and subscribes to the provided
+/// [Transport]. It handles connection lifecycle, message fetching,
+/// incremental event updates, and sending new messages.
+///
+/// The provided [Transport] is **not** closed when the widget disposes —
+/// callers that pass a shared transport are responsible for its lifetime.
+class ZulipChat extends StatefulWidget {
+  const ZulipChat({
+    super.key,
+    required this.transport,
+    required this.channel,
+    this.topic,
+    this.theme = ZulipTheme.light,
+    this.title,
+    this.onError,
+  });
+
+  final Transport transport;
+  final String channel;
+  final String? topic;
+  final ZulipTheme theme;
+  final String? title;
+  final void Function(String message)? onError;
+
+  @override
+  State<ZulipChat> createState() => _ZulipChatState();
+}
+
+class _ZulipChatState extends State<ZulipChat> {
+  late ZulipClient _client;
+  StreamSubscription<ZulipEvent>? _sub;
+  final List<Message> _messages = [];
+  ConnectionStatus _status = ConnectionStatus.disconnected;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrap();
+  }
+
+  @override
+  void didUpdateWidget(covariant ZulipChat oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final scopeChanged = oldWidget.channel != widget.channel ||
+        oldWidget.topic != widget.topic ||
+        oldWidget.transport != widget.transport;
+    if (scopeChanged) {
+      _teardown().then((_) {
+        if (mounted) _bootstrap();
+      });
+    }
+  }
+
+  Future<void> _bootstrap() async {
+    _client = ZulipClient(widget.transport);
+    _sub = _client.events.listen(_onEvent);
+    if (mounted) {
+      setState(() {
+        _messages.clear();
+        _status = ConnectionStatus.connecting;
+        _error = null;
+      });
+    }
+    try {
+      await _client.connect(
+        ScopeFilter(channel: widget.channel, topic: widget.topic),
+      );
+      final history = await _client.fetchMessages();
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(history);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      setState(() => _error = msg);
+      widget.onError?.call(msg);
+    }
+  }
+
+  Future<void> _teardown() async {
+    await _sub?.cancel();
+    _sub = null;
+    await _client.dispose();
+  }
+
+  void _onEvent(ZulipEvent event) {
+    if (!mounted) return;
+    switch (event) {
+      case ConnectionEvent(:final status):
+        setState(() => _status = status);
+      case MessageEvent(:final message):
+        setState(() {
+          if (_messages.every((m) => m.id != message.id)) {
+            _messages.add(message);
+          }
+        });
+      case ErrorEvent(:final message):
+        setState(() => _error = message);
+        widget.onError?.call(message);
+    }
+  }
+
+  Future<void> _onSend(String text) async {
+    try {
+      await _client.sendMessage(text);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString();
+      setState(() => _error = msg);
+      widget.onError?.call(msg);
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_teardown());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    final subtitle = widget.topic;
+    return Material(
+      color: t.background,
+      child: Column(
+        children: [
+          _ChatHeader(
+            theme: t,
+            title: widget.title ?? '#${widget.channel}',
+            subtitle: subtitle,
+            status: _status,
+          ),
+          if (_error != null)
+            _ErrorBanner(
+              theme: t,
+              message: _error!,
+              onDismiss: () => setState(() => _error = null),
+            ),
+          Expanded(
+            child: MessageList(
+              messages: _messages,
+              theme: t,
+              currentUserId: _client.currentUserId,
+              isLoading: _status == ConnectionStatus.connecting &&
+                  _messages.isEmpty,
+            ),
+          ),
+          Composer(
+            theme: t,
+            onSend: _onSend,
+            enabled: _status == ConnectionStatus.connected,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChatHeader extends StatelessWidget {
+  const _ChatHeader({
+    required this.theme,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+  });
+
+  final ZulipTheme theme;
+  final String title;
+  final String? subtitle;
+  final ConnectionStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.surface,
+        border: Border(bottom: BorderSide(color: theme.border)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: theme.text,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                if (subtitle != null && subtitle!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      subtitle!,
+                      style: TextStyle(color: theme.muted, fontSize: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          _ConnectionDot(theme: theme, status: status),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectionDot extends StatelessWidget {
+  const _ConnectionDot({required this.theme, required this.status});
+
+  final ZulipTheme theme;
+  final ConnectionStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label) = switch (status) {
+      ConnectionStatus.connected => (const Color(0xFF22C55E), 'Connected'),
+      ConnectionStatus.connecting => (const Color(0xFFF59E0B), 'Connecting…'),
+      ConnectionStatus.error => (const Color(0xFFEF4444), 'Error'),
+      ConnectionStatus.disconnected => (theme.muted, 'Offline'),
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(color: theme.muted, fontSize: 11)),
+      ],
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({
+    required this.theme,
+    required this.message,
+    required this.onDismiss,
+  });
+
+  final ZulipTheme theme;
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFFEE2E2),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFF991B1B), size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Color(0xFF991B1B), fontSize: 12),
+            ),
+          ),
+          IconButton(
+            iconSize: 16,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close, color: Color(0xFF991B1B)),
+          ),
+        ],
+      ),
+    );
+  }
+}

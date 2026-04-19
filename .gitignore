@@ -7,3 +7,11 @@ coverage
 *.log
 .env
 .env.local
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+packages/flutter/pubspec.lock
+packages/flutter/**/build/
+packages/flutter/**/.idea/

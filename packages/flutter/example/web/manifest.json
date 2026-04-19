@@ -1,0 +1,12 @@
+{
+    "name": "Zulip Embed — Flutter demo",
+    "short_name": "Zulip Embed",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#F8FAFC",
+    "theme_color": "#6172F3",
+    "description": "Interactive demo of the zulip_embed Flutter package.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": []
+}
