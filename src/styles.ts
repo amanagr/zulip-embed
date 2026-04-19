@@ -875,6 +875,37 @@ button {
     background: var(--zc-color-bg);
 }
 
+.typing-indicator {
+    font-size: 11px;
+    color: var(--zc-color-muted);
+    min-height: 14px;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.typing-indicator[hidden] {
+    display: none;
+}
+
+.typing-indicator::after {
+    content: "…";
+    animation: zc-typing-blink 1.2s steps(3, end) infinite;
+}
+
+@keyframes zc-typing-blink {
+    0%, 20% { opacity: 0.2; }
+    50% { opacity: 1; }
+    100% { opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .typing-indicator::after {
+        animation: none;
+    }
+}
+
 :host([read-only]) .composer,
 :host([snapshot-url]) .composer {
     display: none;

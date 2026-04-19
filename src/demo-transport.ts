@@ -4,6 +4,7 @@ import type {
     GetMessagesResult,
     ReactionParams,
     Transport,
+    TypingOp,
 } from "./transport.ts";
 import type {
     Message,
@@ -30,6 +31,7 @@ export class DemoTransport implements Transport {
     private onEvent: ZulipEventListener | undefined;
     private pendingReplies = new Set<ReturnType<typeof setTimeout>>();
     private closed = false;
+    private fakeTypingHandle: ReturnType<typeof setTimeout> | undefined;
 
     constructor(options: DemoTransportOptions) {
         this.scope = options.scope;
@@ -153,6 +155,38 @@ export class DemoTransport implements Transport {
 
     async removeReaction(params: ReactionParams): Promise<void> {
         this.toggleReaction(params, "remove");
+        return Promise.resolve();
+    }
+
+    async sendTyping(op: TypingOp, _scope: ScopeFilter): Promise<void> {
+        // Demo parity: when the local viewer starts typing, simulate a
+        // teammate typing back after a short delay so consumers can see
+        // the indicator in action. Stop signals clear the faux user.
+        if (this.closed) return Promise.resolve();
+        if (this.readOnly) return Promise.resolve();
+        if (op === "start") {
+            // Schedule a fake "Zulip Bot is typing…" event with a small
+            // debounce so rapid start/stop doesn't flicker.
+            if (this.fakeTypingHandle === undefined) {
+                const handle = setTimeout(() => {
+                    this.fakeTypingHandle = undefined;
+                    if (this.closed) return;
+                    this.onEvent?.({
+                        type: "typing",
+                        users: [{userId: 14, fullName: "Zulip Bot"}],
+                    });
+                }, 400);
+                this.fakeTypingHandle = handle;
+                this.pendingReplies.add(handle);
+            }
+        } else {
+            if (this.fakeTypingHandle !== undefined) {
+                clearTimeout(this.fakeTypingHandle);
+                this.pendingReplies.delete(this.fakeTypingHandle);
+                this.fakeTypingHandle = undefined;
+            }
+            this.onEvent?.({type: "typing", users: []});
+        }
         return Promise.resolve();
     }
 

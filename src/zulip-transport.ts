@@ -5,12 +5,14 @@ import type {
     GetMessagesResult,
     ReactionParams,
     Transport,
+    TypingOp,
 } from "./transport.ts";
 import type {
     Message,
     Reaction,
     ScopeFilter,
     SendMessageParams,
+    TypingUser,
     ZulipEventListener,
 } from "./types.ts";
 
@@ -92,6 +94,19 @@ const reactionEventSchema = z.object({
     user_id: z.number(),
 });
 
+// Typing events on /register include the sender's user_id + full name
+// (plus recipients for DMs, which we ignore — we only report typing to
+// the active scope). We're lenient about op since servers may emit
+// op="start" or op="stop"; scope filtering happens upstream via narrow.
+const typingEventSchema = z.object({
+    op: z.enum(["start", "stop"]),
+    sender: z.object({
+        user_id: z.number(),
+        email: z.string().optional(),
+        full_name: z.string().optional(),
+    }),
+});
+
 const messagesResponseSchema = z.object({
     messages: z.array(messageSchema),
     // found_oldest is true when the server has nothing older than the
@@ -118,6 +133,16 @@ export class ZulipTransport implements Transport {
     // add/remove, but UI subscribers want the full bucketed list. We keep a
     // map here so we can emit that list on every op.
     private readonly reactionState = new Map<number, Map<string, Set<number>>>();
+    // Users currently typing in the active scope. Keyed by user_id so a
+    // second start from the same user replaces the first (and their
+    // timeout also refreshes).
+    private readonly typingUsers = new Map<number, TypingUser>();
+    // stream_id cache for the active channel. Populated lazily on the
+    // first sendTyping() call and invalidated on scope change. Typing in
+    // channels requires stream_id; older servers that only support DM
+    // typing will 400 on channel typing and we swallow the error.
+    private channelIdCache: number | undefined;
+    private channelIdCacheFor: string | undefined;
 
     constructor(options: ZulipTransportOptions) {
         this.serverUrl = validateServerUrl(options.serverUrl);
@@ -232,8 +257,51 @@ export class ZulipTransport implements Transport {
         sendMessageResponseSchema.parse(response);
     }
 
+    async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
+        // Channel typing requires the numeric stream_id, not the name.
+        // Cache per channel: the caller's scope is stable across a
+        // session, so we only resolve the id on the first typing ping.
+        const streamId = await this.resolveChannelId(scope.channel);
+        if (streamId === undefined) return;
+        const body: Record<string, string> = {
+            op,
+            // Wire value is the legacy "stream"; Zulip's typing endpoint
+            // accepts both "stream" and "channel" on current servers but
+            // "stream" works everywhere — matches the same rationale as
+            // sendMessage() above.
+            type: "stream",
+            stream_id: String(streamId),
+            topic: scope.topic ?? "",
+        };
+        try {
+            await this.request("POST", "/api/v1/typing", body);
+        } catch {
+            // Older servers without channel typing return 400 here. The
+            // composer fires these rapidly, so swallow the error rather
+            // than spam the error banner — typing is a best-effort hint.
+        }
+    }
+
     getCurrentUserId(): number | undefined {
         return this.currentUserId;
+    }
+
+    private async resolveChannelId(channel: string): Promise<number | undefined> {
+        if (this.channelIdCacheFor === channel && this.channelIdCache !== undefined) {
+            return this.channelIdCache;
+        }
+        try {
+            const response = await this.request("GET", "/api/v1/get_stream_id", {
+                stream: channel,
+            });
+            const parsed = z.object({stream_id: z.number()}).safeParse(response);
+            if (!parsed.success) return undefined;
+            this.channelIdCache = parsed.data.stream_id;
+            this.channelIdCacheFor = channel;
+            return parsed.data.stream_id;
+        } catch {
+            return undefined;
+        }
     }
 
     private async register(): Promise<z.infer<typeof registerResponseSchema>> {
@@ -243,6 +311,7 @@ export class ZulipTransport implements Transport {
                 "update_message",
                 "delete_message",
                 "reaction",
+                "typing",
             ]),
             narrow: JSON.stringify(buildNarrow(this.scope)),
             apply_markdown: "true",
@@ -307,6 +376,21 @@ export class ZulipTransport implements Transport {
                 messageId: parsed.data.message_id,
                 reactions,
             });
+        } else if (event.type === "typing") {
+            const parsed = typingEventSchema.safeParse(event);
+            if (!parsed.success) return;
+            // Skip notifications about ourselves — the server still
+            // broadcasts them to the originating client.
+            if (parsed.data.sender.user_id === this.currentUserId) return;
+            if (parsed.data.op === "start") {
+                this.typingUsers.set(parsed.data.sender.user_id, {
+                    userId: parsed.data.sender.user_id,
+                    fullName: parsed.data.sender.full_name ?? "Someone",
+                });
+            } else {
+                this.typingUsers.delete(parsed.data.sender.user_id);
+            }
+            this.onEvent?.({type: "typing", users: [...this.typingUsers.values()]});
         }
     }
 

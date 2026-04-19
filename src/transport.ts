@@ -19,6 +19,8 @@ export interface GetMessagesResult {
     hasMore: boolean;
 }
 
+export type TypingOp = "start" | "stop";
+
 export interface Transport {
     connect(onEvent: ZulipEventListener): Promise<void>;
     close(): Promise<void>;
@@ -26,5 +28,10 @@ export interface Transport {
     sendMessage(params: SendMessageParams): Promise<void>;
     addReaction(params: ReactionParams): Promise<void>;
     removeReaction(params: ReactionParams): Promise<void>;
+    // Fire a typing notification for the current scope. Errors are the
+    // caller's problem — transports that don't support typing (e.g.
+    // snapshot) should still implement the method as a no-op so the
+    // composer's debounced emitter doesn't need to feature-detect.
+    sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void>;
     getCurrentUserId(): number | undefined;
 }

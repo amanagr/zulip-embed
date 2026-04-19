@@ -3,6 +3,7 @@ import type {
     GetMessagesResult,
     ReactionParams,
     Transport,
+    TypingOp,
 } from "./transport.ts";
 import type {
     ScopeFilter,
@@ -50,6 +51,10 @@ export class ZulipClient {
 
     async removeReaction(params: ReactionParams): Promise<void> {
         await this.transport.removeReaction(params);
+    }
+
+    async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
+        await this.transport.sendTyping(op, scope);
     }
 
     getCurrentUserId(): number | undefined {

@@ -7,7 +7,13 @@ import {SnapshotTransport} from "./snapshot-transport.ts";
 import {enhanceSpoilers} from "./spoilers.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
 import type {Transport} from "./transport.ts";
-import type {ConnectionStatus, Message, Reaction, ScopeFilter} from "./types.ts";
+import type {
+    ConnectionStatus,
+    Message,
+    Reaction,
+    ScopeFilter,
+    TypingUser,
+} from "./types.ts";
 import {ZulipTransport} from "./zulip-transport.ts";
 
 const OBSERVED_ATTRIBUTES = [
@@ -54,7 +60,16 @@ interface ComponentState {
     unreadAnchorId: number | undefined;
     // Count of messages at or below the unread anchor — shown on the pill.
     unreadCount: number;
+    // Users currently typing in this scope. Transport-reported; empty
+    // when no one is typing.
+    typingUsers: TypingUser[];
 }
+
+// Interval (ms) between "start" pings while the user is actively
+// keystroking. Zulip expects a refresh every ~10s; 8s gives headroom.
+const TYPING_REFRESH_MS = 8000;
+// After the user stops keystroking for this long, emit op=stop.
+const TYPING_IDLE_MS = 5000;
 
 export class ZulipChatElement extends HTMLElement {
     static readonly observedAttributes = OBSERVED_ATTRIBUTES;
@@ -71,6 +86,7 @@ export class ZulipChatElement extends HTMLElement {
         loadingOlder: false,
         unreadAnchorId: undefined,
         unreadCount: 0,
+        typingUsers: [],
     };
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
@@ -82,7 +98,16 @@ export class ZulipChatElement extends HTMLElement {
     private headerTopicEl: HTMLElement | undefined;
     private statusDotEl: HTMLElement | undefined;
     private errorBannerEl: HTMLElement | undefined;
+    private typingIndicatorEl: HTMLElement | undefined;
     private attachedToDom = false;
+    // Typing-send bookkeeping. `typingActive` tracks whether the most
+    // recent ping we sent was a "start" (so we know to send "stop" on
+    // idle or on send). The refresh timer re-sends "start" every
+    // TYPING_REFRESH_MS; the idle timer fires "stop" after
+    // TYPING_IDLE_MS of no keystrokes.
+    private typingActive = false;
+    private typingIdleTimer: ReturnType<typeof setTimeout> | undefined;
+    private typingRefreshTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor() {
         super();
@@ -320,6 +345,15 @@ export class ZulipChatElement extends HTMLElement {
         const composer = document.createElement("div");
         composer.className = "composer";
 
+        // Typing indicator sits above the input row so it doesn't shift
+        // the composer layout as users come and go.
+        const typing = document.createElement("div");
+        typing.className = "typing-indicator";
+        typing.setAttribute("aria-live", "polite");
+        typing.hidden = true;
+        this.typingIndicatorEl = typing;
+        composer.append(typing);
+
         const row = document.createElement("div");
         row.className = "composer-row";
 
@@ -331,6 +365,7 @@ export class ZulipChatElement extends HTMLElement {
         input.addEventListener("input", () => {
             this.autosize(input);
             this.refreshSendButton();
+            this.onComposerKeystroke();
         });
         input.addEventListener("keydown", (event) => {
             if (event.key === "Enter" && !event.shiftKey) {
@@ -392,6 +427,7 @@ export class ZulipChatElement extends HTMLElement {
 
         const token = ++this.initToken;
         const scope = this.readScope();
+        this.stopTyping({silent: true});
         this.setState({
             messages: [],
             status: "connecting",
@@ -401,6 +437,7 @@ export class ZulipChatElement extends HTMLElement {
             loadingOlder: false,
             unreadAnchorId: undefined,
             unreadCount: 0,
+            typingUsers: [],
         });
 
         let transport: Transport;
@@ -428,6 +465,14 @@ export class ZulipChatElement extends HTMLElement {
                 this.deleteMessage(event.messageId);
             } else if (event.type === "reaction") {
                 this.updateReactions(event.messageId, event.reactions);
+            } else if (event.type === "typing") {
+                // Never show the local viewer in their own indicator.
+                const selfId = this.client?.getCurrentUserId();
+                const others =
+                    selfId === undefined
+                        ? event.users
+                        : event.users.filter((u) => u.userId !== selfId);
+                this.setState({typingUsers: others});
             } else if (event.type === "connection") {
                 this.setState({status: event.status});
             } else if (event.type === "error") {
@@ -459,6 +504,9 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private async teardownClient(): Promise<void> {
+        // Fire a best-effort "stop" before disconnecting so the server
+        // doesn't keep showing this viewer as typing to teammates.
+        this.stopTyping();
         this.unsubscribe?.();
         this.unsubscribe = undefined;
         const client = this.client;
@@ -632,6 +680,10 @@ export class ZulipChatElement extends HTMLElement {
         this.composerInputEl.value = "";
         this.autosize(this.composerInputEl);
         this.refreshSendButton();
+        // Sending implicitly ends the typing session — tell the server
+        // before the message so teammates don't see a lingering "is
+        // typing" after the message lands.
+        this.stopTyping();
 
         try {
             await this.client.sendMessage({
@@ -643,6 +695,64 @@ export class ZulipChatElement extends HTMLElement {
         } catch (error) {
             this.setState({error: describeError(error)});
         }
+    }
+
+    // Called on every composer keystroke. Sends a "start" typing ping
+    // the first time (and refreshes every TYPING_REFRESH_MS while the
+    // user keeps typing), and schedules a "stop" after TYPING_IDLE_MS
+    // of silence. No-op in read-only / snapshot mode since there is no
+    // server to notify.
+    private onComposerKeystroke(): void {
+        if (!this.client) return;
+        if (this.hasAttribute("read-only") || this.hasAttribute("snapshot-url")) {
+            return;
+        }
+        if (this.composerInputEl?.value.trim().length === 0) {
+            // Empty composer after a keystroke (e.g. backspace-to-empty)
+            // should behave like an explicit stop.
+            this.stopTyping();
+            return;
+        }
+        if (!this.typingActive) {
+            this.typingActive = true;
+            this.sendTypingPing("start");
+            this.typingRefreshTimer = setInterval(() => {
+                if (this.typingActive) this.sendTypingPing("start");
+            }, TYPING_REFRESH_MS);
+        }
+        if (this.typingIdleTimer !== undefined) {
+            clearTimeout(this.typingIdleTimer);
+        }
+        this.typingIdleTimer = setTimeout(() => {
+            this.stopTyping();
+        }, TYPING_IDLE_MS);
+    }
+
+    // Tear down all typing state. When `silent` is true we skip the
+    // network ping (used at bootstrap where there is no live session
+    // to end) but still clear timers.
+    private stopTyping(options: {silent?: boolean} = {}): void {
+        if (this.typingIdleTimer !== undefined) {
+            clearTimeout(this.typingIdleTimer);
+            this.typingIdleTimer = undefined;
+        }
+        if (this.typingRefreshTimer !== undefined) {
+            clearInterval(this.typingRefreshTimer);
+            this.typingRefreshTimer = undefined;
+        }
+        if (this.typingActive) {
+            this.typingActive = false;
+            if (options.silent !== true) this.sendTypingPing("stop");
+        }
+    }
+
+    private sendTypingPing(op: "start" | "stop"): void {
+        const client = this.client;
+        if (!client) return;
+        const scope = this.readScope();
+        // Swallow errors — typing is best-effort; a failed ping must
+        // never surface as a user-visible error banner.
+        client.sendTyping(op, scope).catch(() => undefined);
     }
 
     private setState(patch: Partial<ComponentState>): void {
@@ -706,6 +816,17 @@ export class ZulipChatElement extends HTMLElement {
             }
         }
 
+        if (this.typingIndicatorEl) {
+            const label = formatTypingLabel(this.state.typingUsers);
+            if (label === undefined) {
+                this.typingIndicatorEl.hidden = true;
+                this.typingIndicatorEl.textContent = "";
+            } else {
+                this.typingIndicatorEl.hidden = false;
+                this.typingIndicatorEl.textContent = label;
+            }
+        }
+
         if (this.newMessagesPillEl) {
             const show =
                 this.state.unreadAnchorId !== undefined &&
@@ -730,6 +851,18 @@ export class ZulipChatElement extends HTMLElement {
 function describeError(error: unknown): string {
     if (error instanceof Error) return error.message;
     return String(error);
+}
+
+// Build the "Alice is typing" / "Alice and Bob are typing" / "Several
+// people are typing" label shown above the composer. Returns undefined
+// when no one else is typing so the caller can hide the row entirely.
+function formatTypingLabel(users: TypingUser[]): string | undefined {
+    if (users.length === 0) return undefined;
+    const names = users.map((u) => u.fullName.trim()).filter((n) => n.length > 0);
+    if (names.length === 0) return "Someone is typing";
+    if (names.length === 1) return `${names[0]!} is typing`;
+    if (names.length === 2) return `${names[0]!} and ${names[1]!} are typing`;
+    return "Several people are typing";
 }
 
 let registered = false;

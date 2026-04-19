@@ -5,6 +5,7 @@ import type {
     GetMessagesResult,
     ReactionParams,
     Transport,
+    TypingOp,
 } from "./transport.ts";
 import type {
     Message,
@@ -123,6 +124,13 @@ export class SnapshotTransport implements Transport {
 
     removeReaction(_params: ReactionParams): Promise<void> {
         return Promise.reject(new Error("Snapshot transport is read-only"));
+    }
+
+    sendTyping(_op: TypingOp, _scope: ScopeFilter): Promise<void> {
+        // No-op rather than reject: the composer is hidden in snapshot
+        // mode, but a host that mounted the component without the
+        // read-only attribute shouldn't see error noise for typing pings.
+        return Promise.resolve();
     }
 
     getCurrentUserId(): number | undefined {

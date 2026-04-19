@@ -84,9 +84,17 @@ export interface ReactionEvent {
     reactions: Reaction[];
 }
 
+export interface TypingUser {
+    userId: number;
+    fullName: string;
+}
+
 export interface TypingEvent {
     type: "typing";
-    userIds: number[];
+    // The full set of users currently typing in the active scope. Emit
+    // the full set on every change (rather than op=add/remove) so UI
+    // consumers don't have to track state themselves.
+    users: TypingUser[];
 }
 
 export interface ErrorEvent {
