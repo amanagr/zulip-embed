@@ -20,6 +20,7 @@ to point it at a real server.
 | [`nextjs/`](./nextjs/)           | Next.js App Router app that mounts the component inside a `"use client"` wrapper (SSR-safe).                                |
 | [`vue/`](./vue/)                 | Vue 3 + Vite app; shows how to keep the dev console clean with `isCustomElement`.                                           |
 | [`svelte/`](./svelte/)           | Svelte 5 + Vite app; shows native Web Component support with no config.                                                     |
+| [`angular/`](./angular/)         | Angular 18 (standalone) + Vite app; shows the `CUSTOM_ELEMENTS_SCHEMA` hook for Web Components.                             |
 
 ## Demo mode — how it works
 
