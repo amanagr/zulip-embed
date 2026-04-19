@@ -1,3 +1,5 @@
+import {z} from "zod";
+
 import type {
     GetMessagesOptions,
     GetMessagesResult,
@@ -10,6 +12,36 @@ import type {
     SendMessageParams,
     ZulipEventListener,
 } from "./types.ts";
+
+const reactionSchema = z.object({
+    emoji: z.string(),
+    count: z.number(),
+    userIds: z.array(z.number()),
+});
+
+const messageSchema = z.object({
+    id: z.number(),
+    senderId: z.number(),
+    senderFullName: z.string(),
+    senderEmail: z.string(),
+    avatarUrl: z.string(),
+    timestamp: z.number(),
+    content: z.string(),
+    contentIsHtml: z.boolean(),
+    type: z.enum(["channel", "direct"]),
+    channelName: z.string().optional(),
+    topic: z.string().optional(),
+    reactions: z.array(reactionSchema),
+});
+
+const snapshotSchema = z.object({
+    version: z.literal(1),
+    generatedAt: z.number(),
+    server: z.string(),
+    channel: z.string(),
+    topic: z.string().optional(),
+    messages: z.array(messageSchema),
+});
 
 export interface SnapshotFile {
     // Schema version so consumers can bail out if the on-disk format changes.
@@ -44,7 +76,7 @@ export class SnapshotTransport implements Transport {
     private onEvent: ZulipEventListener | undefined;
 
     constructor(options: SnapshotTransportOptions) {
-        this.url = options.url;
+        this.url = options.data === undefined ? validateSnapshotUrl(options.url) : options.url;
         this.scope = options.scope;
         this.inline = options.data;
     }
@@ -111,6 +143,41 @@ export class SnapshotTransport implements Transport {
     }
 }
 
+// Validate the snapshot URL. We accept relative URLs (resolved against
+// the page origin) and absolute http/https URLs. Everything else — data:,
+// javascript:, blob:, file:, protocol-relative (//evil.tld) — is
+// rejected: the JSON's `content` fields flow into DOMPurify, but a
+// bypass there becomes stored XSS if an attacker controls the feed.
+// Treat the snapshot URL the same way we treat the live server URL.
+function validateSnapshotUrl(raw: string): string {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+        throw new Error("snapshot-url is empty");
+    }
+    // Protocol-relative URLs (//host/path) are disallowed because they
+    // inherit the page's scheme and silently point off-origin.
+    if (trimmed.startsWith("//")) {
+        throw new Error(`snapshot-url may not be protocol-relative: ${raw}`);
+    }
+    // Relative paths without a scheme are fine — URL() will reject them
+    // without a base, so short-circuit before that throws.
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+        return trimmed;
+    }
+    let parsed: URL;
+    try {
+        parsed = new URL(trimmed);
+    } catch {
+        throw new Error(`Invalid snapshot-url: ${raw}`);
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+        throw new Error(
+            `snapshot-url must use http or https (got ${parsed.protocol}): ${raw}`,
+        );
+    }
+    return parsed.toString();
+}
+
 function filterToScope(messages: Message[], scope: ScopeFilter): Message[] {
     return messages.filter((m) => {
         if (m.channelName !== scope.channel) return false;
@@ -119,30 +186,41 @@ function filterToScope(messages: Message[], scope: ScopeFilter): Message[] {
     });
 }
 
-// Hand-rolled validator rather than pulling zod in here — the snapshot
-// format is narrow and stable, and we already validate at write time in
-// the fetch script. Better to fail loudly with a specific field name than
-// to carry a schema lib just for this.
+// Full schema validation on load. Every field that flows into the DOM
+// (content, avatarUrl, topic, channelName, senderFullName) is asserted
+// to be the expected primitive before reaching the renderer, so a
+// malformed or attacker-controlled snapshot can't smuggle non-string
+// payloads through to DOMPurify or the URL helpers.
 function parseSnapshot(raw: unknown): SnapshotFile {
-    if (typeof raw !== "object" || raw === null) {
-        throw new Error("Snapshot file is not a JSON object");
+    const parsed = snapshotSchema.safeParse(raw);
+    if (!parsed.success) {
+        throw new Error(`Invalid snapshot payload: ${parsed.error.message}`);
     }
-    const obj = raw as Record<string, unknown>;
-    if (obj["version"] !== 1) {
-        throw new Error(
-            `Unsupported snapshot version: ${String(obj["version"])} (expected 1)`,
-        );
-    }
-    if (!Array.isArray(obj["messages"])) {
-        throw new Error("Snapshot.messages is not an array");
-    }
+    const data = parsed.data;
     return {
         version: 1,
-        generatedAt: typeof obj["generatedAt"] === "number" ? obj["generatedAt"] : 0,
-        server: typeof obj["server"] === "string" ? obj["server"] : "",
-        channel: typeof obj["channel"] === "string" ? obj["channel"] : "",
-        topic: typeof obj["topic"] === "string" ? obj["topic"] : undefined,
-        messages: obj["messages"] as Message[],
+        generatedAt: data.generatedAt,
+        server: data.server,
+        channel: data.channel,
+        topic: data.topic,
+        messages: data.messages.map((m) => ({
+            id: m.id,
+            senderId: m.senderId,
+            senderFullName: m.senderFullName,
+            senderEmail: m.senderEmail,
+            avatarUrl: m.avatarUrl,
+            timestamp: m.timestamp,
+            content: m.content,
+            contentIsHtml: m.contentIsHtml,
+            type: m.type,
+            channelName: m.channelName,
+            topic: m.topic,
+            reactions: m.reactions.map((r) => ({
+                emoji: r.emoji,
+                count: r.count,
+                userIds: r.userIds,
+            })),
+        })),
     };
 }
 

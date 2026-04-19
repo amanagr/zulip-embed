@@ -71,6 +71,26 @@ describe("SnapshotTransport", () => {
         );
     });
 
+    test("rejects dangerous URL schemes at construction", () => {
+        const scope = {channel: "announce", topic: "Zulip updates"};
+        expect(() => new SnapshotTransport({url: "javascript:alert(1)", scope})).toThrow();
+        expect(() => new SnapshotTransport({url: "data:application/json,{}", scope})).toThrow();
+        expect(() => new SnapshotTransport({url: "//evil.tld/x.json", scope})).toThrow(
+            /protocol-relative/,
+        );
+        expect(() => new SnapshotTransport({url: "file:///etc/passwd", scope})).toThrow();
+    });
+
+    test("accepts relative and http(s) URLs", () => {
+        const scope = {channel: "announce"};
+        expect(
+            () => new SnapshotTransport({url: "./snapshots/a.json", scope}),
+        ).not.toThrow();
+        expect(
+            () => new SnapshotTransport({url: "https://example.com/a.json", scope}),
+        ).not.toThrow();
+    });
+
     test("pagination returns empty on beforeId — snapshots have no backlog", async () => {
         const transport = new SnapshotTransport({
             url: "unused://",

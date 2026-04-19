@@ -337,11 +337,14 @@ export function sanitizeHtml(html: string, serverOrigin: string | undefined): Do
             ALLOW_DATA_ATTR: false,
             ALLOW_ARIA_ATTR: false,
             ALLOW_UNKNOWN_PROTOCOLS: false,
-            // Belt-and-braces: reject any URI that isn't http(s) or mailto
-            // before our afterSanitizeAttributes hook even runs. The hook
-            // further resolves + re-validates, but this ensures obvious
-            // javascript: / data: / vbscript: hrefs are already gone.
-            ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
+            // Belt-and-braces: reject any URI that isn't http(s), mailto,
+            // a fragment (#), or a same-origin relative path before our
+            // afterSanitizeAttributes hook even runs. The hook further
+            // resolves + re-validates, but this keeps obvious
+            // javascript:/data:/vbscript: hrefs and protocol-relative
+            // URLs (//evil.tld) out even if a future refactor forgets to
+            // install the hook.
+            ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\/(?!\/)|[^:/?#]*(?:[?#]|$))/i,
             FORBID_TAGS: ["style", "script", "iframe", "object", "embed", "form", "input"],
             FORBID_ATTR: ["style", "onerror", "onload", "onclick"],
             USE_PROFILES: {html: true},

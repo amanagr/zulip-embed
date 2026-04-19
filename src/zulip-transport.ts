@@ -263,6 +263,12 @@ export class ZulipTransport implements Transport {
         } else if (event.type === "update_message") {
             const parsed = updateMessageEventSchema.safeParse(event);
             if (!parsed.success) return;
+            // Scope guard: only surface edits for messages that arrived
+            // through our narrow'd queue or paginated fetch. Events for
+            // messages outside scope are dropped even if the server emits
+            // them, so a compromised server can't mutate UI state for
+            // messages the user never loaded.
+            if (!this.reactionState.has(parsed.data.message_id)) return;
             this.onEvent?.({
                 type: "message-update",
                 messageId: parsed.data.message_id,
@@ -280,12 +286,16 @@ export class ZulipTransport implements Transport {
                 parsed.data.message_ids ??
                 (parsed.data.message_id === undefined ? [] : [parsed.data.message_id]);
             for (const messageId of ids) {
+                // Same scope guard as update_message: only forward deletes
+                // for ids we've actually observed.
+                if (!this.reactionState.has(messageId)) continue;
                 this.reactionState.delete(messageId);
                 this.onEvent?.({type: "message-delete", messageId});
             }
         } else if (event.type === "reaction") {
             const parsed = reactionEventSchema.safeParse(event);
             if (!parsed.success) return;
+            if (!this.reactionState.has(parsed.data.message_id)) return;
             const reactions = this.applyReactionOp(parsed.data);
             this.onEvent?.({
                 type: "reaction",

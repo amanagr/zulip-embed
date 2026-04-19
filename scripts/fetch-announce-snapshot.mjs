@@ -17,7 +17,7 @@
 // to the checked-in snapshot in demo/snapshots/.
 
 import {writeFile, mkdir} from "node:fs/promises";
-import {dirname, resolve} from "node:path";
+import {dirname, resolve, sep} from "node:path";
 import {fileURLToPath} from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,6 +43,13 @@ const outPath = resolve(
     REPO_ROOT,
     process.env["ZULIP_ANNOUNCE_OUT"] ?? "demo/public/snapshots/announce-zulip-updates.json",
 );
+// Refuse to write outside the repo. `resolve` silently honors absolute
+// paths and `..` traversal, so a typo (or a malicious workflow edit)
+// could otherwise point this at /etc/anything.
+if (outPath !== REPO_ROOT && !outPath.startsWith(REPO_ROOT + sep)) {
+    console.error(`[fetch-snapshot] refusing to write outside the repo: ${outPath}`);
+    process.exit(1);
+}
 
 const server = serverRaw.replace(/\/+$/, "");
 const authHeader = "Basic " + Buffer.from(`${email}:${apiKey}`, "utf-8").toString("base64");
