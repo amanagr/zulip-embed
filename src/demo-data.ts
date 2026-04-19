@@ -352,7 +352,7 @@ Also a <a href="https://zulip.com">link</a> and an autolinked URL: <a href="http
             contentIsHtml: true,
             content: `
 <p>Inline image (served over HTTPS):</p>
-<p><img src="https://zulip.com/static/images/landing-page/hello/hello-image.png" alt="Zulip screenshot"></p>`,
+<p><img src="https://zulip.com/static/images/logo/zulip-org-logo.svg" alt="Zulip logo"></p>`,
             reactions: [reaction("heart", [11, 15, 1000])],
         }),
         demoMessage({
