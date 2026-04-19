@@ -152,6 +152,13 @@ export interface MessageUpdateEvent {
     contentIsHtml?: boolean | undefined;
     topic?: string | undefined;
     editedTimestamp?: number | undefined;
+    // Structured representation of the updated message. Emitted by the
+    // agent-reply streaming primitive so the local renderer can swap in
+    // a new parts array (token-by-token during streaming, then the final
+    // parts on finish/abort) without touching `content`. Undefined means
+    // the parts of the message didn't change — consumers should leave
+    // any existing Message.parts in place.
+    parts?: MessagePart[] | undefined;
 }
 
 export interface MessageDeleteEvent {

@@ -1,3 +1,8 @@
+import {
+    createAgentReplyHandle,
+    type AgentReplyHandle,
+    type StartAgentReplyOptions,
+} from "./agent-reply.ts";
 import type {
     EditMessageParams,
     GetMessagesOptions,
@@ -10,6 +15,7 @@ import type {
     Channel,
     ConnectionStatus,
     Message,
+    MessagePart,
     ScopeFilter,
     SendMessageParams,
     Topic,
@@ -161,6 +167,30 @@ export class ZulipClient {
         return this.transport.listTopics(channel);
     }
 
+    // Starts a new agent-reply stream against the active or a caller-
+    // supplied scope. The returned handle exposes append/finish/abort
+    // primitives; every side-effect flows through the same transport +
+    // event pipeline that the rest of the client uses, so a provisional
+    // send + streamed edits look identical to a vanilla message on the
+    // wire. Requires `transport.sendMessageWithId` — snapshot-style
+    // read-only transports have no implementation and .messageId rejects.
+    startAgentReply(scope: ScopeFilter, options: StartAgentReplyOptions): AgentReplyHandle {
+        const emit: ZulipEventListener = (event) => {
+            this.applyEvent(event);
+            this.emit(event);
+        };
+        return createAgentReplyHandle({
+            transport: this.transport,
+            scope,
+            options,
+            emit,
+            getCurrentUser:
+                this.transport.getCurrentUser === undefined
+                    ? undefined
+                    : () => this.transport.getCurrentUser(),
+        });
+    }
+
     getCurrentUserId(): number | undefined {
         return this.transport.getCurrentUserId?.();
     }
@@ -171,9 +201,7 @@ export class ZulipClient {
     // email / full name / avatar, or when you want to await readiness.
     get whenReady(): Promise<User> {
         if (this.transport.getCurrentUser === undefined) {
-            return Promise.reject(
-                new Error("transport does not support getCurrentUser"),
-            );
+            return Promise.reject(new Error("transport does not support getCurrentUser"));
         }
         return this.transport.getCurrentUser();
     }
@@ -214,6 +242,45 @@ export class ZulipClient {
             this.setState({messages: [...this.state.messages, message]});
             return;
         }
+        if (event.type === "message-update") {
+            this.applyMessageUpdate(event);
+            return;
+        }
+    }
+
+    private applyMessageUpdate(event: {
+        messageId: number;
+        content?: string | undefined;
+        contentIsHtml?: boolean | undefined;
+        parts?: MessagePart[] | undefined;
+    }): void {
+        const idx = this.state.messages.findIndex((m) => m.id === event.messageId);
+        if (idx < 0) return;
+        const current = this.state.messages[idx]!;
+        const nextContent = event.content ?? current.content;
+        // Trust the transport's explicit `contentIsHtml` flag; fall back
+        // to the current flag when no new content arrived so agent-reply
+        // part-only updates don't flip an HTML message back to plain text.
+        const nextContentIsHtml =
+            event.content === undefined ? current.contentIsHtml : (event.contentIsHtml ?? false);
+        const nextParts = event.parts ?? current.parts;
+        const patch =
+            current.type === "channel"
+                ? {
+                      ...current,
+                      content: nextContent,
+                      contentIsHtml: nextContentIsHtml,
+                      parts: nextParts,
+                  }
+                : {
+                      ...current,
+                      content: nextContent,
+                      contentIsHtml: nextContentIsHtml,
+                      parts: nextParts,
+                  };
+        const next = this.state.messages.slice();
+        next[idx] = patch;
+        this.setState({messages: next});
     }
 
     private isInScope(message: Message): boolean {

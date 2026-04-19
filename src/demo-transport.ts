@@ -43,8 +43,7 @@ export class DemoTransport implements Transport {
         this.autoReplyDelayMs = options.autoReplyDelayMs ?? 1500;
         this.readOnly = options.readOnly ?? false;
         this.messages = seedMessages(options.scope.channel, options.scope.topic);
-        this.nextId =
-            this.messages.reduce((max, m) => (m.id > max ? m.id : max), 0) + 1;
+        this.nextId = this.messages.reduce((max, m) => (m.id > max ? m.id : max), 0) + 1;
     }
 
     async connect(onEvent: ZulipEventListener): Promise<void> {
@@ -101,8 +100,8 @@ export class DemoTransport implements Transport {
         for (let id = startId; id < anchorId; id++) {
             // JS modulo is signed; we only feed positive ids now (floor at
             // FLOOR_ID=1) but defend against future changes.
-            const authorIdx = ((id % SAMPLE_AUTHORS.length) + SAMPLE_AUTHORS.length) %
-                SAMPLE_AUTHORS.length;
+            const authorIdx =
+                ((id % SAMPLE_AUTHORS.length) + SAMPLE_AUTHORS.length) % SAMPLE_AUTHORS.length;
             const user = SAMPLE_AUTHORS[authorIdx]!;
             out.push({
                 id,
@@ -123,6 +122,10 @@ export class DemoTransport implements Transport {
     }
 
     async sendMessage(params: SendMessageParams): Promise<void> {
+        await this.sendMessageWithId(params);
+    }
+
+    async sendMessageWithId(params: SendMessageParams): Promise<{messageId: number}> {
         if (this.closed) {
             throw new Error("Transport is closed");
         }
@@ -166,7 +169,7 @@ export class DemoTransport implements Transport {
         if (this.autoReply && message.type === "channel") {
             this.scheduleAutoReply(message);
         }
-        return Promise.resolve();
+        return Promise.resolve({messageId: message.id});
     }
 
     async editMessage(params: EditMessageParams): Promise<void> {

@@ -475,6 +475,32 @@ button {
     border-radius: var(--zc-radius-sm);
 }
 
+/* Streaming agent reply in progress. A blinking caret pseudo-element
+   sits after the trailing text so the renderer can leave the text node
+   alone during incremental updates. */
+.message-streaming .message-content::after {
+    content: "";
+    display: inline-block;
+    width: 0.45em;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    background: currentColor;
+    opacity: 0.6;
+    animation: zc-agent-cursor 1s steps(1, end) infinite;
+}
+
+@keyframes zc-agent-cursor {
+    0%,
+    50% {
+        opacity: 0.6;
+    }
+    50.01%,
+    100% {
+        opacity: 0;
+    }
+}
+
 .composer-edit-banner {
     display: flex;
     align-items: center;

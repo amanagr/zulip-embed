@@ -4,6 +4,7 @@ import {registerZulipTopicListElement} from "./topic-list.ts";
 
 export {ZulipClient} from "./client.ts";
 export type {ClientState, ZulipClientOptions} from "./client.ts";
+export type {AgentAuthor, AgentReplyHandle, StartAgentReplyOptions} from "./agent-reply.ts";
 export {DemoTransport} from "./demo-transport.ts";
 export type {DemoTransportOptions} from "./demo-transport.ts";
 export {SnapshotTransport} from "./snapshot-transport.ts";

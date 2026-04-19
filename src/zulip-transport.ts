@@ -213,14 +213,10 @@ export class ZulipTransport implements Transport {
         const hasDirect = options.email !== undefined && options.apiKey !== undefined;
         const hasToken = options.authToken !== undefined && options.authToken !== "";
         if (!hasDirect && !hasToken) {
-            throw new Error(
-                "ZulipTransport requires either {email, apiKey} or {authToken}",
-            );
+            throw new Error("ZulipTransport requires either {email, apiKey} or {authToken}");
         }
         if (hasDirect && hasToken) {
-            throw new Error(
-                "ZulipTransport: pass either {email, apiKey} or {authToken}, not both",
-            );
+            throw new Error("ZulipTransport: pass either {email, apiKey} or {authToken}, not both");
         }
 
         if (hasDirect) {
@@ -228,8 +224,7 @@ export class ZulipTransport implements Transport {
             // throw InvalidCharacterError). Encode to UTF-8 first so we match
             // RFC 7617 and surface a clean error instead of a cryptic one.
             this.authHeader =
-                "Basic " +
-                base64EncodeUtf8(`${options.email ?? ""}:${options.apiKey ?? ""}`);
+                "Basic " + base64EncodeUtf8(`${options.email ?? ""}:${options.apiKey ?? ""}`);
             this.authTokenExchange = Promise.resolve();
         } else {
             this.authTokenExchange = this.exchangeAuthToken(options.authToken!);
@@ -256,9 +251,7 @@ export class ZulipTransport implements Transport {
             void this.pollLoop();
         } catch (error) {
             const classified =
-                error instanceof ClassifiedError
-                    ? error
-                    : classifyThrownError(error);
+                error instanceof ClassifiedError ? error : classifyThrownError(error);
             onEvent({type: "connection", status: "error"});
             onEvent({
                 type: "error",
@@ -282,9 +275,7 @@ export class ZulipTransport implements Transport {
             }
         }
         if (this.currentUser === undefined) {
-            this.rejectCurrentUser(
-                new Error("Transport closed before user identity was resolved"),
-            );
+            this.rejectCurrentUser(new Error("Transport closed before user identity was resolved"));
         }
         this.onEvent?.({type: "connection", status: "disconnected"});
         this.onEvent = undefined;
@@ -300,8 +291,7 @@ export class ZulipTransport implements Transport {
         // Zulip includes the anchor in its response, so we strip it below
         // to avoid a duplicate.
         const limit = options.limit ?? this.historyLimit;
-        const anchor =
-            options.beforeId === undefined ? "newest" : String(options.beforeId);
+        const anchor = options.beforeId === undefined ? "newest" : String(options.beforeId);
         const params = {
             anchor,
             num_before: String(limit),
@@ -323,9 +313,7 @@ export class ZulipTransport implements Transport {
         // anchor. If the field is missing (older servers), infer from the
         // returned batch size.
         const hasMore =
-            parsed.found_oldest === undefined
-                ? messages.length >= limit
-                : !parsed.found_oldest;
+            parsed.found_oldest === undefined ? messages.length >= limit : !parsed.found_oldest;
         return {messages, hasMore};
     }
 
@@ -349,11 +337,7 @@ export class ZulipTransport implements Transport {
             params.kind === "topic" || params.kind === "both" ? params.topic : undefined;
         if (newContent !== undefined) body["content"] = newContent;
         if (newTopic !== undefined) body["topic"] = newTopic;
-        await this.request(
-            "PATCH",
-            `/api/v1/messages/${String(params.messageId)}`,
-            body,
-        );
+        await this.request("PATCH", `/api/v1/messages/${String(params.messageId)}`, body);
         // Optimistic local update: the server will also emit an
         // update_message event through the event queue, but dispatching
         // one here keeps the UI responsive even before the poll catches
@@ -382,6 +366,17 @@ export class ZulipTransport implements Transport {
     }
 
     async sendMessage(params: SendMessageParams): Promise<void> {
+        await this.postMessage(params);
+    }
+
+    async sendMessageWithId(params: SendMessageParams): Promise<{messageId: number}> {
+        const parsed = await this.postMessage(params);
+        return {messageId: parsed.id};
+    }
+
+    private async postMessage(
+        params: SendMessageParams,
+    ): Promise<z.infer<typeof sendMessageResponseSchema>> {
         const body: Record<string, string> = {content: params.content};
         if (params.type === "channel") {
             // Wire value is "stream" for back-compat with Zulip < 9. Zulip
@@ -397,7 +392,7 @@ export class ZulipTransport implements Transport {
             body["to"] = JSON.stringify(params.recipients);
         }
         const response = await this.request("POST", "/api/v1/messages", body);
-        sendMessageResponseSchema.parse(response);
+        return sendMessageResponseSchema.parse(response);
     }
 
     async sendTyping(op: TypingOp, scope: ScopeFilter): Promise<void> {
@@ -426,10 +421,7 @@ export class ZulipTransport implements Transport {
     }
 
     async listChannels(): Promise<Channel[]> {
-        const response = await this.request(
-            "GET",
-            "/api/v1/users/me/subscriptions",
-        );
+        const response = await this.request("GET", "/api/v1/users/me/subscriptions");
         const parsed = subscriptionsResponseSchema.parse(response);
         // pinned-first, then alphabetical within each group. Matches the
         // ordering Zulip's own web app uses.
@@ -452,10 +444,7 @@ export class ZulipTransport implements Transport {
     async listTopics(channel: string): Promise<Topic[]> {
         const streamId = await this.resolveChannelId(channel);
         if (streamId === undefined) return [];
-        const response = await this.request(
-            "GET",
-            `/api/v1/users/me/${String(streamId)}/topics`,
-        );
+        const response = await this.request("GET", `/api/v1/users/me/${String(streamId)}/topics`);
         const parsed = topicsResponseSchema.parse(response);
         // Resolved topics carry a magic prefix in their name; peel it off
         // and expose the resolved state as a boolean so UI code doesn't
@@ -660,8 +649,7 @@ export class ZulipTransport implements Transport {
                 "unauthorized",
             );
         }
-        this.authHeader =
-            "Basic " + base64EncodeUtf8(`${payload.email}:${payload.api_key}`);
+        this.authHeader = "Basic " + base64EncodeUtf8(`${payload.email}:${payload.api_key}`);
     }
 
     private async loadCurrentUser(): Promise<void> {
@@ -718,9 +706,7 @@ export class ZulipTransport implements Transport {
                 if (this.closed) return;
                 if ((error as {name?: string}).name === "AbortError") return;
                 const classified =
-                    error instanceof ClassifiedError
-                        ? error
-                        : classifyThrownError(error);
+                    error instanceof ClassifiedError ? error : classifyThrownError(error);
                 attempt += 1;
                 const delayMs = classified.retryAfterMs ?? computeBackoffMs(attempt);
                 this.onEvent?.({
@@ -752,10 +738,7 @@ export class ZulipTransport implements Transport {
         // settled promise.
         await this.authTokenExchange;
         if (this.authHeader === undefined) {
-            throw new ClassifiedError(
-                "Authorization header unavailable",
-                "unauthorized",
-            );
+            throw new ClassifiedError("Authorization header unavailable", "unauthorized");
         }
         const url = new URL(this.serverUrl + path);
         const headers: Record<string, string> = {Authorization: this.authHeader};
@@ -804,9 +787,7 @@ function validateServerUrl(raw: string): string {
         throw new Error(`Invalid Zulip server URL: ${raw}`);
     }
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-        throw new Error(
-            `Zulip server URL must use http or https (got ${parsed.protocol}): ${raw}`,
-        );
+        throw new Error(`Zulip server URL must use http or https (got ${parsed.protocol}): ${raw}`);
     }
     if (
         parsed.protocol === "http:" &&
@@ -841,21 +822,14 @@ function base64EncodeUtf8(input: string): string {
 class ClassifiedError extends Error {
     readonly code: ErrorCode;
     readonly retryAfterMs: number | undefined;
-    constructor(
-        message: string,
-        code: ErrorCode,
-        retryAfterMs: number | undefined = undefined,
-    ) {
+    constructor(message: string, code: ErrorCode, retryAfterMs: number | undefined = undefined) {
         super(message);
         this.code = code;
         this.retryAfterMs = retryAfterMs;
     }
 }
 
-async function classifyHttpError(
-    response: Response,
-    path: string,
-): Promise<ClassifiedError> {
+async function classifyHttpError(response: Response, path: string): Promise<ClassifiedError> {
     // Zulip returns JSON like {"result": "error", "msg": "Invalid narrow operator: foo", "code": "BAD_REQUEST"}.
     // Surface that msg directly so the chat banner is actionable.
     const status = String(response.status);
@@ -968,8 +942,7 @@ function convertMessage(api: ApiMessage): Message {
         // and a subject; the fallback to "" is defensive — a malformed
         // server response shouldn't crash the renderer, it just produces
         // an orphan-looking message.
-        const channelName =
-            typeof api.display_recipient === "string" ? api.display_recipient : "";
+        const channelName = typeof api.display_recipient === "string" ? api.display_recipient : "";
         return {
             ...base,
             type: "channel",

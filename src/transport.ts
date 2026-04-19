@@ -39,6 +39,13 @@ export interface Transport {
     close(): Promise<void>;
     getMessages(scope: ScopeFilter, options?: GetMessagesOptions): Promise<GetMessagesResult>;
     sendMessage(params: SendMessageParams): Promise<void>;
+    // Variant of sendMessage that resolves with the server-assigned
+    // message id. Optional because read-only transports (snapshots)
+    // can't honor it; the agent-reply streaming primitive fails fast
+    // when it's not implemented. Kept separate from `sendMessage` so
+    // existing callers that treat the send as fire-and-forget don't
+    // have to thread the id through their code paths.
+    sendMessageWithId?(params: SendMessageParams): Promise<{messageId: number}>;
     editMessage(params: EditMessageParams): Promise<void>;
     deleteMessage(messageId: number): Promise<void>;
     addReaction(params: ReactionParams): Promise<void>;
