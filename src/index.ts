@@ -32,9 +32,12 @@ export type {
     ErrorEvent,
     LegacyChannelScope,
     Message,
+    MessageDeleteEvent,
+    MessageEvent,
     MessagePart,
     MessagePartAuthor,
     MessageType,
+    MessageUpdateEvent,
     NormalizedScope,
     Reaction,
     ReactionEvent,
@@ -54,6 +57,11 @@ export type {
     ZulipEventListener,
     ZulipMessageEventDetail,
 } from "./types.ts";
+export type {
+    MessageActionDescriptor,
+    MessageActionPlacement,
+    MessageActionVariant,
+} from "./message-actions.ts";
 export {canonicalUserIds, isChannelScope, isDmScope, normalizeScope} from "./scope.ts";
 export type {
     DirectMessageConversation,

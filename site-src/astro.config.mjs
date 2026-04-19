@@ -48,6 +48,10 @@ export default defineConfig({
             title: "zulip-embed",
             description:
                 "Embed Zulip chat as a framework-agnostic Web Component or headless SDK.",
+            // Our custom 404 lives at src/pages/404.astro. Opt out of
+            // Starlight's built-in 404 route so Astro stops warning
+            // about a duplicate registration.
+            disable404Route: true,
             social: [
                 {
                     icon: "github",
@@ -100,6 +104,11 @@ export default defineConfig({
                         {label: "Events", slug: "reference/events"},
                         {label: "Theming", slug: "reference/theming"},
                         {label: "Agents & AI", slug: "reference/agents"},
+                        {
+                            label: "API (generated)",
+                            autogenerate: {directory: "reference/api"},
+                            collapsed: true,
+                        },
                     ],
                 },
             ],
