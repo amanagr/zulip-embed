@@ -1396,17 +1396,26 @@ function stripHtmlToText(html: string): string {
 }
 
 // Build the "Alice is typing" / "Alice and Bob are typing" / "Several
-// Accept brand-logo only when it's a safe absolute http(s) URL or a
-// relative path the browser will resolve against the page. Same threat
-// model as validateSnapshotUrl: data:/javascript:/file: URIs would
-// otherwise become an injection vector the embed host rarely scrutinizes.
+// Accept brand-logo only when it resolves to an http(s) URL — either
+// absolute, or a relative path that resolves against the host page. A
+// prior version sniffed for a scheme with a regex and fell through to
+// "treat as relative" when none matched; an attacker could prepend a
+// C0 control (e.g. U+0000) to an otherwise-absolute URL — the regex
+// would miss the scheme but the browser's URL parser strips C0 chars
+// and would happily fetch the attacker-controlled host. We resolve
+// against document.baseURI (falling back to a sentinel base when no
+// document is available, e.g. SSR) so the final protocol check is
+// authoritative regardless of how the input was spelled.
 function sanitizeBrandLogoUrl(raw: string): string {
     const trimmed = raw.trim();
     if (trimmed === "") return "";
     if (trimmed.startsWith("//")) return "";
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+    const base =
+        typeof document !== "undefined" && document.baseURI
+            ? document.baseURI
+            : "https://zulip.invalid/";
     try {
-        const parsed = new URL(trimmed);
+        const parsed = new URL(trimmed, base);
         if (parsed.protocol === "https:" || parsed.protocol === "http:") {
             return parsed.toString();
         }

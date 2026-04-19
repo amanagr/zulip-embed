@@ -107,6 +107,32 @@ describe("<zulip-chat> branding attributes", () => {
 
         const img = el.shadowRoot?.querySelector<HTMLImageElement>(".header-brand-logo");
         expect(img?.hidden).toBe(false);
-        expect(img?.getAttribute("src")).toBe("/assets/logo.svg");
+        // Resolved against document.baseURI, so the final src is absolute.
+        expect(img?.getAttribute("src") ?? "").toMatch(/\/assets\/logo\.svg$/);
+    });
+
+    test("brand-logo rejects C0-control-prefixed schemes (parser bypass)", async () => {
+        // A prior regex-based scheme sniff missed schemes prefixed with
+        // U+0000 / U+0009 / U+001F — the browser URL parser strips those
+        // and would otherwise load the attacker-controlled host.
+        for (const payload of [
+            "\u0000javascript:alert(1)",
+            "\u0009data:text/html,<img>",
+            "\u001Fws://attacker.example/leak",
+        ]) {
+            const el = document.createElement("zulip-chat");
+            el.setAttribute("demo", "");
+            el.setAttribute("channel", "general");
+            el.setAttribute("brand-logo", payload);
+            document.body.append(el);
+
+            for (let i = 0; i < 3; i++) await flush();
+
+            const img = el.shadowRoot?.querySelector<HTMLImageElement>(".header-brand-logo");
+            expect(img?.hidden).toBe(true);
+            expect(img?.hasAttribute("src")).toBe(false);
+
+            el.remove();
+        }
     });
 });
