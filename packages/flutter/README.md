@@ -85,9 +85,11 @@ An example app with a runtime-switchable demo/live mode and a light/dark toggle 
 - [x] `DemoTransport` with echo bot
 - [x] `ZulipTransport` with `/api/v1/register`, `/api/v1/events` long-poll, `/api/v1/messages`
 - [x] `ZulipTheme` with light + dark presets
+- [x] Live message edits, deletes, and reaction updates
 - [ ] Pagination / older-messages loading
 - [ ] Markdown rendering (currently renders HTML-stripped text)
-- [ ] Reactions, threads, typing indicators
+- [ ] Reaction picker + send UI (live events show, but the composer can't add them yet)
+- [ ] Typing indicators, threads
 - [ ] JWT SSO / ephemeral credential flow
 
 ## License
