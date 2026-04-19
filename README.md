@@ -202,7 +202,7 @@ DOMPurify with a strict allow-list before it hits the DOM. See
 | Custom Zulip emoji (`<img class="emoji">`) | ✅ |
 | `@user` mentions, `#channel` references, `#channel > topic` links | ✅ |
 | Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup | ✅ |
-| Spoilers | 🚧 (structural, no reveal toggle yet) |
+| Spoilers (click / keyboard reveal) | ✅ |
 | KaTeX math | 🚧 (markup passes through, no KaTeX stylesheet bundled) |
 | Code-block syntax highlighting (Pygments classes) | 🚧 (classes preserved, theme not bundled) |
 | Polls | ❌ |
@@ -242,7 +242,7 @@ next" order.
 1. ✅ Sanitized HTML rendering (DOMPurify)
 2. ✅ Live message edits, deletes, and reactions
 3. ✅ Rendering showcase + `#announce` read-only demo
-4. Spoiler reveal toggle
+4. ✅ Spoiler reveal toggle
 5. Code-block syntax highlighting (bundle a Pygments-compatible theme)
 6. KaTeX math rendering (opt-in, lazy-loaded)
 7. Unread separator + "new messages" indicator

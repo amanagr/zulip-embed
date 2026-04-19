@@ -370,5 +370,16 @@ Also a <a href="https://zulip.com">link</a> and an autolinked URL: <a href="http
 <h5>H5</h5>
 <h6>H6</h6>`,
         }),
+        demoMessage({
+            id: 309,
+            senderEmail: "zulip-bot@example.com",
+            channel: "showcase",
+            topic,
+            minutesAgo: 8,
+            contentIsHtml: true,
+            content: `
+<p>Click the spoiler below to reveal the twist:</p>
+<div class="spoiler-block"><div class="spoiler-header"><p>Ending of the novel</p></div><div class="spoiler-content" aria-hidden="true"><p>It was <strong>Zulip all along</strong>.</p></div></div>`,
+        }),
     ];
 }

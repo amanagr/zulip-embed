@@ -2,6 +2,7 @@ import {ZulipClient} from "./client.ts";
 import {DemoTransport} from "./demo-transport.ts";
 import {isNearBottom, renderMessages, scrollToBottom, type RenderContext} from "./render.ts";
 import {SnapshotTransport} from "./snapshot-transport.ts";
+import {enhanceSpoilers} from "./spoilers.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
 import type {Transport} from "./transport.ts";
 import type {ConnectionStatus, Message, Reaction, ScopeFilter} from "./types.ts";
@@ -588,6 +589,7 @@ export class ZulipChatElement extends HTMLElement {
                 this.feedEl.replaceChildren(loading);
             } else {
                 renderMessages(this.feedEl, this.state.messages, this.renderContext());
+                enhanceSpoilers(this.feedEl);
                 const banner = document.createElement("div");
                 banner.className = "feed-top-banner";
                 if (this.state.loadingOlder) {
