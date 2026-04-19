@@ -9,7 +9,7 @@ const int _viewerId = 2;
 /// In-memory fake transport that seeds a few messages and echoes whatever
 /// you send after a short delay. Useful for docs, examples, and tests so
 /// the widgets render without a Zulip server.
-class DemoTransport implements Transport {
+class DemoTransport extends Transport {
   final List<Message> _messages = [];
   final Set<Timer> _pendingReplies = {};
   int _nextId = 1000;

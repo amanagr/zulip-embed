@@ -43,6 +43,7 @@ class _ZulipChatState extends State<ZulipChat> {
   late ZulipClient _client;
   StreamSubscription<ZulipEvent>? _sub;
   final List<Message> _messages = [];
+  List<TypingUser> _typingUsers = const [];
   ConnectionStatus _status = ConnectionStatus.disconnected;
   String? _error;
 
@@ -133,10 +134,16 @@ class _ZulipChatState extends State<ZulipChat> {
             break;
           }
         });
+      case TypingEvent(:final users):
+        setState(() => _typingUsers = users);
       case ErrorEvent(:final message):
         setState(() => _error = message);
         widget.onError?.call(message);
     }
+  }
+
+  void _onTyping(TypingOp op) {
+    unawaited(_client.sendTyping(op));
   }
 
   Future<void> _onSend(String text) async {
@@ -185,10 +192,13 @@ class _ZulipChatState extends State<ZulipChat> {
                   _messages.isEmpty,
             ),
           ),
+          if (_typingUsers.isNotEmpty)
+            _TypingRow(theme: t, users: _typingUsers),
           Composer(
             theme: t,
             onSend: _onSend,
             enabled: _status == ConnectionStatus.connected,
+            onTyping: _onTyping,
           ),
         ],
       ),
@@ -274,6 +284,39 @@ class _ConnectionDot extends StatelessWidget {
         const SizedBox(width: 6),
         Text(label, style: TextStyle(color: theme.muted, fontSize: 11)),
       ],
+    );
+  }
+}
+
+class _TypingRow extends StatelessWidget {
+  const _TypingRow({required this.theme, required this.users});
+
+  final ZulipTheme theme;
+  final List<TypingUser> users;
+
+  String _label() {
+    if (users.isEmpty) return '';
+    if (users.length == 1) return '${users[0].fullName} is typing…';
+    if (users.length == 2) {
+      return '${users[0].fullName} and ${users[1].fullName} are typing…';
+    }
+    return 'Several people are typing…';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: theme.surface,
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Text(
+        _label(),
+        style: TextStyle(
+          color: theme.muted,
+          fontSize: 12,
+          fontStyle: FontStyle.italic,
+        ),
+      ),
     );
   }
 }

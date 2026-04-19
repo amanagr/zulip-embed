@@ -16,7 +16,7 @@ import 'types.dart';
 ///
 /// Snapshots are a fixed window — there is no pagination and no write
 /// path. `sendMessage`, `addReaction`, and `removeReaction` all reject.
-class SnapshotTransport implements Transport {
+class SnapshotTransport extends Transport {
   SnapshotTransport({
     required String url,
     Map<String, dynamic>? inlineData,
