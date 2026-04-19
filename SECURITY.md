@@ -1,13 +1,129 @@
-# Security model
+# Security policy
 
 This document summarizes the threats the embed defends against, what it
 **cannot** defend against, and how to report issues.
 
 ## Reporting a vulnerability
 
-Please email security reports to `security@zulip.com` — do **not** open a
-public GitHub issue for anything potentially exploitable. We'll acknowledge
-within 72 hours and work with you on disclosure timing.
+Please email security reports to **`security@zulip.com`** — do **not**
+open a public GitHub issue for anything potentially exploitable. This
+is the standing security mailbox for the Zulip project, and the Zulip
+Embed SDK reuses it: the Zulip maintainers triage embed reports from
+the same queue as Zulip server reports.
+
+When you file a report, please include:
+
+- Affected version(s) of `zulip-embed` (or the `zulip_embed` Flutter
+  package, `zulip-embed-react`, `zulip-embed-react-native`).
+- A minimal reproduction — a snippet, URL, or attached HTML/Dart file
+  is ideal. For sanitizer bypasses, paste the offending markdown.
+- Observed vs. expected behavior, and — if you know — the class of
+  issue (XSS, credential leak, SSRF, etc.).
+- Whether you'd like public credit after the fix ships; we default to
+  crediting reporters in the CHANGELOG unless you ask otherwise.
+
+### Response expectations
+
+| Stage                             | Target                                    |
+| --------------------------------- | ----------------------------------------- |
+| Acknowledge receipt               | within **72 hours**                       |
+| Initial triage + severity call    | within **7 days**                         |
+| Patch shipped — critical severity | within **30 days** of acknowledgement     |
+| Patch shipped — other severities  | within **90 days** of acknowledgement     |
+
+"Critical" means something like unauthenticated XSS from default
+Zulip-rendered content, credential exfiltration, or a sanitizer bypass
+that fires without user interaction. Everything else is lower-severity
+by default; we'll tell you which bucket we've assigned and why.
+
+If we miss a target we'll say so, explain the blocker, and propose a
+new date — we won't quietly run the clock out.
+
+## Scope
+
+### In scope (treat as a vulnerability and report privately)
+
+- Stored or reflected XSS via Zulip markdown, sanitizer bypasses,
+  missed allow-list entries in `src/render.ts`, or attribute-reflection
+  injection into `<zulip-chat>` and siblings.
+- Credential leaks — API keys, auth tokens, JWTs, or bot passwords
+  escaping into `localStorage`, `sessionStorage`, IndexedDB, logs,
+  query strings, `Referer` headers, or error messages.
+- Subresource Integrity (SRI) desync between
+  `dist/INTEGRITY.{json,md}` and the bytes actually published to npm /
+  unpkg.
+- SSRF or unsafe URL dereferencing via `resolveUrl`, `snapshot-url`,
+  avatar / inline-upload fetches, or the Flutter transport's
+  `_normalize()` path.
+- Any way to upgrade a plain-text `http://` connection into a silent
+  credential-exfil channel without the existing console warning
+  firing.
+- Same-origin bypasses of `snapshot-url` scheme validation, or
+  path-escape bugs in `scripts/fetch-announce-snapshot.mjs`.
+
+### Not a vulnerability (file as a normal bug or feature request)
+
+- Feature requests and missing functionality.
+- Client-side DoS from adversarial markdown that renders slowly or
+  inflates the DOM — we treat this as a rendering bug (file an issue),
+  not a security report.
+- Issues that only reproduce against Zulip servers older than the
+  oldest version this SDK officially supports.
+- Anything under **Out of scope** in the threat model below (host-page
+  XSS, MITM on `http://`, malicious Zulip server, custom-emoji origins
+  the embedder wires up themselves).
+- Automated scanner output without a working proof-of-concept. We're
+  happy to look at real findings, but raw Nessus / Burp exports with
+  no analysis aren't actionable.
+
+## Disclosure policy
+
+We practice **coordinated disclosure**:
+
+1. You report privately to `security@zulip.com`. We acknowledge and
+   triage per the table above.
+2. We develop and test a fix on a private branch. You're welcome to
+   review candidate patches; we'll share them once they're ready.
+3. We ship the fix in a patched release on the latest supported minor
+   (and backport to the previous minor if it's still in the support
+   window — see below).
+4. We run `npm deprecate` against the vulnerable version range with a
+   short message pointing at the fixed version, so `npm install`
+   surfaces the warning to anyone still on an affected release. The
+   Flutter package uses `pub.dev` retraction for the same purpose.
+5. We request or assign a **CVE** once the fix ships (or sooner, if
+   coordination with downstream distributors needs it), publish a
+   GitHub Security Advisory, and update `CHANGELOG.md` with the
+   affected range, the fix, and reporter credit.
+6. Public write-ups, blog posts, and conference talks are welcome
+   after the advisory goes public. Please coordinate timing with us
+   before the advisory is published.
+
+If a vulnerability is already being exploited in the wild or has been
+publicly disclosed by someone else, we'll compress the timeline and
+ship as fast as we safely can.
+
+## Supported versions
+
+We support **the latest minor release line** with feature updates and
+security patches, and the **previous minor** with security patches
+only for 90 days after a new minor ships. Anything older is
+unsupported — please upgrade.
+
+| Version line       | Status                                        | Security patches |
+| ------------------ | --------------------------------------------- | ---------------- |
+| `1.x` (latest)     | Supported — features, fixes, security patches | Yes              |
+| `0.8.x` (previous) | Security patches only, until 90 days after `1.0`'s GA | Yes      |
+| `< 0.8`            | Unsupported                                   | No               |
+
+Until `1.0` ships, `0.8.x` is the "latest" line and the pre-1.0
+releases before it (`0.7` and earlier) are unsupported. Once `1.0`
+ships, the table above takes effect.
+
+The React, React Native, and Flutter packages follow the same version
+line as the core `zulip-embed` package they ship against — a security
+fix in `zulip-embed@1.2.3` is released alongside matching package
+updates where applicable.
 
 ## Threat model at a glance
 
