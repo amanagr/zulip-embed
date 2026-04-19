@@ -1,7 +1,7 @@
 # zulip-embed-react
 
 Thin React wrappers around the framework-agnostic
-[`zulip-embed`](https://github.com/zulip/zulip-embed) Web Components.
+[`zulip-embed`](https://github.com/amanagr/zulip-embed) Web Components.
 
 ## Install
 

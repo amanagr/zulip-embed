@@ -5,13 +5,13 @@ Web Component, native React / React Native / Flutter wrappers, and a
 headless TypeScript SDK — all Apache-2.0, all hitting the same Zulip
 REST API so your data and your audit trail stay in your Zulip.
 
-> **Status — v0.8 release candidate.** The core Web Components
+> **Status — v1.0.0, stable.** The core Web Components
 > (`<zulip-chat>`, `<zulip-channel-list>`, `<zulip-topic-list>`,
 > `<zulip-announcement>`), the headless `ZulipClient`, the React
-> wrapper, and the Flutter package are all at v0.8 feature parity.
-> React Native ships as `0.8.0-alpha` (plain-text rendering —
+> wrapper, and the Flutter package are all at v1.0.0 feature parity.
+> React Native ships as `1.0.0-alpha` (plain-text rendering —
 > see [package README](./packages/react-native/README.md)). SwiftUI +
-> Compose are on the roadmap. The public API may still move before 1.0.
+> Compose are on the roadmap. The public API is frozen under semver.
 
 <p align="center">
   <a href="https://amanagr.github.io/zulip-embed/">
@@ -153,7 +153,7 @@ and [`<ZulipTopicList>`](./packages/react/src/zulip-topic-list.tsx).
 
 ### Track 3 — React Native (alpha)
 
-> **Alpha preview (`0.8.0-alpha`).** Plain-text rendering only.
+> **Alpha preview (`1.0.0-alpha`).** Plain-text rendering only.
 > Reactions / typing / message-action UI not yet wired in the
 > `<ZulipChatScreen>` widget. Headless `ZulipClient` works end-to-end.
 > See [`packages/react-native/README.md`](./packages/react-native/README.md)
@@ -236,30 +236,23 @@ rewritten bundle past the browser:
 ></script>
 ```
 
-Hashes for the current release live in the table below. The release
-workflow splices them in automatically when a tag is cut
+SRI hashes and per-entry gzipped sizes for each release are published
+in the signed artifact manifest on the
+[GitHub Release page](https://github.com/amanagr/zulip-embed/releases)
+and in `INTEGRITY.json` inside each npm tarball. The release workflow
 ([scripts/release.mjs](./scripts/release.mjs) computes the values,
 [`.github/workflows/release.yml`](./.github/workflows/release.yml)
-commits them back to the tag). The raw `dist/INTEGRITY.json` manifest
-is published as a workflow artifact on each run.
+commits them back to the tag) also splices a per-version table into
+this README between the `<!-- sri:start -->` / `<!-- sri:end -->`
+markers on every tag push.
 
 <!-- sri:start -->
 
-| Entry                         | Size (gz) | SRI hash   |
-| ----------------------------- | --------- | ---------- |
-| `zulip-embed.iife.js` (unpkg) | —         | `sha256-…` |
-| `zulip-embed/chat`            | —         | `sha256-…` |
-| `zulip-embed/channel-list`    | —         | `sha256-…` |
-| `zulip-embed/topic-list`      | —         | `sha256-…` |
-| `zulip-embed/announcement`    | —         | `sha256-…` |
-| `zulip-embed/agent`           | —         | `sha256-…` |
-| `zulip-embed/demo`            | —         | `sha256-…` |
+_The verified-release table is populated by `scripts/splice-sri.mjs` on
+tag push. For unreleased `main`, run `pnpm build && node
+scripts/release.mjs` locally and read `dist/INTEGRITY.md`._
 
 <!-- sri:end -->
-
-Hashes above are refreshed on every tagged release. For unreleased
-`main`, run `pnpm build && node scripts/release.mjs` locally and read
-`dist/INTEGRITY.md`.
 
 ## Bundle subpaths
 
@@ -362,7 +355,7 @@ always deploys.
 
 ## Plug-and-play components
 
-v0.8 ships a catalog of composable custom elements so you can drop any
+v1.0 ships a catalog of composable custom elements so you can drop any
 subset of the Zulip web app's UI into your own product:
 
 | Component              | Status         | Description                                                                      |
@@ -371,7 +364,7 @@ subset of the Zulip web app's UI into your own product:
 | `<zulip-channel-list>` | done           | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
 | `<zulip-topic-list>`   | done           | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
 | `<zulip-announcement>` | done           | Pinned-message banner; dismissible; fetches a single message by id               |
-| `<zulip-dm-list>`      | v0.8 (planned) | Direct-message pane                                                              |
+| `<zulip-dm-list>`      | v1.x (planned) | Direct-message pane                                                              |
 | `<zulip-compose>`      | v1.x           | Standalone composer (drafts, scheduled send, file upload)                        |
 | `<zulip-inbox>`        | v1.x           | Unreads grouped by channel > topic                                               |
 | `<zulip-recent>`       | v1.x           | Recent conversations view                                                        |
@@ -479,7 +472,7 @@ See [`SECURITY.md`](./SECURITY.md) for the threat model.
 | Streaming agent replies (`startAgentReply`)                | done           |
 | Pinned-message banner (`<zulip-announcement>`)             | done           |
 | JWT SSO handoff (`auth-token`)                             | done           |
-| Direct messages                                            | v0.8 (planned) |
+| Direct messages                                            | v1.x (planned) |
 | Presence (online/offline dots)                             | planned        |
 | File uploads from the composer                             | planned        |
 | Message search                                             | planned        |

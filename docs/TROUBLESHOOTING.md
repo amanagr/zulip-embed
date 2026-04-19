@@ -5,7 +5,7 @@ with [`ONBOARDING.md`](./ONBOARDING.md) — which gets you from zero to a
 live embed — this file covers what to do when something looks wrong.
 
 If your problem isn't here, open a discussion at
-<https://github.com/zulip/zulip-embed/discussions>. For a suspected
+<https://github.com/amanagr/zulip-embed/discussions>. For a suspected
 security issue, follow [`SECURITY.md`](../SECURITY.md).
 
 ## Error codes
@@ -103,7 +103,7 @@ Content-Security-Policy:
 
 The `style-src 'unsafe-inline'` is currently required because the
 element injects scoped styles into its shadow root. An opt-in
-nonce-based path is on the roadmap — track <https://github.com/zulip/zulip-embed/issues>
+nonce-based path is on the roadmap — track <https://github.com/amanagr/zulip-embed/issues>
 for progress.
 
 ## The bundle is bigger than I expected
@@ -150,10 +150,10 @@ don't pierce by default. Two supported override paths:
 
     ```css
     zulip-chat {
-        --zulip-accent: #5f3dc4;
-        --zulip-accent-contrast: #fff;
-        --zulip-radius: 10px;
-        --zulip-font-family: "Inter", system-ui, sans-serif;
+        --zc-color-accent: #5f3dc4;
+        --zc-color-accent-contrast: #fff;
+        --zc-radius: 10px;
+        --zc-font-family: "Inter", system-ui, sans-serif;
     }
     ```
 

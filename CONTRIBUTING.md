@@ -156,7 +156,7 @@ Use the issue templates in `.github/ISSUE_TEMPLATE/`:
   the proposal.
 
 For questions and general discussion, use
-[GitHub Discussions](https://github.com/zulip/zulip-embed/discussions).
+[GitHub Discussions](https://github.com/amanagr/zulip-embed/discussions).
 For anything that looks security-sensitive, follow
 [`SECURITY.md`](./SECURITY.md) — private email, not a GitHub issue.
 

@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
     - name: Security report
-      url: https://github.com/zulip/zulip-embed/blob/main/SECURITY.md
+      url: https://github.com/amanagr/zulip-embed/blob/main/SECURITY.md
       about: Please do NOT open a public issue for security-sensitive reports. Email security@zulip.com per SECURITY.md.
     - name: Questions & discussion
-      url: https://github.com/zulip/zulip-embed/discussions
+      url: https://github.com/amanagr/zulip-embed/discussions
       about: Usage questions, integration help, design discussion — not bugs or feature requests.
