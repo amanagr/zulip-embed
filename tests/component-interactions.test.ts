@@ -21,6 +21,16 @@ async function waitForMessages(el: HTMLElement, min = 1, maxTicks = 20): Promise
     }
 }
 
+// The emoji picker is lazy-loaded via a dynamic import, so the
+// click → picker-visible path takes several microtask turns. Poll
+// until the predicate holds instead of guessing a flush count.
+async function waitFor(predicate: () => boolean, maxTicks = 40): Promise<void> {
+    for (let i = 0; i < maxTicks; i++) {
+        if (predicate()) return;
+        await flush();
+    }
+}
+
 describe("<zulip-chat> interactions", () => {
     beforeEach(() => {
         vi.useFakeTimers({shouldAdvanceTime: true});
@@ -112,7 +122,11 @@ describe("<zulip-chat> interactions", () => {
         expect(addBtn).toBeTruthy();
 
         addBtn?.click();
-        await flush();
+        await waitFor(
+            () =>
+                el.shadowRoot?.querySelector<HTMLElement>(".emoji-picker")?.hidden ===
+                false,
+        );
 
         const picker = el.shadowRoot?.querySelector<HTMLElement>(".emoji-picker");
         expect(picker).toBeTruthy();
@@ -132,14 +146,18 @@ describe("<zulip-chat> interactions", () => {
 
         const addBtn = el.shadowRoot?.querySelector<HTMLButtonElement>(".reaction-add");
         addBtn?.click();
-        await flush();
+        await waitFor(
+            () =>
+                el.shadowRoot?.querySelector<HTMLElement>(".emoji-picker")?.hidden ===
+                false,
+        );
         const picker = el.shadowRoot?.querySelector<HTMLElement>(".emoji-picker");
         expect(picker?.hidden).toBe(false);
 
         const firstEmoji = picker?.querySelector<HTMLButtonElement>(".emoji-picker-btn");
         expect(firstEmoji).toBeTruthy();
         firstEmoji?.click();
-        await flush();
+        await waitFor(() => picker?.hidden === true);
 
         // Picker uses [hidden] to toggle visibility rather than detaching
         // the node so the anchor/focus logic stays simple. Pin that —
