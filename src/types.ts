@@ -57,9 +57,14 @@ export interface MessageEvent {
 export interface MessageUpdateEvent {
     type: "message-update";
     messageId: number;
-    // Updated HTML content (apply_markdown=true). Absent when the edit only
-    // touches topic/channel.
+    // Updated content. Absent when the edit only touches topic/channel.
     content?: string | undefined;
+    // Whether `content` is server-rendered HTML (true for ZulipTransport,
+    // which always sets apply_markdown=true) or plain text. Consumers
+    // must honor this flag rather than inferring HTML from the presence
+    // of `content` — otherwise an edit from a future non-HTML transport
+    // would silently flow through the HTML sanitizer on the wrong path.
+    contentIsHtml?: boolean | undefined;
     topic?: string | undefined;
     editedTimestamp?: number | undefined;
 }

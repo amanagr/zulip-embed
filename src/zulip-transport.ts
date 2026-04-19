@@ -273,6 +273,11 @@ export class ZulipTransport implements Transport {
                 type: "message-update",
                 messageId: parsed.data.message_id,
                 content: parsed.data.rendered_content,
+                // rendered_content is server-markdown output (apply_markdown=true
+                // is set on register), so it's always HTML. Emit the flag
+                // explicitly so consumers route it through the sanitizer
+                // rather than inferring from `content !== undefined`.
+                contentIsHtml: parsed.data.rendered_content === undefined ? undefined : true,
                 topic: parsed.data.subject,
                 editedTimestamp:
                     parsed.data.edit_timestamp === undefined

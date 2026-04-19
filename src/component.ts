@@ -366,7 +366,12 @@ export class ZulipChatElement extends HTMLElement {
             if (event.type === "message") {
                 this.appendMessage(event.message);
             } else if (event.type === "message-update") {
-                this.updateMessage(event.messageId, event.content, event.topic);
+                this.updateMessage(
+                    event.messageId,
+                    event.content,
+                    event.contentIsHtml,
+                    event.topic,
+                );
             } else if (event.type === "message-delete") {
                 this.deleteMessage(event.messageId);
             } else if (event.type === "reaction") {
@@ -458,14 +463,20 @@ export class ZulipChatElement extends HTMLElement {
     private updateMessage(
         id: number,
         content: string | undefined,
+        contentIsHtml: boolean | undefined,
         topic: string | undefined,
     ): void {
         const next = this.state.messages.map((m) => {
             if (m.id !== id) return m;
+            // Trust the transport's contentIsHtml flag rather than inferring
+            // HTML from `content !== undefined`. A future non-HTML transport
+            // emitting an edit event would otherwise flow plain text through
+            // the HTML sanitizer on the wrong render path.
             return {
                 ...m,
                 content: content ?? m.content,
-                contentIsHtml: content !== undefined ? true : m.contentIsHtml,
+                contentIsHtml:
+                    content === undefined ? m.contentIsHtml : contentIsHtml ?? false,
                 topic: topic ?? m.topic,
             };
         });
