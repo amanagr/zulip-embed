@@ -51,6 +51,17 @@ jobs:
           ZULIP_ANNOUNCE_SERVER: ${{ vars.ZULIP_ANNOUNCE_SERVER || 'https://chat.zulip.org' }}
         run: node scripts/fetch-announce-snapshot.mjs
 
+      - name: Fetch chat.zulip.org channels + topics snapshot
+        # Backs the <zulip-channel-list> / <zulip-topic-list> demos with
+        # real subscription + topic data. Same credentials and no-op
+        # fallback as the messages fetcher above.
+        continue-on-error: true
+        env:
+          ZULIP_ANNOUNCE_EMAIL: ${{ secrets.ZULIP_ANNOUNCE_EMAIL }}
+          ZULIP_ANNOUNCE_API_KEY: ${{ secrets.GH_ACTIONS_BOT_API_KEY }}
+          ZULIP_ANNOUNCE_SERVER: ${{ vars.ZULIP_ANNOUNCE_SERVER || 'https://chat.zulip.org' }}
+        run: node scripts/fetch-channels-topics-snapshot.mjs
+
       - name: Build static site
         env:
           VITE_BASE: /${{ github.event.repository.name }}/

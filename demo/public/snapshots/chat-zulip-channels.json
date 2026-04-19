@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "generatedAt": 1760227200000,
+  "server": "https://chat.zulip.org",
+  "channel": "announce",
+  "messages": [],
+  "channels": [
+    {
+      "channelId": 1,
+      "name": "announce",
+      "description": "Zulip announcements.",
+      "color": "#e79ab5",
+      "pinToTop": true,
+      "isMuted": false,
+      "unreadCount": 0
+    },
+    {
+      "channelId": 2,
+      "name": "development help",
+      "description": "Help with developing Zulip itself.",
+      "color": "#76ce90",
+      "pinToTop": false,
+      "isMuted": false,
+      "unreadCount": 0
+    },
+    {
+      "channelId": 9,
+      "name": "general",
+      "description": "General chat.",
+      "color": "#c2c2c2",
+      "pinToTop": false,
+      "isMuted": false,
+      "unreadCount": 0
+    },
+    {
+      "channelId": 18,
+      "name": "mobile",
+      "description": "The Zulip mobile app.",
+      "color": "#94c849",
+      "pinToTop": false,
+      "isMuted": false,
+      "unreadCount": 0
+    },
+    {
+      "channelId": 26,
+      "name": "production help",
+      "description": "Production issues.",
+      "color": "#dbdbdb",
+      "pinToTop": false,
+      "isMuted": false,
+      "unreadCount": 0
+    }
+  ],
+  "topics": {
+    "announce": [
+      {
+        "name": "Zulip updates",
+        "maxMessageId": 999999,
+        "unreadCount": 0,
+        "isResolved": false
+      },
+      {
+        "name": "Zulip Server 9.0",
+        "maxMessageId": 999000,
+        "unreadCount": 0,
+        "isResolved": false
+      },
+      {
+        "name": "Mobile app 26.0",
+        "maxMessageId": 998000,
+        "unreadCount": 0,
+        "isResolved": false
+      }
+    ],
+    "general": [
+      {
+        "name": "discussion",
+        "maxMessageId": 990000,
+        "unreadCount": 0,
+        "isResolved": false
+      },
+      {
+        "name": "suggestions",
+        "maxMessageId": 985000,
+        "unreadCount": 0,
+        "isResolved": false
+      }
+    ],
+    "development help": [
+      {
+        "name": "getting started",
+        "maxMessageId": 980000,
+        "unreadCount": 0,
+        "isResolved": false
+      },
+      {
+        "name": "frontend tests",
+        "maxMessageId": 979000,
+        "unreadCount": 0,
+        "isResolved": true
+      }
+    ],
+    "mobile": [
+      {
+        "name": "release 27.0",
+        "maxMessageId": 970000,
+        "unreadCount": 0,
+        "isResolved": false
+      }
+    ],
+    "production help": [
+      {
+        "name": "upgrade notes",
+        "maxMessageId": 960000,
+        "unreadCount": 0,
+        "isResolved": false
+      }
+    ]
+  }
+}
