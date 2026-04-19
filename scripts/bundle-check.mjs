@@ -24,15 +24,18 @@ const DIST = resolve(import.meta.dirname, "..", "dist");
 // Ratchet policy: pick a number just above today's measurement so CI
 // fails on regression. Tighten whenever a real improvement lands.
 const BUDGETS = {
-    "entries/chat.js": 60 * 1024,
+    // chat and announcement both pull render.ts, which ships the flat
+    // EMOJI_GLYPH_BY_NAME map so reaction pills render their glyph
+    // instead of literal ":name:" text. That map costs ~7 KB gzipped;
+    // the older 60/20 KB caps predate the fix, when renderer only knew
+    // ~20 alias glyphs. Tightened just above current measurement so
+    // real regressions still fail CI.
+    "entries/chat.js": 62 * 1024,
     "entries/channel-list.js": 8 * 1024,
     "entries/dm-list.js": 10 * 1024,
     "entries/topic-list.js": 8 * 1024,
     "entries/agent.js": 5 * 1024,
-    // announcement pulls render.ts for `sanitizeHtml` (Zulip-server
-    // content is HTML). Transports are dynamic-imported, so the budget
-    // only covers the sanitizer + shadow-DOM scaffolding.
-    "entries/announcement.js": 20 * 1024,
+    "entries/announcement.js": 23 * 1024,
     "entries/demo.js": 28 * 1024,
 };
 

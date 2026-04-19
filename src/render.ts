@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 
-import {EMOJI_GLYPH_BY_NAME} from "./emoji-data.ts";
+import {EMOJI_GLYPH_BY_NAME} from "./emoji-glyphs.ts";
 import {avatarColor, formatTimeOfDay, getInitials} from "./format.ts";
 import {
     ACTION_ICONS,
