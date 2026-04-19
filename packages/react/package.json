@@ -1,5 +1,5 @@
 {
-  "name": "@zulip/react",
+  "name": "zulip-embed-react",
   "version": "0.2.0",
   "description": "React wrapper for the Zulip Embed Web Component.",
   "license": "Apache-2.0",
@@ -24,13 +24,13 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@zulip/embed": "^0.2.0",
+    "zulip-embed": "^0.2.0",
     "react": ">=17.0.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.0.1",
     "@types/react": "^19.0.0",
-    "@zulip/embed": "workspace:*",
+    "zulip-embed": "workspace:*",
     "jsdom": "^25.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

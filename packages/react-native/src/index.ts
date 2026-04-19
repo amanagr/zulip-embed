@@ -1,4 +1,4 @@
-// @zulip/react-native — RN-native chat widgets + the headless SDK.
+// zulip-embed-react-native — RN-native chat widgets + the headless SDK.
 //
 // The headless SDK (ZulipClient, ZulipTransport, DemoTransport) works
 // in React Native out of the box because it's DOM-free. The UI
@@ -31,6 +31,6 @@ export type {
     User,
     ZulipEvent,
     ZulipEventListener,
-} from "@zulip/embed";
+} from "zulip-embed";
 
-export {ZulipClient, DemoTransport, ZulipTransport} from "@zulip/embed";
+export {ZulipClient, DemoTransport, ZulipTransport} from "zulip-embed";

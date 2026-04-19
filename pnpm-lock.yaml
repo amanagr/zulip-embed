@@ -48,9 +48,6 @@ importers:
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.14
-      '@zulip/embed':
-        specifier: workspace:*
-        version: link:../..
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
@@ -66,15 +63,15 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@24.12.2)(jsdom@25.0.1)(terser@5.46.1)
+      zulip-embed:
+        specifier: workspace:*
+        version: link:../..
 
   packages/react-native:
     devDependencies:
       '@types/react':
         specifier: ^19.0.0
         version: 19.2.14
-      '@zulip/embed':
-        specifier: workspace:*
-        version: link:../..
       react:
         specifier: ^19.0.0
         version: 19.2.5
@@ -87,6 +84,9 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@24.12.2)(jsdom@25.0.1)(terser@5.46.1)
+      zulip-embed:
+        specifier: workspace:*
+        version: link:../..
 
 packages:
 

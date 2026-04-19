@@ -3,8 +3,8 @@ import {act, render} from "@testing-library/react";
 import {useMemo} from "react";
 
 import {useZulipChat} from "../src/hooks.js";
-import type {Transport} from "@zulip/embed";
-import {DemoTransport} from "@zulip/embed";
+import type {Transport} from "zulip-embed";
+import {DemoTransport} from "zulip-embed";
 
 // A thin probe component that renders the hook's output as data
 // attributes so the test can inspect status + message count without

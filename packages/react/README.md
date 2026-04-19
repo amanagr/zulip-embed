@@ -1,24 +1,24 @@
-# @zulip/react
+# zulip-embed-react
 
 Thin React wrappers around the framework-agnostic
-[`@zulip/embed`](https://github.com/zulip/zulip-embed) Web Components.
+[`zulip-embed`](https://github.com/zulip/zulip-embed) Web Components.
 
 ## Install
 
 ```sh
-pnpm add @zulip/embed @zulip/react
+pnpm add zulip-embed zulip-embed-react
 ```
 
-`@zulip/embed` is a peer dependency — install both. Importing from
-`@zulip/react` registers the Web Components as a side effect, so you
-don't also need an explicit `import "@zulip/embed"`.
+`zulip-embed` is a peer dependency — install both. Importing from
+`zulip-embed-react` registers the Web Components as a side effect, so you
+don't also need an explicit `import "zulip-embed"`.
 
 ## Usage
 
 ### Embedded chat
 
 ```tsx
-import {ZulipChat} from "@zulip/react";
+import {ZulipChat} from "zulip-embed-react";
 
 export function SupportPage() {
   return (
@@ -40,7 +40,7 @@ export function SupportPage() {
 ### Channel + topic pickers
 
 ```tsx
-import {ZulipChannelList, ZulipTopicList} from "@zulip/react";
+import {ZulipChannelList, ZulipTopicList} from "zulip-embed-react";
 
 export function Sidebar() {
   const [channel, setChannel] = useState("general");

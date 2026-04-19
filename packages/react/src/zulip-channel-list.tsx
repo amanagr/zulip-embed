@@ -5,8 +5,8 @@
 import {createElement, useEffect, useRef, forwardRef, useImperativeHandle} from "react";
 import type {CSSProperties, ReactElement} from "react";
 
-import "@zulip/embed";
-import type {ZulipChannelListElement} from "@zulip/embed";
+import "zulip-embed";
+import type {ZulipChannelListElement} from "zulip-embed";
 
 export interface ChannelSelectedDetail {
     channelId: number;

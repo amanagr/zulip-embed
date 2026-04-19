@@ -1,12 +1,12 @@
-// Ambient types for @zulip/embed's headless surface — enough for
+// Ambient types for zulip-embed's headless surface — enough for
 // the RN widgets to typecheck without compiling the core SDK. When
-// consumers install @zulip/embed, the real .d.ts overrides these.
+// consumers install zulip-embed, the real .d.ts overrides these.
 //
 // RN doesn't need the DOM-backed pieces (Web Components, render
 // pipeline, DOMPurify), so we only re-declare the transport + client
 // API.
 
-declare module "@zulip/embed" {
+declare module "zulip-embed" {
     export interface Channel {
         channelId: number;
         name: string;

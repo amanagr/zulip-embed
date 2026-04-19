@@ -79,7 +79,7 @@ bundle-split work must not regress:
 - `7b67326` — sizing on `:host` so external height rules take effect.
 - `e8a5939` — emoji-picker category nav crushed by grid flex squeeze.
 - `302cf22` — composer textarea invisible on light theme.
-- `4e6a24f` — `fix(ci)`: build core bundle before `@zulip/react`
+- `4e6a24f` — `fix(ci)`: build core bundle before `zulip-embed-react`
   typecheck (latent ordering bug exposed when the React package was
   added).
 
@@ -90,7 +90,7 @@ bundle-split work must not regress:
    at 4Hz with a trailing-edge debounce, plus
    `sendMessageWithId()` contract. The bundle-split work in #10 must
    keep `startAgentReply` inside the `agent` subpath entry and not
-   accidentally eager-load it into the base `@zulip/embed/chat` tree.
+   accidentally eager-load it into the base `zulip-embed/chat` tree.
    Single-consumer code paths are where regressions hide — any change
    to `ZulipClient`'s event fan-out during splitting needs the
    `agent-reply.test.ts` fake-timer suite run under the new entry
@@ -139,7 +139,7 @@ final release theater (#17) are explicitly Sprint 6.
 
 1. **#10 — Bundle surgery + subpath exports** _(originally Sprint 4
    scope in V1_PLAN.md; keep here, it blocks everything else)_.
-   Gate for v1.0: without subpath entries, `@zulip/embed/chat` is
+   Gate for v1.0: without subpath entries, `zulip-embed/chat` is
    conceptually meaningless and the 70KB budget line in the README is
    aspirational. Must land first — #11 and #12 depend on `entries/`
    existing, and the npm publish workflow needs a final `exports` map
@@ -174,7 +174,7 @@ final release theater (#17) are explicitly Sprint 6.
    already in `5830cdf`). Gate for v1.0: RN currently claims ✅ in the
    README matrix but is plain-text only (no HTML renderer, no
    reactions UI, no typing indicator). Shipping 0.8 without honest
-   status-setting risks a `@zulip/react-native` 1.0 that adopters
+   status-setting risks a `zulip-embed-react-native` 1.0 that adopters
    feel misled by. S-sized task; included because it's a
    reputational fix, not a feature.
 
@@ -184,7 +184,7 @@ final release theater (#17) are explicitly Sprint 6.
   `src/entries/*.ts` existing. Landing #10 last would force re-doing
   #11 and #12's publish path.
 - **#17 second** because subpath exports only truly work when verified
-  in an `npm install @zulip/embed@0.8.0-rc.0 && node -e "..."` loop.
+  in an `npm install zulip-embed@0.8.0-rc.0 && node -e "..."` loop.
   Delaying publish until 1.0 is a known anti-pattern — we eat a
   first-publish surprise on the RC, not the GA.
 - **#12 third** because it carries the last breaking-change budget
@@ -261,16 +261,16 @@ second on #17 + #11.
    `push: tags: ['v*']`. Steps: `pnpm install`, `pnpm test`,
    `pnpm build`, `pnpm -r build`, then `pnpm publish --access public`
    for the root and each workspace package in topological order
-   (`@zulip/embed` → `@zulip/react` → `@zulip/react-native`). Uses
+   (`zulip-embed` → `zulip-embed-react` → `zulip-embed-react-native`). Uses
    `NPM_TOKEN` secret. Dry-run once with `--dry-run` flag on a PR
    branch before the first real tag.
 7. **Add bundler-compat CI matrix row in the same `release.yml`.**
-   Post-publish job consumes `@zulip/embed@0.8.0-rc.0` from the
+   Post-publish job consumes `zulip-embed@0.8.0-rc.0` from the
    registry in three ephemeral projects: one Webpack 5, one Rollup 4,
-   one Vite. Each resolves `@zulip/embed/chat` and asserts the IIFE
+   one Vite. Each resolves `zulip-embed/chat` and asserts the IIFE
    runs without throwing. Fails the release if any fails.
-8. **Publish `@zulip/embed@0.8.0-rc.0` to npm** from a tag on a
-   release branch. Verify: `unpkg.com/@zulip/embed@0.8.0-rc.0/chat`
+8. **Publish `zulip-embed@0.8.0-rc.0` to npm** from a tag on a
+   release branch. Verify: `unpkg.com/zulip-embed@0.8.0-rc.0/chat`
    loads and registers `<zulip-chat>` in a fresh HTML file with no
    other scripts.
 9. **Write `src/announcement.ts` + `src/entries/announcement.ts`** per
@@ -294,12 +294,12 @@ second on #17 + #11.
 
 ## 4. Open questions for the human
 
-1. **npm org ownership.** `@zulip/*` is an npm scope. Do you have
-   publish rights on `@zulip/embed` / `@zulip/react` /
-   `@zulip/react-native` today, or does the first publish need to go
-   to a different scope (e.g. `@zulip-embed/embed`)? Assumption
-   otherwise: you own the scope and `NPM_TOKEN` is a pending TODO.
-   _If I'm wrong, item #6 above needs to stall on provisioning._
+1. **npm publish rights.** _Resolved 2026-04-19:_ user does not own the
+   `@zulip` npm scope, so packages are shipping as unscoped names —
+   `zulip-embed`, `zulip-embed-react`, `zulip-embed-react-native`. All
+   three registry lookups returned 404 at decision time; publishing the
+   first tarball claims the names. `NPM_TOKEN` provisioning is still a
+   pending TODO on item #6.
 2. **Version jump semantics.** `package.json` is at `0.2.0`; the plan
    has been shipping 0.4 / 0.6 / 0.8 tags in CHANGELOG notes only. OK
    to bump directly to `0.8.0-rc.0` on the next publish, skipping

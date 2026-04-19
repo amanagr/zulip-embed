@@ -1,10 +1,10 @@
-// @zulip/react — thin React wrappers around the framework-agnostic
+// zulip-embed-react — thin React wrappers around the framework-agnostic
 // <zulip-chat>, <zulip-channel-list>, and <zulip-topic-list> Web
 // Components. The components themselves own all rendering + state;
 // these wrappers only convert React props to attributes, wire
 // React-style `on*` callback props to the underlying CustomEvents,
 // and trigger the customElements.define side effect on import so
-// downstream apps don't have to remember to `import "@zulip/embed"`.
+// downstream apps don't have to remember to `import "zulip-embed"`.
 
 export {ZulipChat} from "./zulip-chat.js";
 export type {ZulipChatProps} from "./zulip-chat.js";
@@ -37,6 +37,6 @@ export type {
     ZulipEvent,
     ZulipEventListener,
     ZulipMessageEventDetail,
-} from "@zulip/embed";
-export {ZulipClient} from "@zulip/embed";
-export type {ClientState, Transport, ZulipClientOptions} from "@zulip/embed";
+} from "zulip-embed";
+export {ZulipClient} from "zulip-embed";
+export type {ClientState, Transport, ZulipClientOptions} from "zulip-embed";

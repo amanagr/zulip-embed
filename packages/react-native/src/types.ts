@@ -1,5 +1,5 @@
 // Re-export the headless types so RN consumers don't need to reach
-// into @zulip/embed directly.
+// into zulip-embed directly.
 export type {
     Channel,
     ConnectionStatus,
@@ -19,9 +19,9 @@ export type {
     User,
     ZulipEvent,
     ZulipEventListener,
-} from "@zulip/embed";
+} from "zulip-embed";
 
-export {ZulipClient, DemoTransport, ZulipTransport} from "@zulip/embed";
+export {ZulipClient, DemoTransport, ZulipTransport} from "zulip-embed";
 
 // RN-specific theme token. Colors match the Web Component's default
 // light theme so the chat feels consistent across platforms.

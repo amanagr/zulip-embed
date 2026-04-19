@@ -1,5 +1,5 @@
 {
-  "name": "@zulip/embed",
+  "name": "zulip-embed",
   "version": "0.2.0",
   "description": "Embed Zulip chat as a framework-agnostic Web Component or headless SDK.",
   "license": "Apache-2.0",

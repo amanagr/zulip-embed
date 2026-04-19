@@ -1,4 +1,4 @@
-# Migrating to `@zulip/embed@0.2.0`
+# Migrating to `zulip-embed@0.2.0`
 
 Sprint 1 of v1 turned the auth story and the public API types inside
 out. This guide walks through the four concrete migrations, in the
@@ -42,7 +42,7 @@ See [Zulip JWT docs](https://zulip.com/api/) for key provisioning.
 
 The `api-key` attribute still works for local development but logs a
 deprecation warning at mount. It is scheduled for removal in
-`@zulip/embed@1.0.0`.
+`zulip-embed@1.0.0`.
 
 ## 2. Narrow on `Message.type` before accessing channel fields
 

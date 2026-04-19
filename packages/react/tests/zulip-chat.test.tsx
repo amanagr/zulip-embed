@@ -4,7 +4,7 @@ import {createRef} from "react";
 
 import {ZulipChat} from "../src/index.js";
 
-// Under vitest, @zulip/embed's `import` side effect calls
+// Under vitest, zulip-embed's `import` side effect calls
 // customElements.define, so the real Web Component is registered
 // before these tests run. That's what lets us assert on shadow DOM
 // contents without any mocking.

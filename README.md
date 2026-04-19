@@ -43,7 +43,7 @@ REST API so your data and your audit trail stay in your Zulip.
 ### 1. Script tag (any site)
 
 ```html
-<script type="module" src="https://unpkg.com/@zulip/embed"></script>
+<script type="module" src="https://unpkg.com/zulip-embed"></script>
 
 <zulip-chat
     server="https://chat.example.com"
@@ -56,10 +56,10 @@ REST API so your data and your audit trail stay in your Zulip.
 ></zulip-chat>
 ```
 
-### 2. React — [`@zulip/react`](./packages/react/)
+### 2. React — [`zulip-embed-react`](./packages/react/)
 
 ```tsx
-import {ZulipChat} from "@zulip/react";
+import {ZulipChat} from "zulip-embed-react";
 
 export function SupportPage() {
     return (
@@ -79,10 +79,10 @@ Includes `<ZulipChat>`, `<ZulipChannelList>`, and `<ZulipTopicList>`
 — all thin wrappers over the Web Components with idiomatic camelCase
 props and typed event callbacks.
 
-### 3. React Native — [`@zulip/react-native`](./packages/react-native/)
+### 3. React Native — [`zulip-embed-react-native`](./packages/react-native/)
 
 ```tsx
-import {ZulipChatScreen, ZulipTransport, DARK_THEME} from "@zulip/react-native";
+import {ZulipChatScreen, ZulipTransport, DARK_THEME} from "zulip-embed-react-native";
 
 const transport = new ZulipTransport({
     server: "https://chat.example.com",
@@ -127,12 +127,12 @@ Pure Dart widgets (no WebView). The [`example/`](./packages/flutter/example/)
 app is compiled to Flutter web as part of CI and published at
 [`amanagr.github.io/zulip-embed/flutter/`](https://amanagr.github.io/zulip-embed/flutter/).
 
-### 5. Headless SDK — `@zulip/embed`
+### 5. Headless SDK — `zulip-embed`
 
 When you want full control over the UI:
 
 ```ts
-import {ZulipClient, ZulipTransport} from "@zulip/embed";
+import {ZulipClient, ZulipTransport} from "zulip-embed";
 
 const client = new ZulipClient({
     transport: new ZulipTransport({
@@ -250,15 +250,15 @@ subset of the Zulip web app's UI into your own product:
 | `<zulip-message>`      | ⏳     | Single-message embed for quote-of-the-day widgets                                |
 
 Each Web Component is mirrored by a typed React wrapper in
-[`@zulip/react`](./packages/react/) as soon as it lands.
+[`zulip-embed-react`](./packages/react/) as soon as it lands.
 
 ## Frameworks
 
 | Framework                           | Status     | Package                                    |
 | ----------------------------------- | ---------- | ------------------------------------------ |
-| Web Components (framework-agnostic) | ✅         | [`@zulip/embed`](./src/)                   |
-| React                               | ✅         | [`@zulip/react`](./packages/react/)        |
-| React Native                        | ✅         | [`@zulip/react-native`](./packages/react-native/) |
+| Web Components (framework-agnostic) | ✅         | [`zulip-embed`](./src/)                   |
+| React                               | ✅         | [`zulip-embed-react`](./packages/react/)        |
+| React Native                        | ✅         | [`zulip-embed-react-native`](./packages/react-native/) |
 | Flutter                             | ✅         | [`packages/flutter/`](./packages/flutter/) |
 | SwiftUI (iOS)                       | ⏳ planned | `packages/swiftui/`                        |
 | Jetpack Compose (Android)           | ⏳ planned | `packages/compose/`                        |
@@ -268,8 +268,8 @@ Each Web Component is mirrored by a typed React wrapper in
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  Framework wrappers                                              │
-│  ├── @zulip/react           (typed JSX over custom elements)     │
-│  ├── @zulip/react-native    (FlatList-based ZulipChatScreen)     │
+│  ├── zulip-embed-react           (typed JSX over custom elements)     │
+│  ├── zulip-embed-react-native    (FlatList-based ZulipChatScreen)     │
 │  └── zulip_embed (Flutter)  (pure Dart widgets)                  │
 ├──────────────────────────────────────────────────────────────────┤
 │  UI layer — Custom Elements + Shadow DOM                         │
@@ -350,13 +350,13 @@ See [`SECURITY.md`](./SECURITY.md) for the threat model.
 
 ```
 zulip-embed/
-├── src/                   # @zulip/embed — Web Components + headless SDK
+├── src/                   # zulip-embed — Web Components + headless SDK
 ├── tests/                 # Vitest suite (276 tests)
 ├── demo/                  # Landing page + playground (this repo's Pages site)
 ├── scripts/               # CI snapshot fetchers
 ├── packages/
-│   ├── react/             # @zulip/react         (done)
-│   ├── react-native/      # @zulip/react-native  (done)
+│   ├── react/             # zulip-embed-react         (done)
+│   ├── react-native/      # zulip-embed-react-native  (done)
 │   └── flutter/           # zulip_embed          (done)
 └── .github/workflows/     # CI: test, typecheck, build, deploy Pages
 ```
@@ -406,8 +406,8 @@ dart test
 4. ✅ Flutter parity (live chat, edit/delete, typing, snapshot)
 5. ✅ `Transport.listChannels()` + `listTopics()` primitives
 6. ✅ `<zulip-channel-list>` + `<zulip-topic-list>` components
-7. ✅ React wrapper package (`@zulip/react`)
-8. ✅ React Native package (`@zulip/react-native`)
+7. ✅ React wrapper package (`zulip-embed-react`)
+8. ✅ React Native package (`zulip-embed-react-native`)
 9. ✅ Branded header (`brand-name`, `brand-logo`) + theming playground
 10. ✅ Compose toolbar (B/I/strike/code/link/quote/lists/spoiler/mention/emoji) + keyboard shortcuts
 11. ✅ Categorized, searchable emoji picker with recents

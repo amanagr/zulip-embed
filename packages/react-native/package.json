@@ -1,5 +1,5 @@
 {
-  "name": "@zulip/react-native",
+  "name": "zulip-embed-react-native",
   "version": "0.2.0",
   "description": "React Native chat widgets + headless SDK for Zulip.",
   "license": "Apache-2.0",
@@ -24,13 +24,13 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@zulip/embed": "^0.2.0",
+    "zulip-embed": "^0.2.0",
     "react": ">=17.0.0",
     "react-native": ">=0.70.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
-    "@zulip/embed": "workspace:*",
+    "zulip-embed": "workspace:*",
     "react": "^19.0.0",
     "react-native": "^0.76.0",
     "typescript": "~5.7.2",

@@ -41,7 +41,7 @@ jobs:
       - run: pnpm test
 
       # Build the core bundle (including rolled-up .d.ts) so the
-      # @zulip/react typecheck below can resolve `@zulip/embed` via the
+      # zulip-embed-react typecheck below can resolve `zulip-embed` via the
       # package's published `types` entry — same surface downstream
       # consumers hit.
       - run: pnpm -w run build
@@ -49,11 +49,11 @@ jobs:
       # Typecheck + test the React wrapper alongside the core bundle.
       # Kept as explicit per-package steps rather than a `pnpm -r`
       # sweep so a failure surfaces against the right package name.
-      - name: Typecheck @zulip/react
+      - name: Typecheck zulip-embed-react
         working-directory: packages/react
         run: pnpm typecheck
 
-      - name: Test @zulip/react
+      - name: Test zulip-embed-react
         working-directory: packages/react
         run: pnpm test
 

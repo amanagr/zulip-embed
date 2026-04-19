@@ -15,13 +15,13 @@
 import {createElement, useEffect, useRef, forwardRef, useImperativeHandle} from "react";
 import type {CSSProperties, ReactElement} from "react";
 
-import "@zulip/embed";
+import "zulip-embed";
 import type {
     ZulipChatElement,
     ZulipConnectionChangeEventDetail,
     ZulipErrorEventDetail,
     ZulipMessageEventDetail,
-} from "@zulip/embed";
+} from "zulip-embed";
 
 export interface ZulipChatProps {
     // Live-connection credentials. Leave server/email/apiKey undefined

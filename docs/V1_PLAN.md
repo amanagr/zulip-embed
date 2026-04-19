@@ -4,7 +4,7 @@ Source: synthesis of a 5-PM panel (dev-infra, open-source, enterprise-security, 
 
 ## Current-state summary
 
-The repo at `/home/aman/zulip-embed` is a pnpm workspace with four publishable units: the core web package at `src/` (published as `@zulip/embed`), a React wrapper at `packages/react/`, a React Native package at `packages/react-native/`, and a Flutter package at `packages/flutter/`. The core package exports the `<zulip-chat>`, `<zulip-channel-list>`, and `<zulip-topic-list>` custom elements, the `ZulipClient`, and three transports (`ZulipTransport`, `DemoTransport`, `SnapshotTransport`). Everything compiles from `src/index.ts` into a single Vite library bundle (`dist/zulip-embed.js` = 174 KB raw, 43 KB gzipped; IIFE = 132 KB raw, 39 KB gzipped). The demo page at `demo/index.html` + `demo/main.ts` is also the production landing page — `VITE_MODE=site` reuses it into `site/`. Tests are 36 vitest files in `tests/` plus 5 Dart test files in `packages/flutter/test/` plus 2 React tests in `packages/react/tests/`. There is no `docs/` directory yet.
+The repo at `/home/aman/zulip-embed` is a pnpm workspace with four publishable units: the core web package at `src/` (published as `zulip-embed`), a React wrapper at `packages/react/`, a React Native package at `packages/react-native/`, and a Flutter package at `packages/flutter/`. The core package exports the `<zulip-chat>`, `<zulip-channel-list>`, and `<zulip-topic-list>` custom elements, the `ZulipClient`, and three transports (`ZulipTransport`, `DemoTransport`, `SnapshotTransport`). Everything compiles from `src/index.ts` into a single Vite library bundle (`dist/zulip-embed.js` = 174 KB raw, 43 KB gzipped; IIFE = 132 KB raw, 39 KB gzipped). The demo page at `demo/index.html` + `demo/main.ts` is also the production landing page — `VITE_MODE=site` reuses it into `site/`. Tests are 36 vitest files in `tests/` plus 5 Dart test files in `packages/flutter/test/` plus 2 React tests in `packages/react/tests/`. There is no `docs/` directory yet.
 
 The component in `src/component.ts` is 1322 lines, a single `ZulipChatElement` that owns template construction, state, transport lifecycle, and every keyboard / scroll / composer handler. Observed attributes today are the 16 listed at `src/component.ts:37-54`; the ones that tear down and rebuild the client are `demo`, `demo-variant`, `snapshot-url`, `server`, `email`, `api-key`, `channel`, `topic`. The `bootstrapClient()` method at `src/component.ts:648` instantiates a new `ZulipTransport` directly from the `email` + `api-key` attributes, then wraps it in a `ZulipClient` and subscribes with an `initToken` fence. No `CustomEvent` is dispatched off `<zulip-chat>` today — event-dispatch is used only in `src/channel-list.ts:387` and in `src/topic-list.ts`. That is the single biggest gap for the React hook + event surface work.
 
@@ -66,7 +66,7 @@ Six two-week sprints. Each sprint lands one user-visible milestone and ships to 
 ### Sprint 6: polish + release (weeks 11–12)
 
 - **Goal.** Ship 1.0. Copywriting, micro-interactions, landing-page sanding.
-- **Deliverable.** `@zulip/embed@1.0.0` on npm, signed GitHub release, updated landing page, migration guide from 0.1.
+- **Deliverable.** `zulip-embed@1.0.0` on npm, signed GitHub release, updated landing page, migration guide from 0.1.
 - **Items.** #17 (SRI + signed releases finalization), #18 (copywriting + micro-interactions), release-candidate burn-down.
 
 ## Item details
@@ -234,19 +234,19 @@ Six two-week sprints. Each sprint lands one user-visible milestone and ships to 
 - **Files touched.** `vite.config.ts` (multi-entry `build.rollupOptions.input`), `package.json` `exports` map, split `src/index.ts` into `src/entries/chat.ts`, `channel-list.ts`, `topic-list.ts`, `announcement.ts`, `dm-list.ts`, `agent.ts`, `demo.ts`; dynamic imports in `src/component.ts` around `DemoTransport`/`SnapshotTransport`/`createEmojiPicker`/`EMOJI_GLYPHS`; new `scripts/bundle-check.mjs` CI-gated.
 - **Public API additions.** Subpath entries:
   ```
-  @zulip/embed             — zero-side-effect type entry
-  @zulip/embed/chat        — registers <zulip-chat>
-  @zulip/embed/channel-list
-  @zulip/embed/topic-list
-  @zulip/embed/dm-list
-  @zulip/embed/announcement
-  @zulip/embed/agent       — startAgentReply + AgentReplyHandle
-  @zulip/embed/demo        — DemoTransport + SnapshotTransport
-  @zulip/embed/all         — compat; registers everything
+  zulip-embed             — zero-side-effect type entry
+  zulip-embed/chat        — registers <zulip-chat>
+  zulip-embed/channel-list
+  zulip-embed/topic-list
+  zulip-embed/dm-list
+  zulip-embed/announcement
+  zulip-embed/agent       — startAgentReply + AgentReplyHandle
+  zulip-embed/demo        — DemoTransport + SnapshotTransport
+  zulip-embed/all         — compat; registers everything
   ```
 - **Test strategy.** `scripts/bundle-check.mjs`: `chat` ≤ 72KB, `channel-list` ≤ 20KB, `topic-list` ≤ 15KB, `announcement` ≤ 10KB, `dm-list` ≤ 25KB. Runs under `pnpm test`.
 - **Size.** L (5 days).
-- **Risks.** `@zulip/embed/all` preserves muscle memory but we hide it from headline docs.
+- **Risks.** `zulip-embed/all` preserves muscle memory but we hide it from headline docs.
 
 ### #11 — `<zulip-announcement>` pinned banner
 
@@ -349,7 +349,7 @@ Six two-week sprints. Each sprint lands one user-visible milestone and ships to 
 - **#2** removes the `api-key` attribute. Migration: replace with `auth-token` (preferred) or pass `apiKey` through `ZulipTransport` options on the JS side.
 - **#3** narrows `Message`, `SendMessageParams`, `EditMessageParams`. Migration: `if (msg.channelName)` → `if (msg.type === "channel")`. Codemod in `scripts/codemod-0.2.mjs`.
 - **#12** widens `ScopeFilter` with `kind`. Compat: old flat shape accepted for one release with console warning.
-- **#10** reshapes `exports`. Migration: switch to subpath imports or use `@zulip/embed/all`.
+- **#10** reshapes `exports`. Migration: switch to subpath imports or use `zulip-embed/all`.
 - **#13** widens `ConnectionStatus` with `"reconnecting"`. Exhaustive switches must add a branch.
 
 ### Flutter parity per-sprint
@@ -382,7 +382,7 @@ Items **#4, #7, #10, #14, #16, #17** are Flutter-irrelevant.
 - **0.2 (end of sprint 1)** — JWT handoff, discriminated unions, error taxonomy, `"reconnecting"`. All v1 breaking changes here. `docs/migration-0.2.md`.
 - **0.4 (end of sprint 2)** — typed event surface, React hook, `ZulipClient` sugar, RN runtime bug fixed.
 - **0.6 (end of sprint 3)** — agent primitives. Demo page "Agent reply, live" tab.
-- **0.8 (end of sprint 4)** — bundle surgery, topic lifecycle, announcement, DM list, RN alpha banner, SRI. `@zulip/embed/chat` subpath published.
+- **0.8 (end of sprint 4)** — bundle surgery, topic lifecycle, announcement, DM list, RN alpha banner, SRI. `zulip-embed/chat` subpath published.
 - **1.0-rc (start of sprint 6)** — tagged after sprint 5 docs complete. One-week external-beta burn-in. Bugfix-only until 1.0.
 - **1.0 (end of sprint 6)** — polish pass lands, signed release, README SRI table updated, blog post.
 
@@ -392,7 +392,7 @@ Items **#4, #7, #10, #14, #16, #17** are Flutter-irrelevant.
 - **#10 gains a `/all` entry** — preserves one-import muscle memory while headline docs show subpaths.
 - **#12 bumped L** — `ScopeFilter` touched by every scope-aware file (30+ call sites).
 - **#15's "reaction-nudge after 5 scrolled messages" trimmed** — depends on message-viewed tracking we don't have; moves to v1.1.
-- **Post-v1**: `@zulip/mcp-server` (v1.1 — read-only server first: channels/topics/search), presence + `<zulip-user-list>` (v1.1), file upload with `beforeSend` DLP hook (v1.1), search (v1.1, bundled with MCP), bubble layout variant (v1.1), polls/scheduled/GIFs (v1.2), SAML/OIDC enterprise (v1.2+), Notion/Teachable/Framer starter kits (v1.1).
+- **Post-v1**: `zulip-embed-mcp-server` (v1.1 — read-only server first: channels/topics/search), presence + `<zulip-user-list>` (v1.1), file upload with `beforeSend` DLP hook (v1.1), search (v1.1, bundled with MCP), bubble layout variant (v1.1), polls/scheduled/GIFs (v1.2), SAML/OIDC enterprise (v1.2+), Notion/Teachable/Framer starter kits (v1.1).
 
 ## Landing page + demo track
 

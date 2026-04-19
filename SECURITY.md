@@ -18,7 +18,7 @@ within 72 hours and work with you on disclosure timing.
 | Component config | XSS via attributes (`channel`, `topic`) | All attribute reads flow through `textContent` / DOM API setters — never `innerHTML` |
 | Transport | Plaintext credential exfiltration | `serverUrl` validated to `http(s)` only; `http://` against non-loopback hosts emits a console warning |
 | Credential storage | API key visible in DOM | **Not mitigated** — see "Out of scope" |
-| Third-party script tags | Tampered `@zulip/embed` bundle | Publish with SRI-friendly unpkg URLs (roadmap: sign releases) |
+| Third-party script tags | Tampered `zulip-embed` bundle | Publish with SRI-friendly unpkg URLs (roadmap: sign releases) |
 | Flutter transport | Same class of issues as web | `_normalize()` validates scheme; HTTP Basic built from UTF-8 bytes |
 
 ## What the sanitizer accepts

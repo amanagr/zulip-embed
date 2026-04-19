@@ -12,8 +12,8 @@
 
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 
-import type {ClientState, Transport, ScopeFilter, SendMessageParams} from "@zulip/embed";
-import {ZulipClient} from "@zulip/embed";
+import type {ClientState, Transport, ScopeFilter, SendMessageParams} from "zulip-embed";
+import {ZulipClient} from "zulip-embed";
 
 export interface UseZulipChatResult {
     // Active message list for the scope. Stable reference until state
