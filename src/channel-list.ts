@@ -1,8 +1,5 @@
-import {DemoTransport} from "./demo-transport.ts";
-import {SnapshotTransport} from "./snapshot-transport.ts";
 import type {Transport} from "./transport.ts";
 import type {Channel, ScopeFilter} from "./types.ts";
-import {ZulipTransport} from "./zulip-transport.ts";
 
 const OBSERVED_ATTRIBUTES = [
     "demo",
@@ -257,15 +254,20 @@ export class ZulipChannelListElement extends HTMLElement {
         this.shadow.replaceChildren(style, root);
     }
 
-    private createTransport(): Transport {
+    private async createTransport(): Promise<Transport> {
         // listChannels is scope-agnostic, but Transport ctors need a
         // scope. Use a throwaway "general" — no messages are fetched.
         const scope: ScopeFilter = {channel: "general"};
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
+            // Dynamic import so live-only channel lists don't pull in the
+            // snapshot fetch/parse surface.
+            const {SnapshotTransport} = await import("./snapshot-transport.ts");
             return new SnapshotTransport({url: snapshotUrl, scope});
         }
         if (this.hasAttribute("demo")) {
+            // Dynamic import keeps demo fixtures out of the default entry.
+            const {DemoTransport} = await import("./demo-transport.ts");
             return new DemoTransport({scope});
         }
         const server = this.getAttribute("server");
@@ -277,6 +279,12 @@ export class ZulipChannelListElement extends HTMLElement {
                 'Live mode requires a "server" attribute. Add the "demo" attribute to preview without a server.',
             );
         }
+        // Dynamic import keeps the ~18KB Zod schema surface out of the
+        // static channel-list entry; a page that renders <zulip-channel-list>
+        // alongside <zulip-chat> deduplicates this chunk across both
+        // components, and a page that uses channel-list alone pays the
+        // cost only when it actually connects.
+        const {ZulipTransport} = await import("./zulip-transport.ts");
         if (authToken && authToken !== "") {
             return new ZulipTransport({serverUrl: server, authToken, scope});
         }
@@ -300,10 +308,20 @@ export class ZulipChannelListElement extends HTMLElement {
 
         let transport: Transport;
         try {
-            transport = this.createTransport();
+            transport = await this.createTransport();
         } catch (error) {
+            if (token !== this.loadToken) return;
             this.setStatus(undefined);
             this.setError(describeError(error));
+            return;
+        }
+        if (token !== this.loadToken) {
+            // Attribute changed mid-dynamic-import; discard this transport.
+            try {
+                await transport.close();
+            } catch {
+                // Ignore teardown errors.
+            }
             return;
         }
 

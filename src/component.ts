@@ -6,8 +6,7 @@ import {
     wrapLink,
     wrapSelection,
 } from "./compose-format.ts";
-import {DemoTransport} from "./demo-transport.ts";
-import {createEmojiPicker, type EmojiPickerHandle} from "./emoji-picker.ts";
+import type {EmojiPickerHandle} from "./emoji-picker.ts";
 import {enhanceKatex} from "./katex.ts";
 import {
     parseMessageActionIds,
@@ -21,7 +20,6 @@ import {
     scrollToBottom,
     type RenderContext,
 } from "./render.ts";
-import {SnapshotTransport} from "./snapshot-transport.ts";
 import {enhanceSpoilers} from "./spoilers.ts";
 import {COMPONENT_STYLES} from "./styles.ts";
 import type {Transport} from "./transport.ts";
@@ -156,6 +154,8 @@ export class ZulipChatElement extends HTMLElement {
     private initToken = 0;
     private feedEl: HTMLElement | undefined;
     private emojiPicker: EmojiPickerHandle | undefined;
+    private emojiPickerRoot: HTMLElement | undefined;
+    private emojiPickerPromise: Promise<EmojiPickerHandle> | undefined;
     private newMessagesPillEl: HTMLButtonElement | undefined;
     private composerInputEl: HTMLTextAreaElement | undefined;
     private composerSendEl: HTMLButtonElement | undefined;
@@ -256,7 +256,10 @@ export class ZulipChatElement extends HTMLElement {
 
         // The picker lives inside .root (a positioned container) so it
         // can float above messages without escaping the rounded border.
-        this.emojiPicker = createEmojiPicker(this.shadow, root);
+        // Deferred: createEmojiPicker() pulls ~11KB of emoji metadata that
+        // only matters when the user actually opens the picker. We hold
+        // onto the root reference and lazily import on first open.
+        this.emojiPickerRoot = root;
 
         // Inline confirmation widgets live inside the shadow root but
         // the embedder sits on the host element. Listen for the
@@ -582,16 +585,8 @@ export class ZulipChatElement extends HTMLElement {
         add(MENTION_ICON_SVG, "Mention (@)", () => insertAtCursor(input, "@"));
         addSeparator(bar);
         add(EMOJI_ICON_SVG, "Emoji", () => {
-            if (this.emojiPicker === undefined) return;
-            if (this.emojiPicker.isOpen()) {
-                this.emojiPicker.close();
-                return;
-            }
             const anchor = bar.lastElementChild as HTMLElement;
-            this.emojiPicker.open(anchor, (emojiName) => {
-                const glyph = EMOJI_GLYPHS[emojiName] ?? `:${emojiName}:`;
-                insertAtCursor(input, glyph);
-            });
+            void this.openComposerEmojiPicker(anchor, input);
         });
 
         return bar;
@@ -705,9 +700,19 @@ export class ZulipChatElement extends HTMLElement {
 
         let transport: Transport;
         try {
-            transport = this.createTransport(scope);
+            transport = await this.createTransport(scope);
         } catch (error) {
             this.setState({status: "error", error: describeError(error), loading: false});
+            return;
+        }
+        if (token !== this.initToken) {
+            // Attribute changed mid-dynamic-import; drop this transport and
+            // let the later bootstrap replace us.
+            try {
+                await transport.close();
+            } catch {
+                // Ignore teardown errors.
+            }
             return;
         }
 
@@ -834,14 +839,21 @@ export class ZulipChatElement extends HTMLElement {
         }
     }
 
-    private createTransport(scope: ScopeFilter): Transport {
+    private async createTransport(scope: ScopeFilter): Promise<Transport> {
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
             // Snapshot mode is implicitly read-only; the transport rejects
             // writes and the composer is hidden via the read-only attribute.
+            // Dynamic import so live-only embeds don't pay the snapshot
+            // transport's fetch + JSON-parse surface.
+            const {SnapshotTransport} = await import("./snapshot-transport.ts");
             return new SnapshotTransport({url: snapshotUrl, scope});
         }
         if (this.hasAttribute("demo")) {
+            // Dynamic import keeps the demo fixture data out of the
+            // production entry — a chat embed pointed at a real server
+            // never pulls ~14KB of seed messages.
+            const {DemoTransport} = await import("./demo-transport.ts");
             return new DemoTransport({
                 scope,
                 readOnly: this.hasAttribute("read-only"),
@@ -994,12 +1006,52 @@ export class ZulipChatElement extends HTMLElement {
     private handleAddReaction(message: Message, anchor: HTMLElement): void {
         // v0.1 picker: curated emoji grid anchored to the "+" button.
         // Re-opening on the same anchor toggles the panel closed.
-        if (this.emojiPicker === undefined) return;
-        if (this.emojiPicker.isOpen()) {
-            this.emojiPicker.close();
+        void this.openReactionEmojiPicker(anchor, message);
+    }
+
+    private async ensureEmojiPicker(): Promise<EmojiPickerHandle | undefined> {
+        if (this.emojiPicker) return this.emojiPicker;
+        if (this.emojiPickerRoot === undefined) return undefined;
+        if (!this.emojiPickerPromise) {
+            const root = this.emojiPickerRoot;
+            this.emojiPickerPromise = import("./emoji-picker.ts").then(
+                ({createEmojiPicker}) => {
+                    const picker = createEmojiPicker(this.shadow, root);
+                    this.emojiPicker = picker;
+                    return picker;
+                },
+            );
+        }
+        return this.emojiPickerPromise;
+    }
+
+    private async openComposerEmojiPicker(
+        anchor: HTMLElement,
+        input: HTMLTextAreaElement,
+    ): Promise<void> {
+        const picker = await this.ensureEmojiPicker();
+        if (picker === undefined) return;
+        if (picker.isOpen()) {
+            picker.close();
             return;
         }
-        this.emojiPicker.open(anchor, (emojiName) => {
+        picker.open(anchor, (emojiName) => {
+            const glyph = EMOJI_GLYPHS[emojiName] ?? `:${emojiName}:`;
+            insertAtCursor(input, glyph);
+        });
+    }
+
+    private async openReactionEmojiPicker(
+        anchor: HTMLElement,
+        message: Message,
+    ): Promise<void> {
+        const picker = await this.ensureEmojiPicker();
+        if (picker === undefined) return;
+        if (picker.isOpen()) {
+            picker.close();
+            return;
+        }
+        picker.open(anchor, (emojiName) => {
             this.handleToggleReaction(message, emojiName);
         });
     }

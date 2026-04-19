@@ -15,20 +15,20 @@ const DIST = resolve(import.meta.dirname, "..", "dist");
 // Budgets from V1_PLAN.md §10 ("Bundle surgery"). Size in bytes of the
 // gzipped transitive closure per subpath entry.
 //
-// The plan's final targets (chat ≤72 / channel-list ≤20 / topic-list
-// ≤15) assume #10d has landed: DemoTransport + SnapshotTransport are
-// dynamic-imported from component.ts / channel-list.ts / topic-list.ts
-// so they don't sit in the base chunk of every UI entry. Until that
-// work ships, channel-list and topic-list pull the 24 KB demo chunk
-// into their closure via Rollup's entry-sharing. The budgets below
-// reflect *today's* state with a small headroom so CI actually fails
-// on regression; tighten to the final targets in the #10d commit.
+// These measure only the STATIC relative-import graph. Dynamic imports
+// (e.g. the ZulipTransport / DemoTransport / SnapshotTransport /
+// emoji-picker chunks the UI entries pull via `import()` at runtime)
+// are intentionally excluded — they split into separate chunks and a
+// browser only fetches them when that code path actually runs.
+//
+// Ratchet policy: pick a number just above today's measurement so CI
+// fails on regression. Tighten whenever a real improvement lands.
 const BUDGETS = {
-    "entries/chat.js": 72 * 1024,
-    "entries/channel-list.js": 36 * 1024, // target 20 after #10d
-    "entries/topic-list.js": 36 * 1024, // target 15 after #10d
-    "entries/agent.js": 15 * 1024,
-    "entries/demo.js": 30 * 1024,
+    "entries/chat.js": 60 * 1024,
+    "entries/channel-list.js": 8 * 1024,
+    "entries/topic-list.js": 8 * 1024,
+    "entries/agent.js": 5 * 1024,
+    "entries/demo.js": 28 * 1024,
 };
 
 function gzippedSize(path) {

@@ -74,6 +74,12 @@ export default defineConfig(() => {
                     // lifts into chunks/ — size-budget script counts the
                     // transitive graph, not the entry file alone.
                 },
+                // Without this, Rollup treats the `zulip-embed` entry's
+                // re-exports (`export { DemoTransport } from …`) as
+                // unused and strips them, leaving consumers with a
+                // side-effect-only shim. `strict` keeps every declared
+                // export in the emitted entry file.
+                preserveEntrySignatures: "strict" as const,
             },
             sourcemap: true,
             target: "es2022",

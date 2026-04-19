@@ -1,8 +1,5 @@
-import {DemoTransport} from "./demo-transport.ts";
-import {SnapshotTransport} from "./snapshot-transport.ts";
 import type {Transport} from "./transport.ts";
 import type {ScopeFilter, Topic} from "./types.ts";
-import {ZulipTransport} from "./zulip-transport.ts";
 
 const OBSERVED_ATTRIBUTES = [
     "demo",
@@ -221,13 +218,18 @@ export class ZulipTopicListElement extends HTMLElement {
         this.shadow.replaceChildren(style, root);
     }
 
-    private createTransport(channel: string): Transport {
+    private async createTransport(channel: string): Promise<Transport> {
         const scope: ScopeFilter = {channel};
         const snapshotUrl = this.getAttribute("snapshot-url");
         if (snapshotUrl !== null && snapshotUrl !== "") {
+            // Dynamic import so live-only topic lists don't pull in the
+            // snapshot fetch/parse surface.
+            const {SnapshotTransport} = await import("./snapshot-transport.ts");
             return new SnapshotTransport({url: snapshotUrl, scope});
         }
         if (this.hasAttribute("demo")) {
+            // Dynamic import keeps demo fixtures out of the default entry.
+            const {DemoTransport} = await import("./demo-transport.ts");
             return new DemoTransport({scope});
         }
         const server = this.getAttribute("server");
@@ -239,6 +241,11 @@ export class ZulipTopicListElement extends HTMLElement {
                 'Live mode requires a "server" attribute. Add the "demo" attribute to preview without a server.',
             );
         }
+        // Dynamic import keeps the ~18KB Zod schema surface out of the
+        // static topic-list entry; pages that render it alongside the
+        // chat element share the chunk, and standalone usage pays only
+        // when it actually connects.
+        const {ZulipTransport} = await import("./zulip-transport.ts");
         if (authToken && authToken !== "") {
             return new ZulipTransport({serverUrl: server, authToken, scope});
         }
@@ -270,10 +277,20 @@ export class ZulipTopicListElement extends HTMLElement {
 
         let transport: Transport;
         try {
-            transport = this.createTransport(channel);
+            transport = await this.createTransport(channel);
         } catch (error) {
+            if (token !== this.loadToken) return;
             this.setStatus(undefined);
             this.setError(describeError(error));
+            return;
+        }
+        if (token !== this.loadToken) {
+            // Attribute changed mid-dynamic-import; discard this transport.
+            try {
+                await transport.close();
+            } catch {
+                // Ignore teardown errors.
+            }
             return;
         }
 
