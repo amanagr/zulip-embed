@@ -4,6 +4,7 @@ description: Use zulip-chat in Vue 3 as a native web component — no wrapper re
 ---
 
 import {LinkCard, Code} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 Vue 3 treats unknown elements as custom elements out of the box, so
 `<zulip-chat>` drops in with no wrapper.
@@ -73,6 +74,10 @@ Custom events bubble through Vue's `@event` syntax:
 `$event` on each handler is the `CustomEvent` — access
 `$event.detail` for the payload. See
 [events reference](/reference/events/) for every payload type.
+
+## Try it live
+
+<StackblitzEmbed path="examples/vue" file="src/App.vue" />
 
 ## Copy-paste example
 

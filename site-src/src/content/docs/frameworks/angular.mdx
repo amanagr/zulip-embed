@@ -4,6 +4,7 @@ description: Use zulip-chat in Angular 18+ via CUSTOM_ELEMENTS_SCHEMA — standa
 ---
 
 import {LinkCard} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 Angular ships first-class support for custom elements through
 `CUSTOM_ELEMENTS_SCHEMA`. Works in standalone components (Angular 14+)
@@ -78,6 +79,10 @@ export class SupportComponent {
   }
 }
 ```
+
+## Try it live
+
+<StackblitzEmbed path="examples/angular" file="src/app/app.component.ts" />
 
 ## Copy-paste example
 

@@ -4,6 +4,7 @@ description: Native chat UI on iOS and Android, sharing the same transport and e
 ---
 
 import {Aside, LinkCard} from "@astrojs/starlight/components";
+import SnackEmbed from "../../../components/SnackEmbed.astro";
 
 `zulip-embed-react-native` ships native screens built on top of
 React Native's core components — no WebView, no headless browser. It
@@ -91,10 +92,20 @@ configuration required — the wrapper is pure JS.
 npx expo install zulip-embed-react-native
 ```
 
+## Try it live
+
+Expo Snack boots the wrapper on the web preview and (with the QR
+code) on a real device. The embedded version below spins up in
+demo mode — no server needed.
+
+<SnackEmbed
+    code={`import {StatusBar} from "expo-status-bar";\nimport {StyleSheet, View} from "react-native";\nimport {ZulipChat} from "zulip-embed-react-native";\n\nexport default function App() {\n  return (\n    <View style={styles.container}>\n      <StatusBar style="auto" />\n      <ZulipChat demo channel="general" topic="welcome" />\n    </View>\n  );\n}\n\nconst styles = StyleSheet.create({\n  container: {\n    flex: 1,\n    backgroundColor: "#fff",\n    paddingTop: 48,\n  },\n});\n`}
+/>
+
 ## Copy-paste example
 
 <LinkCard
-  title="Expo Snack starter"
-  description="Spin up a live React Native playground with the widget wired in."
+  title="packages/react-native/"
+  description="Full package source and README with a complete usage guide."
   href="https://github.com/amanagr/zulip-embed/tree/main/packages/react-native"
 />

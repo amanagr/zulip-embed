@@ -1,0 +1,83 @@
+---
+// Embed an Expo Snack for a React Native example. Snack takes a
+// `?name=...&dependencies=...` query string and boots a live RN
+// preview inline. `loading="lazy"` defers iframe creation until the
+// section scrolls into view so the RN page stays light.
+//
+// Unlike the StackBlitz embed we don't point Snack at a GitHub path
+// — Snack doesn't support that path out of the box, so the snippet
+// is shipped as a `code` prop. The caller owns the shape of that
+// snippet.
+
+interface Props {
+    name?: string;
+    code: string;
+    dependencies?: string;
+    title?: string;
+    height?: number;
+    platform?: "ios" | "android" | "web" | "mydevice";
+}
+
+const {
+    name = "zulip-embed-react-native",
+    code,
+    dependencies = "zulip-embed-react-native@*",
+    title = "Try it live",
+    height = 580,
+    platform = "web",
+} = Astro.props;
+
+const params = new URLSearchParams({
+    name,
+    platform,
+    dependencies,
+    code,
+    preview: "true",
+    theme: "dark",
+});
+const embedSrc = `https://snack.expo.dev/embed?${params.toString()}`;
+const openUrl = `https://snack.expo.dev/?${new URLSearchParams({name, platform, dependencies, code}).toString()}`;
+---
+
+<section class="try-live">
+    <header class="try-live-head">
+        <h3>{title}</h3>
+        <a class="try-live-open" href={openUrl} target="_blank" rel="noopener"
+            >Open in Snack ↗</a
+        >
+    </header>
+    <iframe
+        class="try-live-frame"
+        src={embedSrc}
+        title={`${title} — Expo Snack sandbox`}
+        loading="lazy"
+        allow="clipboard-read; clipboard-write"
+        sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+        style={`height: ${height}px;`}></iframe>
+</section>
+
+<style>
+    .try-live {
+        margin: 1.5rem 0 2rem;
+    }
+    .try-live-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .try-live-head h3 {
+        margin: 0;
+        font-size: 1.05rem;
+    }
+    .try-live-open {
+        font-size: 0.875rem;
+    }
+    .try-live-frame {
+        width: 100%;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.5rem;
+        display: block;
+    }
+</style>

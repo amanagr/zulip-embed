@@ -4,6 +4,7 @@ description: Drop a zulip-chat widget into a plain HTML page with one script tag
 ---
 
 import {Tabs, TabItem, LinkCard} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 The zero-build-step path. Works in a static file on disk, on a CDN, or
 inside any SSR framework that lets you render a `<script>` tag.
@@ -117,6 +118,10 @@ registers all of them.
   description="Every published version ships a sha384 hash bundle under the GitHub release. Pin it if your CSP requires integrity="
   href="https://github.com/amanagr/zulip-embed/releases"
 />
+
+## Try it live
+
+<StackblitzEmbed path="examples/vanilla-cdn" file="index.html" />
 
 ## Copy-paste example
 

@@ -4,6 +4,7 @@ description: First-party React wrapper with a useZulipChat hook, event props, an
 ---
 
 import {Tabs, TabItem, LinkCard, Aside} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 `zulip-embed-react` wraps the core custom element behind a first-party
 React component and a `useZulipChat` hook. Event handlers land as
@@ -136,6 +137,14 @@ export default function SupportPage({authToken}: {authToken: string}) {
 
 Or dynamically import with `ssr: false` if the parent component is
 otherwise a server component.
+
+## Try it live
+
+The React example boots in StackBlitz with `pnpm install && pnpm dev`
+already wired. Edit the JSX, save, watch the demo-mode widget
+hot-reload.
+
+<StackblitzEmbed path="examples/react" file="src/App.tsx" />
 
 ## Copy-paste example
 

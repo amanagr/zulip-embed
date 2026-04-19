@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 
+import {EMOJI_GLYPH_BY_NAME} from "./emoji-data.ts";
 import {avatarColor, formatTimeOfDay, getInitials} from "./format.ts";
 import {
     ACTION_ICONS,
@@ -978,11 +979,11 @@ function renderReactionPill(
     return pill;
 }
 
-// Fallback mapping from Zulip emoji names (snake_case) to Unicode glyphs
-// for the handful that appear in demo content. Real Zulip servers return
-// the emoji via the message HTML (as <span class="emoji emoji-…">), so
-// this path only fires for plain-text demo reactions. We render the name
-// verbatim if unknown.
+// Alias map for emoji names that aren't in the canonical picker
+// dataset — `party` (→ tada), `thumbs_up` (→ +1), `bug`, `sparkles`,
+// etc. Consulted after `EMOJI_GLYPH_BY_NAME` in `emojiToGlyph` so
+// realm-custom aliases still render a glyph. Kept separate so
+// extending the picker dataset doesn't have to sync these entries.
 export const EMOJI_GLYPHS: Record<string, string> = {
     "+1": "👍",
     thumbs_up: "👍",
@@ -1007,7 +1008,12 @@ export const EMOJI_GLYPHS: Record<string, string> = {
 };
 
 function emojiToGlyph(name: string): string {
-    return EMOJI_GLYPHS[name] ?? `:${name}:`;
+    // Try the full picker dataset first (covers every emoji the user
+    // could have reacted with via the UI), then the alias map
+    // (`party` → tada, `thumbs_up` → +1, etc. — shortcuts not in the
+    // canonical Zulip names), and fall back to the literal `:name:`
+    // so a realm-specific custom emoji at least renders readable text.
+    return EMOJI_GLYPH_BY_NAME[name] ?? EMOJI_GLYPHS[name] ?? `:${name}:`;
 }
 
 function isSafeHttpUrl(url: string): boolean {
@@ -1066,23 +1072,47 @@ function resolveUrl(url: string, serverOrigin: string | undefined): string | und
 
 export function scrollToBottom(feed: HTMLElement): void {
     feed.scrollTop = feed.scrollHeight;
-    // Avatar images and embedded media load asynchronously. Each one
-    // that settles grows `scrollHeight`, which leaves the feed visually
-    // "in the middle" even though we pinned scrollTop just now. Re-pin
-    // once per pending image load as long as the user hasn't scrolled
-    // away in the meantime. One-shot listeners, so this is O(pending
-    // images) and self-cleans.
-    const pending = feed.querySelectorAll<HTMLImageElement>("img");
-    for (const img of pending) {
-        if (img.complete) continue;
-        const onLoad = (): void => {
-            img.removeEventListener("load", onLoad);
-            img.removeEventListener("error", onLoad);
-            if (isNearBottom(feed)) feed.scrollTop = feed.scrollHeight;
-        };
-        img.addEventListener("load", onLoad);
-        img.addEventListener("error", onLoad);
-    }
+
+    // Content grows for a short while after the initial pin —
+    // avatars finish decoding, web fonts swap in, KaTeX rewrites
+    // boxes, spoilers/embeds claim their final size. Every such
+    // growth moves the viewport out of the near-bottom window, so
+    // checking `isNearBottom` inside the callback is too strict: the
+    // scrollTop we just set is no longer near bottom against the new
+    // scrollHeight. Instead, track the exact scrollTop we pinned to
+    // and treat any mismatch as a user scroll.
+    let pinnedTop = feed.scrollTop;
+    const repin = (): void => {
+        if (feed.scrollTop !== pinnedTop) return;
+        feed.scrollTop = feed.scrollHeight;
+        pinnedTop = feed.scrollTop;
+    };
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver(repin);
+    ro.observe(feed);
+    for (const child of feed.children) ro.observe(child);
+
+    // New children appearing (spoilers / KaTeX enhancements, late-
+    // arriving messages) also change scrollHeight. Observe them as
+    // they land.
+    const mo = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+            for (const node of m.addedNodes) {
+                if (node instanceof Element) ro.observe(node);
+            }
+        }
+    });
+    mo.observe(feed, {childList: true, subtree: true});
+
+    // 2s is long enough for avatars, fonts, and most KaTeX rewrites.
+    // After that we release the pin — if content grows further we'd
+    // rather not fight a user who's started scrolling.
+    setTimeout(() => {
+        ro.disconnect();
+        mo.disconnect();
+    }, 2000);
 }
 
 export function isNearBottom(feed: HTMLElement, threshold = 80): boolean {

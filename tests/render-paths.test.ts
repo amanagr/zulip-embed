@@ -260,53 +260,96 @@ describe("scroll helpers", () => {
         expect(isNearBottom(feed, 300)).toBe(true);
     });
 
-    test("scrollToBottom re-pins after pending avatar images finish loading", () => {
+    test("scrollToBottom re-pins when content grows post-settle (ResizeObserver callback)", () => {
         // Regression: the initial scrollToBottom runs before avatars
-        // settle, so scrollHeight grew after the pin and the feed ended
-        // up "in the middle" of the newly tall content. The fix
-        // registers one-shot load listeners that re-pin as long as the
-        // user hasn't scrolled away.
-        const feed = document.createElement("div");
-        Object.defineProperty(feed, "clientHeight", {value: 400, configurable: true});
-        let currentHeight = 500;
-        Object.defineProperty(feed, "scrollHeight", {
-            get: () => currentHeight,
-            configurable: true,
-        });
-        Object.defineProperty(feed, "scrollTop", {value: 0, writable: true, configurable: true});
+        // decode and fonts swap, so scrollHeight grew *after* the pin
+        // and the feed ended up "in the middle" of the newly-tall
+        // content. The fix watches the feed with a ResizeObserver and
+        // re-pins as long as the user hasn't scrolled.
+        let observerCallback: ResizeObserverCallback = () => {};
+        const originalRO = globalThis.ResizeObserver;
+        globalThis.ResizeObserver = class {
+            constructor(cb: ResizeObserverCallback) {
+                observerCallback = cb;
+            }
+            observe(): void {
+                /* noop */
+            }
+            unobserve(): void {
+                /* noop */
+            }
+            disconnect(): void {
+                /* noop */
+            }
+        } as unknown as typeof ResizeObserver;
 
-        const img = document.createElement("img");
-        Object.defineProperty(img, "complete", {value: false, configurable: true});
-        feed.append(img);
+        try {
+            const feed = document.createElement("div");
+            Object.defineProperty(feed, "clientHeight", {value: 400, configurable: true});
+            let currentHeight = 500;
+            Object.defineProperty(feed, "scrollHeight", {
+                get: () => currentHeight,
+                configurable: true,
+            });
+            Object.defineProperty(feed, "scrollTop", {
+                value: 0,
+                writable: true,
+                configurable: true,
+            });
 
-        scrollToBottom(feed);
-        expect(feed.scrollTop).toBe(500);
+            scrollToBottom(feed);
+            expect(feed.scrollTop).toBe(500);
 
-        currentHeight = 900;
-        img.dispatchEvent(new Event("load"));
-        expect(feed.scrollTop).toBe(900);
+            // Fonts swap in, content grows — ResizeObserver fires.
+            currentHeight = 900;
+            observerCallback([], {} as ResizeObserver);
+            expect(feed.scrollTop).toBe(900);
+        } finally {
+            globalThis.ResizeObserver = originalRO;
+        }
     });
 
-    test("scrollToBottom does NOT re-pin if the user scrolled away while the image loaded", () => {
-        const feed = document.createElement("div");
-        Object.defineProperty(feed, "clientHeight", {value: 400, configurable: true});
-        let currentHeight = 500;
-        Object.defineProperty(feed, "scrollHeight", {
-            get: () => currentHeight,
-            configurable: true,
-        });
-        Object.defineProperty(feed, "scrollTop", {value: 0, writable: true, configurable: true});
+    test("scrollToBottom does NOT re-pin if the user scrolled away while content grew", () => {
+        let observerCallback: ResizeObserverCallback = () => {};
+        const originalRO = globalThis.ResizeObserver;
+        globalThis.ResizeObserver = class {
+            constructor(cb: ResizeObserverCallback) {
+                observerCallback = cb;
+            }
+            observe(): void {
+                /* noop */
+            }
+            unobserve(): void {
+                /* noop */
+            }
+            disconnect(): void {
+                /* noop */
+            }
+        } as unknown as typeof ResizeObserver;
 
-        const img = document.createElement("img");
-        Object.defineProperty(img, "complete", {value: false, configurable: true});
-        feed.append(img);
+        try {
+            const feed = document.createElement("div");
+            Object.defineProperty(feed, "clientHeight", {value: 400, configurable: true});
+            let currentHeight = 500;
+            Object.defineProperty(feed, "scrollHeight", {
+                get: () => currentHeight,
+                configurable: true,
+            });
+            Object.defineProperty(feed, "scrollTop", {
+                value: 0,
+                writable: true,
+                configurable: true,
+            });
 
-        scrollToBottom(feed);
-        // User scrolls away to read older history.
-        feed.scrollTop = 10;
-        currentHeight = 900;
-        img.dispatchEvent(new Event("load"));
-        // The listener must leave the user's scroll position alone.
-        expect(feed.scrollTop).toBe(10);
+            scrollToBottom(feed);
+            // User scrolls away to read older history.
+            feed.scrollTop = 10;
+            currentHeight = 900;
+            observerCallback([], {} as ResizeObserver);
+            // The observer must leave the user's scroll position alone.
+            expect(feed.scrollTop).toBe(10);
+        } finally {
+            globalThis.ResizeObserver = originalRO;
+        }
     });
 });

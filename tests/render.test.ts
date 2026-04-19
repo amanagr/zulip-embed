@@ -300,4 +300,30 @@ describe("renderMessage", () => {
         pill?.click();
         expect(called).toEqual({emoji: "tada", id: 1});
     });
+
+    test("reaction pills render the glyph for emojis outside the small alias map", () => {
+        // Regression: reaction rendering used to fall back to `:name:`
+        // literal text for anything not in the ~20-entry EMOJI_GLYPHS
+        // alias dict. The picker surfaces the full canonical dataset,
+        // so reactions like squid / lemon / apple / strawberry showed
+        // up as literal text instead of glyphs.
+        const message: Message = {
+            ...htmlMessage("<p>hi</p>"),
+            reactions: [
+                {emoji: "squid", count: 1, userIds: [11]},
+                {emoji: "lemon", count: 1, userIds: [12]},
+                {emoji: "apple", count: 1, userIds: [13]},
+                {emoji: "strawberry", count: 1, userIds: [14]},
+                {emoji: "stuck_out_tongue", count: 1, userIds: [15]},
+            ],
+        };
+        const node = renderMessage(message, false, {
+            serverOrigin: "https://chat.example.com",
+            currentUserId: 11,
+        });
+        const glyphs = [...node.querySelectorAll<HTMLElement>(".reaction-emoji")].map(
+            (el) => el.textContent,
+        );
+        expect(glyphs).toEqual(["🦑", "🍋", "🍎", "🍓", "😛"]);
+    });
 });

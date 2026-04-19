@@ -384,9 +384,14 @@ export class ZulipChatElement extends HTMLElement {
         // Load older messages when the user is within ~80px of the top
         // and we still have backlog to fetch. The loadingOlder latch
         // prevents duplicate concurrent requests while the network is in
-        // flight.
+        // flight. The `scrollHeight > clientHeight + 80` guard rejects
+        // the spurious "at top" signal that programmatic
+        // scrollToBottom emits when the seeded page of messages is
+        // shorter than the widget viewport (clamped scrollTop = 0 ≠ a
+        // user request for history).
         if (
             feed.scrollTop < 80 &&
+            feed.scrollHeight > feed.clientHeight + 80 &&
             this.state.hasMore &&
             !this.state.loadingOlder &&
             !this.state.loading

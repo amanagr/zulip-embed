@@ -4,6 +4,7 @@ description: Drop zulip-chat into the Next.js App Router with a client wrapper â
 ---
 
 import {Aside, LinkCard} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 Next.js lets you render the widget on the client while keeping the
 rest of the page server-rendered. Use the React wrapper for the
@@ -83,6 +84,10 @@ export default function SupportPage({authToken}) {
   );
 }
 ```
+
+## Try it live
+
+<StackblitzEmbed path="examples/nextjs" file="app/page.tsx" />
 
 ## Copy-paste example
 

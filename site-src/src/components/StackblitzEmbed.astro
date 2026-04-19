@@ -1,0 +1,80 @@
+---
+// Embed a live StackBlitz sandbox for an example folder in the
+// zulip-embed repo. `loading="lazy"` keeps the heavy editor iframe
+// off the initial page load — it only boots when the user scrolls
+// the "Try it live" section into view, so the rest of the doc page
+// stays fast.
+//
+// Props mirror the path structure of the /examples tree:
+//   repo    — the GitHub "owner/name" pair (default: amanagr/zulip-embed)
+//   branch  — the branch to load from (default: main)
+//   path    — the folder under /examples (e.g. "examples/react")
+//   file    — the file StackBlitz should open by default
+//   title   — heading shown above the embed
+//   height  — iframe height in pixels; defaults to 520
+
+interface Props {
+    repo?: string;
+    branch?: string;
+    path: string;
+    file?: string;
+    title?: string;
+    height?: number;
+}
+
+const {
+    repo = "amanagr/zulip-embed",
+    branch = "main",
+    path,
+    file,
+    title = "Try it live",
+    height = 520,
+} = Astro.props;
+
+const fileParam = file === undefined ? "" : `&file=${encodeURIComponent(file)}`;
+const embedSrc = `https://stackblitz.com/github/${repo}/tree/${branch}/${path}?embed=1&view=preview&terminalHeight=0&hideExplorer=0&hideNavigation=1${fileParam}`;
+const openUrl = `https://stackblitz.com/github/${repo}/tree/${branch}/${path}`;
+---
+
+<section class="try-live">
+    <header class="try-live-head">
+        <h3>{title}</h3>
+        <a class="try-live-open" href={openUrl} target="_blank" rel="noopener"
+            >Open in full editor ↗</a
+        >
+    </header>
+    <iframe
+        class="try-live-frame"
+        src={embedSrc}
+        title={`${title} — StackBlitz sandbox`}
+        loading="lazy"
+        allow="clipboard-read; clipboard-write; cross-origin-isolated"
+        sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+        style={`height: ${height}px;`}></iframe>
+</section>
+
+<style>
+    .try-live {
+        margin: 1.5rem 0 2rem;
+    }
+    .try-live-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .try-live-head h3 {
+        margin: 0;
+        font-size: 1.05rem;
+    }
+    .try-live-open {
+        font-size: 0.875rem;
+    }
+    .try-live-frame {
+        width: 100%;
+        border: 1px solid var(--sl-color-hairline);
+        border-radius: 0.5rem;
+        display: block;
+    }
+</style>

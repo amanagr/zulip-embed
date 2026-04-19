@@ -505,6 +505,22 @@ export const EMOJI_INDEX: readonly EmojiSearchEntry[] = EMOJI_CATEGORIES.flatMap
     c.emojis.map((e) => ({...e, category: c.id})),
 );
 
+// Flat name → glyph map for renderers that need to show an emoji given
+// only its Zulip name (reaction pills, composer pastes from external
+// sources). Renderers live in the main bundle — importing EMOJI_INDEX
+// or EMOJI_CATEGORIES would pull in the full picker dataset, but
+// tree-shaking keeps this Record on its own if it's the only export
+// the renderer touches.
+export const EMOJI_GLYPH_BY_NAME: Readonly<Record<string, string>> = (() => {
+    const map: Record<string, string> = {};
+    for (const cat of EMOJI_CATEGORIES) {
+        for (const entry of cat.emojis) {
+            map[entry.name] = entry.glyph;
+        }
+    }
+    return map;
+})();
+
 // Simple substring search that checks `name` and `keywords`. Case-
 // insensitive; matches against the raw token, not individual words, so
 // "heart_eyes" matches "heart", "eyes", or "heart_eyes".

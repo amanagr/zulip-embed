@@ -4,6 +4,7 @@ description: Zero-config web component support in Svelte 5 — drop zulip-chat i
 ---
 
 import {LinkCard} from "@astrojs/starlight/components";
+import StackblitzEmbed from "../../../components/StackblitzEmbed.astro";
 
 Svelte 5 natively treats unknown elements as web components. No
 compiler configuration, no wrapper — just import the bundle and use
@@ -61,6 +62,10 @@ error, guard the import:
   onMount(() => import("zulip-embed"));
 </script>
 ```
+
+## Try it live
+
+<StackblitzEmbed path="examples/svelte" file="src/App.svelte" />
 
 ## Copy-paste example
 
