@@ -95,11 +95,29 @@ const artifacts = artifactPaths.map((rel) => {
     };
 });
 
+// External assets we load at runtime from a CDN (not bundled into dist/,
+// but still part of the trust boundary a host page should be able to
+// verify). Kept in lock-step with src/katex.ts — bump both in the same
+// commit when upgrading KaTeX. See also the TODO(1.1) there to automate
+// this fetch. The hash is re-asserted here instead of imported so this
+// script stays dep-free (runs in CI before any workspace install).
+const KATEX_VERSION = "0.16.11";
+const externalAssets = [
+    {
+        name: "katex-css",
+        url: `https://cdn.jsdelivr.net/npm/katex@${KATEX_VERSION}/dist/katex.min.css`,
+        integrity: "sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+",
+        loadedBy: "src/katex.ts",
+        note: "Pinned KaTeX stylesheet injected into the shadow root when a message contains math.",
+    },
+];
+
 const manifest = {
     name: PKG.name,
     version: PKG.version,
     buildTime: new Date().toISOString(),
     artifacts,
+    externalAssets,
 };
 
 const manifestPath = join(DIST, "INTEGRITY.json");
