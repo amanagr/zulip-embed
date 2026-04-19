@@ -5,20 +5,26 @@ Web Component, native React / React Native / Flutter wrappers, and a
 headless TypeScript SDK — all Apache-2.0, all hitting the same Zulip
 REST API so your data and your audit trail stay in your Zulip.
 
-> **Status — v0.1 developer preview.** Web Component, headless SDK,
-> Flutter, React, and React Native are all shipping. SwiftUI + Compose
-> are on the roadmap. The public API may still move before 1.0.
+> **Status — v0.8 release candidate.** The core Web Components
+> (`<zulip-chat>`, `<zulip-channel-list>`, `<zulip-topic-list>`,
+> `<zulip-announcement>`), the headless `ZulipClient`, the React
+> wrapper, and the Flutter package are all at v0.8 feature parity.
+> React Native ships as `0.8.0-rc.0-alpha` (plain-text rendering —
+> see [package README](./packages/react-native/README.md)). SwiftUI +
+> Compose are on the roadmap. The public API may still move before 1.0.
 
 <p align="center">
   <a href="https://amanagr.github.io/zulip-embed/">
-    <strong>▶ Live demo &amp; playground</strong>
+    <strong>Live demo &amp; playground</strong>
   </a>
   &nbsp;·&nbsp;
-  <a href="#quick-start">Quick start</a>
+  <a href="#quickstart">Quickstart</a>
   &nbsp;·&nbsp;
-  <a href="#frameworks">Frameworks</a>
+  <a href="#bundle-subpaths">Subpaths</a>
   &nbsp;·&nbsp;
-  <a href="#theming">Theming</a>
+  <a href="docs/ONBOARDING.md">Onboarding</a>
+  &nbsp;·&nbsp;
+  <a href="docs/ARCHITECTURE.md">Architecture</a>
   &nbsp;·&nbsp;
   <a href="#supported-zulip-features">Feature matrix</a>
 </p>
@@ -28,19 +34,35 @@ REST API so your data and your audit trail stay in your Zulip.
 - **One-line drop-in** via `<zulip-chat>` Custom Element — works in any
   framework, any bundler, or plain HTML.
 - **Shadow-DOM isolated** so host CSS can't leak in or out.
+- **Tiny critical path.** Subpath entries (`zulip-embed/chat`,
+  `/channel-list`, `/topic-list`, `/announcement`, `/agent`, `/demo`)
+  let you pay only for what you render. `zulip-embed/chat` ships at
+  ~55 KB gzipped; the full `<zulip-announcement>` banner is ~18 KB.
 - **Fully themeable** via `--zc-*` CSS variables (light + dark built in,
   live playground on the demo site).
-- **Native SDKs, not WebViews.** Flutter, React, React Native wrappers
-  all render real platform widgets on top of the same transport layer.
+- **Native SDKs, not WebViews.** Flutter and React wrappers render
+  real platform widgets on top of the same transport layer. RN is an
+  alpha preview.
+- **Agent-native primitives.** `startAgentReply` streams tokens at
+  60fps locally and broadcasts edits at ≤4 Hz; `MessagePart[]`
+  renders tool calls, tool results, and inline confirmation widgets.
 - **Apache-2.0** — safe to ship inside closed-source products.
 - **No backend of ours.** Credentials stay in your app; requests go
   browser → your Zulip server directly.
 - **Demo + snapshot modes** so you can develop offline and publish
   read-only embeds without credentials in the browser.
 
-## Quick start
+## Quickstart
 
-### 1. Script tag (any site)
+Four tracks, pick the one that matches your stack. Before you start,
+you need a Zulip server URL and an account the embed can authenticate
+as — if you're setting that up from scratch, follow the step-by-step
+[Onboarding guide](./docs/ONBOARDING.md).
+
+### Track 1 — Vanilla HTML (unpkg `<script>` tag)
+
+The smallest possible integration: paste one script tag and one
+element into any HTML page.
 
 ```html
 <script type="module" src="https://unpkg.com/zulip-embed"></script>
@@ -56,9 +78,23 @@ REST API so your data and your audit trail stay in your Zulip.
 ></zulip-chat>
 ```
 
-### 2. React — [`zulip-embed-react`](./packages/react/)
+The unpkg URL serves the `zulip-embed` IIFE build (`dist/zulip-embed.iife.js`)
+with every custom element registered — `<zulip-chat>`,
+`<zulip-channel-list>`, `<zulip-topic-list>`, `<zulip-announcement>`.
+If you want to cut the critical path, import subpath entries from
+your bundler instead — see [Bundle subpaths](#bundle-subpaths).
+
+### Track 2 — React
+
+Install [`zulip-embed-react`](./packages/react/) for typed JSX wrappers
++ the headless `useZulipChat` hook.
+
+```bash
+npm i zulip-embed zulip-embed-react
+```
 
 ```tsx
+"use client";
 import {ZulipChat} from "zulip-embed-react";
 
 export function SupportPage() {
@@ -66,7 +102,7 @@ export function SupportPage() {
         <ZulipChat
             server="https://chat.example.com"
             email="you@example.com"
-            apiKey={import.meta.env.VITE_ZULIP_KEY}
+            apiKey={process.env.NEXT_PUBLIC_ZULIP_KEY!}
             channel="general"
             theme="dark"
             brandName="Acme Support"
@@ -75,11 +111,59 @@ export function SupportPage() {
 }
 ```
 
-Includes `<ZulipChat>`, `<ZulipChannelList>`, and `<ZulipTopicList>`
-— all thin wrappers over the Web Components with idiomatic camelCase
-props and typed event callbacks.
+Prefer a headless integration? `useZulipChat(transport, scope)` returns
+`{messages, status, sendMessage, loadOlder, client}` for bring-your-own-UI:
 
-### 3. React Native — [`zulip-embed-react-native`](./packages/react-native/)
+```tsx
+"use client";
+import {useMemo} from "react";
+import {useZulipChat} from "zulip-embed-react";
+import {ZulipTransport} from "zulip-embed";
+
+export function InboxPane() {
+    const transport = useMemo(
+        () =>
+            new ZulipTransport({
+                serverUrl: "https://chat.example.com",
+                email: "bot@example.com",
+                apiKey: process.env.NEXT_PUBLIC_ZULIP_KEY!,
+                scope: {channel: "general"},
+            }),
+        [],
+    );
+    const {messages, status, sendMessage} = useZulipChat(transport, {
+        channel: "general",
+    });
+    return (
+        <section>
+            <header>Status: {status}</header>
+            <ul>
+                {messages.map((m) => (
+                    <li key={m.id}>
+                        <b>{m.senderFullName}</b>: {m.content}
+                    </li>
+                ))}
+            </ul>
+            <button onClick={() => sendMessage("hello!")}>Send</button>
+        </section>
+    );
+}
+```
+
+Also ships [`<ZulipChannelList>`](./packages/react/src/zulip-channel-list.tsx)
+and [`<ZulipTopicList>`](./packages/react/src/zulip-topic-list.tsx).
+
+### Track 3 — React Native (alpha)
+
+> **Alpha preview (`0.8.0-rc.0-alpha`).** Plain-text rendering only.
+> Reactions / typing / message-action UI not yet wired in the
+> `<ZulipChatScreen>` widget. Headless `ZulipClient` works end-to-end.
+> See [`packages/react-native/README.md`](./packages/react-native/README.md)
+> for the full status matrix.
+
+```bash
+npm i zulip-embed zulip-embed-react-native
+```
 
 ```tsx
 import {ZulipChatScreen, ZulipTransport, DARK_THEME} from "zulip-embed-react-native";
@@ -103,10 +187,11 @@ export default function SupportScreen() {
 }
 ```
 
-Pure React Native — `FlatList` + `TextInput` + `KeyboardAvoidingView`.
-No WebView, no browser bridge.
+### Track 4 — Flutter
 
-### 4. Flutter — [`packages/flutter/`](./packages/flutter/)
+Pure Dart widgets, no `WebView`. See [`packages/flutter/`](./packages/flutter/)
+and the Flutter-web demo at
+[`amanagr.github.io/zulip-embed/flutter/`](https://amanagr.github.io/zulip-embed/flutter/).
 
 ```dart
 import 'package:zulip_embed/zulip_embed.dart';
@@ -123,40 +208,47 @@ ZulipChat(
 )
 ```
 
-Pure Dart widgets (no WebView). The [`example/`](./packages/flutter/example/)
-app is compiled to Flutter web as part of CI and published at
-[`amanagr.github.io/zulip-embed/flutter/`](https://amanagr.github.io/zulip-embed/flutter/).
+Also ships `ZulipChannelList`, `ZulipTopicList`, and `ZulipAnnouncement`.
 
-### 5. Headless SDK — `zulip-embed`
+### Demo mode (no server required)
 
-When you want full control over the UI:
-
-```ts
-import {ZulipClient, ZulipTransport} from "zulip-embed";
-
-const client = new ZulipClient({
-    transport: new ZulipTransport({
-        serverUrl: "https://chat.example.com",
-        email: "bot@example.com",
-        apiKey: "xxxx",
-        scope: {channel: "general", topic: "support"},
-    }),
-});
-await client.connect();
-client.subscribe((event) => {
-    if (event.type === "message") console.log(event.message);
-});
-```
-
-### 6. Demo mode (no server required)
+Works in any track. On the Web Component it's a single attribute:
 
 ```html
 <zulip-chat demo channel="general" topic="welcome"></zulip-chat>
 ```
 
-The `demo` attribute swaps in an in-memory transport with seeded
-messages and an echo bot. Perfect for storybooks, tests, and offline
-development.
+In React / Flutter / RN pass `new DemoTransport()` where you would
+pass a live transport. The demo transport bundles seeded messages and
+an echo bot — perfect for storybooks, tests, and offline development.
+
+## Bundle subpaths
+
+The default entry (`zulip-embed`) imports everything and registers every
+element — convenient but heavy. For production, import the subpath
+entry you actually need. Sizes are static gzipped budgets enforced by
+CI (`scripts/bundle-check.mjs`).
+
+| Subpath                    | Registers                            | Gzip budget |
+| -------------------------- | ------------------------------------ | ----------- |
+| `zulip-embed/chat`         | `<zulip-chat>`                       | 60 KB       |
+| `zulip-embed/channel-list` | `<zulip-channel-list>`               | 8 KB        |
+| `zulip-embed/topic-list`   | `<zulip-topic-list>`                 | 8 KB        |
+| `zulip-embed/announcement` | `<zulip-announcement>`               | 20 KB       |
+| `zulip-embed/agent`        | `startAgentReply` helpers            | 5 KB        |
+| `zulip-embed/demo`         | `DemoTransport`, `SnapshotTransport` | 28 KB       |
+| `zulip-embed/all`          | everything (compat shim)             | —           |
+
+Heavy dependencies (the emoji picker, the `DemoTransport` seed data,
+the `SnapshotTransport` fixture loader) are dynamically imported
+inside the custom elements, so they aren't pulled into the critical
+path until the viewer opens a picker or the host opts into demo mode.
+
+```ts
+// Import only what you render:
+import "zulip-embed/chat";
+import "zulip-embed/channel-list";
+```
 
 ## Attributes (`<zulip-chat>`)
 
@@ -166,7 +258,8 @@ development.
 | `snapshot-url` | —         | Load a pre-fetched JSON snapshot of messages instead of opening a live event queue. Implies read-only; no credentials in the browser. See [Snapshot mode](#snapshot-mode). |
 | `server`       | live mode | Base URL of the Zulip server (e.g. `https://chat.zulip.org`).                                                                                                              |
 | `email`        | live mode | Account email or bot email.                                                                                                                                                |
-| `api-key`      | live mode | API key for that account.                                                                                                                                                  |
+| `api-key`      | live mode | API key for that account. Prefer `auth-token` in production — see [`docs/jwt.md`](./docs/jwt.md).                                                                          |
+| `auth-token`   | live mode | Short-lived JWT the SDK exchanges once for a scoped API key. Host page never sees the key.                                                                                 |
 | `channel`      | yes       | Channel name to scope the feed. Defaults to `general`.                                                                                                                     |
 | `topic`        | no        | Topic inside the channel. Omit for a channel-wide view.                                                                                                                    |
 | `theme`        | no        | `light` (default) or `dark`.                                                                                                                                               |
@@ -232,55 +325,61 @@ always deploys.
 
 ## Plug-and-play components
 
-v1 ships a catalog of composable custom elements so you can drop any
+v0.8 ships a catalog of composable custom elements so you can drop any
 subset of the Zulip web app's UI into your own product:
 
-| Component              | Status | Description                                                                      |
-| ---------------------- | ------ | -------------------------------------------------------------------------------- |
-| `<zulip-chat>`         | ✅     | Full channel/topic feed + composer + reactions + typing + edit/delete            |
-| `<zulip-channel-list>` | ✅     | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
-| `<zulip-topic-list>`   | ✅     | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
-| `<zulip-compose>`      | ⏳     | Standalone composer (drafts, scheduled send, file upload)                        |
-| `<zulip-inbox>`        | ⏳     | Unreads grouped by channel > topic                                               |
-| `<zulip-recent>`       | ⏳     | Recent conversations view                                                        |
-| `<zulip-dm-list>`      | ⏳     | Direct-message pane                                                              |
-| `<zulip-user-list>`    | ⏳     | Presence sidebar                                                                 |
-| `<zulip-user-card>`    | ⏳     | Hover / click profile popover                                                    |
-| `<zulip-search>`       | ⏳     | Advanced-filter search box + results                                             |
-| `<zulip-message>`      | ⏳     | Single-message embed for quote-of-the-day widgets                                |
+| Component              | Status          | Description                                                                      |
+| ---------------------- | --------------- | -------------------------------------------------------------------------------- |
+| `<zulip-chat>`         | done            | Full channel/topic feed + composer + reactions + typing + edit/delete            |
+| `<zulip-channel-list>` | done            | Subscribed channels with unread / pin / color / mute; fires `channel-selected`   |
+| `<zulip-topic-list>`   | done            | Topics inside a channel (newest-first), resolved markers; fires `topic-selected` |
+| `<zulip-announcement>` | done            | Pinned-message banner; dismissible; fetches a single message by id               |
+| `<zulip-dm-list>`      | v0.8 (planned)  | Direct-message pane                                                              |
+| `<zulip-compose>`      | v1.x            | Standalone composer (drafts, scheduled send, file upload)                        |
+| `<zulip-inbox>`        | v1.x            | Unreads grouped by channel > topic                                               |
+| `<zulip-recent>`       | v1.x            | Recent conversations view                                                        |
+| `<zulip-user-list>`    | v1.x            | Presence sidebar                                                                 |
+| `<zulip-user-card>`    | v1.x            | Hover / click profile popover                                                    |
+| `<zulip-search>`       | v1.x            | Advanced-filter search box + results                                             |
+| `<zulip-message>`      | v1.x            | Single-message embed for quote-of-the-day widgets                                |
 
 Each Web Component is mirrored by a typed React wrapper in
 [`zulip-embed-react`](./packages/react/) as soon as it lands.
 
 ## Frameworks
 
-| Framework                           | Status     | Package                                    |
-| ----------------------------------- | ---------- | ------------------------------------------ |
-| Web Components (framework-agnostic) | ✅         | [`zulip-embed`](./src/)                   |
-| React                               | ✅         | [`zulip-embed-react`](./packages/react/)        |
-| React Native                        | ✅         | [`zulip-embed-react-native`](./packages/react-native/) |
-| Flutter                             | ✅         | [`packages/flutter/`](./packages/flutter/) |
-| SwiftUI (iOS)                       | ⏳ planned | `packages/swiftui/`                        |
-| Jetpack Compose (Android)           | ⏳ planned | `packages/compose/`                        |
+| Framework                           | Status   | Package                                                |
+| ----------------------------------- | -------- | ------------------------------------------------------ |
+| Web Components (framework-agnostic) | done     | [`zulip-embed`](./src/)                                |
+| React                               | done     | [`zulip-embed-react`](./packages/react/)               |
+| React Native                        | alpha    | [`zulip-embed-react-native`](./packages/react-native/) |
+| Flutter                             | done     | [`packages/flutter/`](./packages/flutter/)             |
+| SwiftUI (iOS)                       | planned  | `packages/swiftui/`                                    |
+| Jetpack Compose (Android)           | planned  | `packages/compose/`                                    |
 
 ## Architecture
+
+See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the transport
+interface, scope model, event pipeline, and bundle strategy in depth.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  Framework wrappers                                              │
-│  ├── zulip-embed-react           (typed JSX over custom elements)     │
-│  ├── zulip-embed-react-native    (FlatList-based ZulipChatScreen)     │
-│  └── zulip_embed (Flutter)  (pure Dart widgets)                  │
+│  ├── zulip-embed-react         (typed JSX over custom elements)  │
+│  ├── zulip-embed-react-native  (FlatList-based; alpha)           │
+│  └── zulip_embed (Flutter)     (pure Dart widgets)               │
 ├──────────────────────────────────────────────────────────────────┤
-│  UI layer — Custom Elements + Shadow DOM                         │
+│  UI layer — Custom Elements + Shadow DOM (dynamic transport loading)│
 │  ├── <zulip-chat>                                                │
 │  ├── <zulip-channel-list>                                        │
-│  └── <zulip-topic-list>                                          │
+│  ├── <zulip-topic-list>                                          │
+│  └── <zulip-announcement>                                        │
 ├──────────────────────────────────────────────────────────────────┤
-│  ZulipClient — state, subscriptions, event fan-out               │
+│  ZulipClient — state, subscriptions, event fan-out,              │
+│                agent-reply streaming                             │
 ├──────────────────────────────────────────────────────────────────┤
 │  Transport interface                                             │
-│  ├── ZulipTransport      (REST + long-poll /events)              │
+│  ├── ZulipTransport      (REST + long-poll /events, JWT exchange)│
 │  ├── DemoTransport       (in-memory, seeded, echo bot)           │
 │  └── SnapshotTransport   (read-only, pre-fetched JSON)           │
 └──────────────────────────────────────────────────────────────────┘
@@ -298,67 +397,77 @@ Rich HTML returned by Zulip's server-side markdown renderer is run
 through DOMPurify with a strict allow-list before it hits the DOM.
 See [`SECURITY.md`](./SECURITY.md) for the threat model.
 
-| Element                                                                  | Status |
-| ------------------------------------------------------------------------ | ------ |
-| Paragraphs, headings (`h1`–`h6`), horizontal rules                       | ✅     |
-| Bold, italic, strikethrough, underline                                   | ✅     |
-| Inline code, fenced code blocks                                          | ✅     |
-| Ordered + unordered lists (incl. nesting)                                | ✅     |
-| Blockquotes (incl. nested)                                               | ✅     |
-| Tables with header row                                                   | ✅     |
-| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`) | ✅     |
-| Autolinked plain-text URLs                                               | ✅     |
-| Inline images (relative paths resolved against `server`)                 | ✅     |
-| Unicode emoji                                                            | ✅     |
-| Custom Zulip emoji (`<img class="emoji">`)                               | ✅     |
-| `@user` mentions, `#channel` references, `#channel > topic` links        | ✅     |
-| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup                     | ✅     |
-| Spoilers (click / keyboard reveal)                                       | ✅     |
-| KaTeX math (lazy-loaded)                                                 | ✅     |
-| Code-block syntax highlighting (Pygments classes)                        | ✅     |
-| Polls                                                                    | ❌     |
-| Widgets / custom message extensions                                      | ❌     |
-| File / image attachment previews beyond `<img>`                          | ❌     |
+| Element                                                                  | Status  |
+| ------------------------------------------------------------------------ | ------- |
+| Paragraphs, headings (`h1`–`h6`), horizontal rules                       | done    |
+| Bold, italic, strikethrough, underline                                   | done    |
+| Inline code, fenced code blocks                                          | done    |
+| Ordered + unordered lists (incl. nesting)                                | done    |
+| Blockquotes (incl. nested)                                               | done    |
+| Tables with header row                                                   | done    |
+| Links (http/https/mailto only, `rel="noopener noreferrer nofollow ugc"`) | done    |
+| Autolinked plain-text URLs                                               | done    |
+| Inline images (relative paths resolved against `server`)                 | done    |
+| Unicode emoji                                                            | done    |
+| Custom Zulip emoji (`<img class="emoji">`)                               | done    |
+| `@user` mentions, `#channel` references, `#channel > topic` links        | done    |
+| Keyboard shortcuts (`<kbd>`), abbreviations, sub/sup                     | done    |
+| Spoilers (click / keyboard reveal)                                       | done    |
+| KaTeX math (lazy-loaded)                                                 | done    |
+| Code-block syntax highlighting (Pygments classes)                        | done    |
+| Structured `MessagePart[]` (text/code/tool_call/tool_result/confirmation)| done    |
+| Polls                                                                    | planned |
+| Widgets / custom message extensions                                      | planned |
+| File / image attachment previews beyond `<img>`                          | planned |
 
 ### Live data & interaction
 
-| Feature                                                    | Status    |
-| ---------------------------------------------------------- | --------- |
-| Channel + topic scoped narrow                              | ✅        |
-| Long-poll event queue via `/register` + `/events`          | ✅        |
-| Send messages to channel                                   | ✅        |
-| Message edits (live, incremental DOM update)               | ✅        |
-| Message deletes (live)                                     | ✅        |
-| Emoji reactions — read, add, remove (live)                 | ✅        |
-| Avatar images (with initials fallback)                     | ✅        |
-| Rich showcase + read-only `#announce` demos                | ✅        |
-| Floating-messenger mode                                    | ✅        |
-| Light + dark themes + branded header                       | ✅        |
-| Typing indicators (send + receive, per-scope filtered)     | ✅        |
-| Unread separator + "new messages" jump-to-bottom pill      | ✅        |
-| Curated emoji reaction picker                              | ✅        |
-| Message pagination (scroll-up loads older)                 | ✅        |
-| Channel + topic enumeration (`listChannels`, `listTopics`) | ✅        |
-| Direct messages                                            | ❌ (v0.5) |
-| Presence (online/offline dots)                             | ❌        |
-| File uploads from the composer                             | ❌        |
-| Message search                                             | ❌        |
-| Unread counters, read receipts                             | ❌        |
-| Draft persistence                                          | ❌        |
+| Feature                                                    | Status         |
+| ---------------------------------------------------------- | -------------- |
+| Channel + topic scoped narrow                              | done           |
+| Long-poll event queue via `/register` + `/events`          | done           |
+| Send messages to channel                                   | done           |
+| Message edits (live, incremental DOM update)               | done           |
+| Message deletes (live)                                     | done           |
+| Emoji reactions — read, add, remove (live)                 | done           |
+| Avatar images (with initials fallback)                     | done           |
+| Rich showcase + read-only `#announce` demos                | done           |
+| Floating-messenger mode                                    | done           |
+| Light + dark themes + branded header                       | done           |
+| Typing indicators (send + receive, per-scope filtered)     | done           |
+| Unread separator + "new messages" jump-to-bottom pill      | done           |
+| Curated emoji reaction picker                              | done           |
+| Message pagination (scroll-up loads older)                 | done           |
+| Channel + topic enumeration (`listChannels`, `listTopics`) | done           |
+| Streaming agent replies (`startAgentReply`)                | done           |
+| Pinned-message banner (`<zulip-announcement>`)             | done           |
+| JWT SSO handoff (`auth-token`)                             | done           |
+| Direct messages                                            | v0.8 (planned) |
+| Presence (online/offline dots)                             | planned        |
+| File uploads from the composer                             | planned        |
+| Message search                                             | planned        |
+| Unread counters, read receipts                             | planned        |
+| Draft persistence                                          | planned        |
 
 ## Repository layout
 
 ```
 zulip-embed/
 ├── src/                   # zulip-embed — Web Components + headless SDK
-├── tests/                 # Vitest suite (276 tests)
+│   └── entries/           # subpath-entry files (chat, channel-list, …)
+├── tests/                 # Vitest suite
 ├── demo/                  # Landing page + playground (this repo's Pages site)
-├── scripts/               # CI snapshot fetchers
+├── scripts/               # CI snapshot fetchers, bundle-size checker
+├── docs/                  # Developer documentation
+│   ├── ONBOARDING.md      # step-by-step Zulip server + auth-token setup
+│   ├── ARCHITECTURE.md    # transport / scope / event / bundle model
+│   ├── jwt.md             # JWT provisioning
+│   └── migration-0.2.md   # 0.1 → 0.2 migration notes
 ├── packages/
 │   ├── react/             # zulip-embed-react         (done)
-│   ├── react-native/      # zulip-embed-react-native  (done)
-│   └── flutter/           # zulip_embed          (done)
-└── .github/workflows/     # CI: test, typecheck, build, deploy Pages
+│   ├── react-native/      # zulip-embed-react-native  (alpha)
+│   └── flutter/           # zulip_embed               (done)
+└── .github/workflows/     # CI: test, typecheck, build, deploy Pages, release
 ```
 
 ## Development
@@ -367,8 +476,9 @@ zulip-embed/
 pnpm install
 pnpm dev          # live demo at http://localhost:5173
 pnpm typecheck    # tsc --noEmit
-pnpm test         # vitest (276 tests)
-pnpm build        # produces dist/zulip-embed.js (ESM) + dist/zulip-embed.iife.js
+pnpm test         # vitest
+pnpm build        # produces dist/zulip-embed.js (ESM) + dist/zulip-embed.iife.js + subpath entries
+pnpm check:bundle # verify per-subpath gzip budgets
 pnpm build:site   # static landing page + playground into ./site
 ```
 
@@ -385,6 +495,7 @@ pnpm test
 ```bash
 cd packages/react-native
 pnpm typecheck
+pnpm test
 ```
 
 ### Flutter package
@@ -396,81 +507,26 @@ dart analyze
 dart test
 ```
 
-## Roadmap
-
-**v1.0 — Component + framework parity**
-
-1. ✅ Sanitized HTML rendering (DOMPurify) + KaTeX math
-2. ✅ Live message edits, deletes, reactions, typing
-3. ✅ Message pagination + unread separator
-4. ✅ Flutter parity (live chat, edit/delete, typing, snapshot)
-5. ✅ `Transport.listChannels()` + `listTopics()` primitives
-6. ✅ `<zulip-channel-list>` + `<zulip-topic-list>` components
-7. ✅ React wrapper package (`zulip-embed-react`)
-8. ✅ React Native package (`zulip-embed-react-native`)
-9. ✅ Branded header (`brand-name`, `brand-logo`) + theming playground
-10. ✅ Compose toolbar (B/I/strike/code/link/quote/lists/spoiler/mention/emoji) + keyboard shortcuts
-11. ✅ Categorized, searchable emoji picker with recents
-12. ✅ Customizable message-action menu (add-reaction, edit, delete, open-in-zulip, copy-link, copy-text)
-13. ⏳ Direct messages — 1:1 and group DM conversations + sending; `/api/v1/messages` with `type=direct`
-14. ⏳ Composer file / image upload — paste, drag-and-drop, and paperclip button; multipart to `/api/v1/user_uploads`
-15. ⏳ `@user` / `#channel` / `:emoji:` autocomplete in the composer — so mentions, channel refs, and emoji shortcodes can be typed inline
-16. ⏳ Presence indicators — online / idle / offline dot on avatars; `/api/v1/users/me/presence` + presence events
-17. ⏳ Message search — keyword + filter bar backed by the `narrow` operators on `/api/v1/messages`
-18. ⏳ Starred (bookmarked) messages — toggle via `/api/v1/messages/flags` and a "Starred" view
-19. ⏳ Unread tracking + unread counts — per-channel and per-topic badges driven by the existing event queue
-20. ⏳ Mark-as-read / mark-as-unread controls — `/api/v1/messages/flags`, including "mark all read" on a topic
-21. ⏳ Resolve / unresolve topic — participant-facing toggle in the topic header; `/api/v1/messages/{id}` with `topic="✔ …"`
-22. ⏳ Rename / move topic — drag-and-drop-free UI for participants with permission; `/api/v1/messages/{id}`
-23. ⏳ Quote-reply and forward — pre-fill composer with a permalink-quoted block
-24. ⏳ Click-to-open image/video lightbox with zoom, download, and prev/next across the current view
-25. ⏳ User card popover on avatar/name click — name, status, availability, "Send DM", "View messages sent"
-26. ⏳ Inbox view (`<zulip-inbox>`) — unreads grouped by channel > topic
-27. ⏳ Recent conversations view (`<zulip-recent>`) — most-recent topics + DMs with unread/participated filters
-28. ⏳ Edit history viewer — show the "(edited)" trail for a message via `/api/v1/messages/{id}/history`
-29. ⏳ Draft persistence — autosave the composer to local storage per scope and restore on reopen
-30. ⏳ JWT SSO handoff — server-side token exchange so adopters don't embed an `api-key` attribute
-31. ⏳ SwiftUI + Compose native SDKs
-32. ⏳ Publish to npm + pub.dev; dedicated developer-docs site
-
-**v1.x follow-ups**
-
-1. ⏳ Scheduled messages — send later via `/api/v1/scheduled_messages`, plus a "Scheduled" view to edit/cancel
-2. ⏳ Message reminders — "remind me about this" via `/api/v1/reminders`, delivered as a DM from Notification Bot
-3. ⏳ Saved snippets — insert reusable message templates via `/api/v1/saved_snippets`
-4. ⏳ Read receipts — "who has read this" popover via `/api/v1/messages/{id}/read_receipts`, honoring the viewer's privacy setting
-5. ⏳ Mute / unmute a topic, channel, or user — personal visibility filters, including the "click to reveal" interstitial for muted senders
-6. ⏳ Follow / unfollow a topic with follow-specific notification preferences
-7. ⏳ User status and availability — read/write via `/api/v1/users/me/status`, rendered next to names
-8. ⏳ Channel subscribe / unsubscribe from inside the widget (`/api/v1/users/me/subscriptions`)
-9. ⏳ Pin / unpin a channel — personal left-sidebar ordering
-10. ⏳ Channel and topic permalink rendering polish — `#channel > topic @ message` pills linking back into the widget's own scope
-11. ⏳ Wildcard and group mentions (`@all`, `@topic`, user groups) with the same autocomplete as personal mentions
-12. ⏳ Scroll-to-date and jump-to-message affordances in longer feeds
-13. ⏳ Collapse / expand long messages with a "Show more" fold
-14. ⏳ View-original (Markdown source) and copy-as-Markdown message actions
-
-**Future iterations**
-
-1. ⏳ Polls — render `/poll` widget messages and let participants add and vote on options (`submessage` events)
-2. ⏳ Collaborative to-do lists — render `/todo` widget messages and let participants check off tasks
-3. ⏳ GIF picker — integrated Tenor/GIPHY/KLIPY search using the server's configured provider
-4. ⏳ Video/voice call link insertion — call-provider-aware button (Jitsi, Zoom, BBB, etc.) via `create-*-video-call` endpoints
-5. ⏳ Alert words — highlight configurable per-user keywords in incoming messages
-6. ⏳ Report-a-message moderation requests — surface the moderation flow when the org has it enabled
-7. ⏳ Uploaded-files manager — browse, download, and delete files the viewer has uploaded
-8. ⏳ Navigation views / `is:starred`, `is:mentioned`, `is:followed` saved filters in the search UI
-9. ⏳ Full offline / background-sync mode for mobile wrappers
-
-See [`SECURITY.md`](./SECURITY.md) for the threat model and
-[`CLAUDE.md`](./CLAUDE.md) for code conventions (including why this
-SDK always says "channel" instead of the legacy "stream").
-
 ## Try it
 
 - **Live demo + playground:** <https://amanagr.github.io/zulip-embed/>
 - **Flutter demo:** <https://amanagr.github.io/zulip-embed/flutter/>
 - **Source:** you're already here.
+
+## Further reading
+
+- [`docs/ONBOARDING.md`](./docs/ONBOARDING.md) — step-by-step Zulip
+  server + auth-token setup for first-time users.
+- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — transport
+  interface, scope model, event pipeline, bundle strategy.
+- [`docs/jwt.md`](./docs/jwt.md) — minting auth tokens on your
+  backend for the `auth-token` attribute.
+- [`docs/migration-0.2.md`](./docs/migration-0.2.md) — 0.1 → 0.2
+  migration notes.
+- [`SECURITY.md`](./SECURITY.md) — threat model and reporting.
+- [`CLAUDE.md`](./CLAUDE.md) — code conventions (including why this
+  SDK always says "channel" instead of the legacy "stream").
+- [`CHANGELOG.md`](./CHANGELOG.md) — release notes per version.
 
 ## License
 
