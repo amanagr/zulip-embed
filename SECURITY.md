@@ -71,6 +71,25 @@ lets integrators keep the API key in memory only and pass it in via JS,
 avoiding the DOM-attribute exposure entirely. Prefer that route for any
 deployment where the host page runs untrusted third-party script.
 
+## Snapshot mode
+
+`snapshot-url` mode loads a pre-fetched JSON payload instead of opening a
+live event queue, so **no credentials travel to the browser**. The
+tradeoffs:
+
+- The snapshot JSON is trusted to the same level as the Zulip server
+  that produced it — every `content` field passes through the same
+  DOMPurify allow-list as live messages.
+- `snapshot-url` is validated against a scheme allow-list (`http`, `https`,
+  or same-origin relative path). `javascript:`, `data:`, `file:`, and
+  protocol-relative `//host` URLs are rejected before `fetch` is called.
+- `scripts/fetch-announce-snapshot.mjs` runs in CI with bot credentials
+  and writes JSON into the repo. The write path is resolved against the
+  repo root and refuses to escape it, so a poisoned `ZULIP_ANNOUNCE_OUT`
+  env var can't overwrite arbitrary files on the runner.
+- The bot must be a **generic** Zulip bot — incoming-webhook bots return
+  HTTP 401 on `/api/v1/messages`. See `README.md` for the setup notes.
+
 ## Out of scope
 
 - **Host-page XSS**: if the page embedding `<zulip-chat>` is already
