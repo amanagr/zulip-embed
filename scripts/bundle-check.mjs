@@ -26,6 +26,7 @@ const DIST = resolve(import.meta.dirname, "..", "dist");
 const BUDGETS = {
     "entries/chat.js": 60 * 1024,
     "entries/channel-list.js": 8 * 1024,
+    "entries/dm-list.js": 10 * 1024,
     "entries/topic-list.js": 8 * 1024,
     "entries/agent.js": 5 * 1024,
     // announcement pulls render.ts for `sanitizeHtml` (Zulip-server

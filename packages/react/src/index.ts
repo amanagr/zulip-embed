@@ -10,6 +10,8 @@ export {ZulipChat} from "./zulip-chat.js";
 export type {ZulipChatProps} from "./zulip-chat.js";
 export {ZulipChannelList} from "./zulip-channel-list.js";
 export type {ZulipChannelListProps, ChannelSelectedDetail} from "./zulip-channel-list.js";
+export {ZulipDmList} from "./zulip-dm-list.js";
+export type {ZulipDmListProps, DmSelectedDetail} from "./zulip-dm-list.js";
 export {ZulipTopicList} from "./zulip-topic-list.js";
 export type {ZulipTopicListProps, TopicSelectedDetail} from "./zulip-topic-list.js";
 
@@ -22,11 +24,15 @@ export type {UseZulipChatResult} from "./hooks.js";
 export type {
     Channel,
     ChannelMessage,
+    ChannelScope,
     ConnectionStatus,
     DirectMessage,
+    DirectMessageConversation,
+    DmScope,
     ErrorCode,
     Message,
     MessageType,
+    NormalizedScope,
     Reaction,
     ScopeFilter,
     SendMessageParams,

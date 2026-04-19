@@ -59,6 +59,7 @@ export default defineConfig(() => {
                         import.meta.dirname,
                         "src/entries/channel-list.ts",
                     ),
+                    "entries/dm-list": resolve(import.meta.dirname, "src/entries/dm-list.ts"),
                     "entries/topic-list": resolve(
                         import.meta.dirname,
                         "src/entries/topic-list.ts",

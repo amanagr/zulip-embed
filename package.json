@@ -25,6 +25,10 @@
       "types": "./dist/entries/channel-list.d.ts",
       "import": "./dist/entries/channel-list.js"
     },
+    "./dm-list": {
+      "types": "./dist/entries/dm-list.d.ts",
+      "import": "./dist/entries/dm-list.js"
+    },
     "./topic-list": {
       "types": "./dist/entries/topic-list.d.ts",
       "import": "./dist/entries/topic-list.js"
