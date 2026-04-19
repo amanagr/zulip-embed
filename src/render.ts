@@ -8,7 +8,7 @@ import {
     type MessageActionDescriptor,
     type MessageActionHostContext,
 } from "./message-actions.ts";
-import type {Message, Reaction} from "./types.ts";
+import type {Message, MessagePart, Reaction} from "./types.ts";
 
 export interface RenderContext {
     // Absolute origin (e.g. https://zulip.example.com) used to resolve
@@ -426,11 +426,82 @@ function makeOverflowMenu(
 }
 
 function renderContent(target: HTMLElement, message: Message, context: RenderContext): void {
+    // If the message carries structured parts, prefer them over the
+    // flat content string. Hosts set `parts` when they want agent
+    // output (tool calls / results / code blocks) rendered as first
+    // class UI rather than as escaped HTML. `content` remains the
+    // human-readable fallback for accessibility and copy/paste; we
+    // just don't render it when parts is present.
+    if (message.parts !== undefined && message.parts.length > 0) {
+        for (const part of message.parts) {
+            target.append(renderPart(part));
+        }
+        return;
+    }
     if (message.contentIsHtml) {
         target.append(sanitizeHtml(message.content, context.serverOrigin));
         return;
     }
     renderPlainText(target, message.content);
+}
+
+function renderPart(part: MessagePart): HTMLElement {
+    if (part.type === "text") {
+        const wrap = document.createElement("span");
+        wrap.classList.add("part-text");
+        renderPlainText(wrap, part.text);
+        return wrap;
+    }
+    if (part.type === "code") {
+        const pre = document.createElement("pre");
+        pre.classList.add("part-code");
+        const code = document.createElement("code");
+        if (part.language !== undefined) {
+            // Use the hljs-compatible convention so a future syntax
+            // highlighter plugin can hook in without a schema change.
+            code.className = `language-${part.language}`;
+        }
+        code.textContent = part.code;
+        pre.append(code);
+        return pre;
+    }
+    if (part.type === "tool_call") {
+        const box = document.createElement("div");
+        box.classList.add("part-tool-call");
+        box.dataset["toolCallId"] = part.id;
+        if (part.status !== undefined) box.dataset["status"] = part.status;
+        const header = document.createElement("div");
+        header.classList.add("part-tool-call-header");
+        header.textContent = `🔧 ${part.name}`;
+        box.append(header);
+        const input = document.createElement("pre");
+        input.classList.add("part-tool-call-input");
+        input.textContent = safeStringify(part.input);
+        box.append(input);
+        return box;
+    }
+    // tool_result
+    const box = document.createElement("div");
+    box.classList.add("part-tool-result");
+    box.dataset["toolCallId"] = part.toolCallId;
+    if (part.isError === true) box.dataset["error"] = "true";
+    const output = document.createElement("pre");
+    output.classList.add("part-tool-result-output");
+    output.textContent = safeStringify(part.output);
+    box.append(output);
+    return box;
+}
+
+function safeStringify(value: unknown): string {
+    // Tool calls / results carry arbitrary JSON from the agent. We
+    // serialize for display but guard against circular refs (a BFS
+    // agent loop could easily produce them) and against throwing on
+    // unsupported values like BigInt.
+    try {
+        return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
 }
 
 function renderPlainText(target: HTMLElement, text: string): void {
