@@ -60,6 +60,13 @@ abstract class Transport {
   /// List topics inside [channel]. Same default rationale as listChannels.
   Future<List<Topic>> listTopics(String channel) async => const [];
 
+  /// List recent direct-message conversations visible to the viewer,
+  /// newest first. Drives the `<zulip-dm-list>` / `ZulipDmList`
+  /// surfaces. Default returns empty so snapshot transports inherit a
+  /// safe no-op.
+  Future<List<DirectMessageConversation>>
+      listDirectMessageConversations() async => const [];
+
   /// Fetch a single message by id. Returns null if the viewer cannot see
   /// the message (unsubscribed channel, deleted message, etc.). Used by
   /// [ZulipAnnouncement]; default returns null so transports that can't

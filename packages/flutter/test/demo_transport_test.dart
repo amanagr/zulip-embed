@@ -7,7 +7,7 @@ void main() {
       final transport = DemoTransport();
       final events = <ZulipEvent>[];
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+        scope: const ScopeFilter.channel('general', topic: 'welcome'),
         onEvent: events.add,
       );
       final statuses =
@@ -20,11 +20,11 @@ void main() {
     test('seeds welcome messages scoped to the channel/topic', () async {
       final transport = DemoTransport();
       await transport.connect(
-        scope: const ScopeFilter(channel: 'design', topic: 'intro'),
+        scope: const ScopeFilter.channel('design', topic: 'intro'),
         onEvent: (_) {},
       );
       final messages = await transport.getMessages(
-        scope: const ScopeFilter(channel: 'design', topic: 'intro'),
+        scope: const ScopeFilter.channel('design', topic: 'intro'),
       );
       expect(messages.length, greaterThanOrEqualTo(2));
       expect(
@@ -44,7 +44,7 @@ void main() {
       final transport = DemoTransport();
       final events = <ZulipEvent>[];
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+        scope: const ScopeFilter.channel('general', topic: 'welcome'),
         onEvent: events.add,
       );
       await transport.sendMessage(
@@ -67,7 +67,7 @@ void main() {
       final transport = DemoTransport();
       final events = <ZulipEvent>[];
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general'),
+        scope: const ScopeFilter.channel('general'),
         onEvent: events.add,
       );
       await transport.sendMessage(
@@ -91,7 +91,7 @@ void main() {
       final client = ZulipClient(transport);
       final received = <ZulipEvent>[];
       final sub = client.events.listen(received.add);
-      await client.connect(const ScopeFilter(channel: 'general'));
+      await client.connect(const ScopeFilter.channel('general'));
       await client.sendMessage('ping');
       await Future<void>.delayed(const Duration(milliseconds: 1000));
       await sub.cancel();

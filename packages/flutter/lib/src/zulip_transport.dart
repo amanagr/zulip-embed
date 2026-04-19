@@ -63,6 +63,24 @@ class ZulipTransport implements Transport {
   // filter to messages the viewer can see.
   ScopeFilter? _scope;
 
+  /// Build Zulip narrow operators from a [ScopeFilter]. Operators are
+  /// 'stream' / 'pm-with' (not 'channel' / 'dm') for compatibility with
+  /// Zulip < 9, which doesn't know the newer aliases. Every supported
+  /// server accepts the legacy operators, so we hardcode them and avoid
+  /// version sniffing. Callers of this SDK only ever see 'channel' /
+  /// 'direct'. See CLAUDE.md.
+  static List<List<String>> _buildNarrow(ScopeFilter scope) {
+    return switch (scope) {
+      ChannelScope(:final channel, :final topic) => [
+          ['stream', channel],
+          if (topic != null) ['topic', topic],
+        ],
+      DmScope(:final userIds) => [
+          ['pm-with', ([...userIds]..sort()).join(',')],
+        ],
+    };
+  }
+
   static Uri _normalize(Uri url) {
     // Reject anything that isn't http/https — file://, chrome-extension://,
     // relative URIs, and so on should never reach the Zulip REST calls,
@@ -115,14 +133,12 @@ class ZulipTransport implements Transport {
     try {
       await _loadCurrentUser();
 
-      // Operator is 'stream' (not 'channel') for compatibility with Zulip
-      // < 9, which doesn't know the 'channel' alias. Every supported
-      // server accepts the legacy operator, so we hardcode it and avoid
-      // version sniffing. Callers of this SDK only ever see 'channel'.
-      final narrow = <List<String>>[
-        ['stream', scope.channel],
-        if (scope.topic != null) ['topic', scope.topic!],
-      ];
+      // Operator is 'stream' / 'pm-with' (not 'channel' / 'dm') for
+      // compatibility with Zulip < 9, which doesn't know the newer
+      // aliases. Every supported server accepts the legacy operators, so
+      // we hardcode them and avoid version sniffing. Callers of this
+      // SDK only ever see 'channel' / 'direct'.
+      final narrow = _buildNarrow(scope);
       final register = await _postForm('/api/v1/register', {
         'event_types': jsonEncode([
           'message',
@@ -205,12 +221,9 @@ class ZulipTransport implements Transport {
     required ScopeFilter scope,
     int limit = 50,
   }) async {
-    // See buildNarrow comment in connect(): wire operator is 'stream' for
-    // Zulip < 9 compat.
-    final narrow = <List<String>>[
-      ['stream', scope.channel],
-      if (scope.topic != null) ['topic', scope.topic!],
-    ];
+    // See _buildNarrow comment in connect(): wire operators are legacy
+    // 'stream' / 'pm-with' for Zulip < 9 compat.
+    final narrow = _buildNarrow(scope);
     final uri = _endpoint('/api/v1/messages', {
       'anchor': 'newest',
       'num_before': '$limit',
@@ -456,17 +469,45 @@ class ZulipTransport implements Transport {
     // out-of-band pings for other narrows never fire the indicator.
     final scope = _scope;
     if (scope == null) return;
-    final messageType = evt['message_type'] as String?;
-    if (messageType != null && messageType != 'stream' && messageType != 'channel') {
-      return;
+    // Channel-scope filtering: drop typing events that don't match the
+    // channel / topic the viewer narrowed to. DM typing events are only
+    // surfaced when the active scope is a DM with the same participant
+    // set.
+    switch (scope) {
+      case ChannelScope(:final channel, :final topic):
+        final messageType = evt['message_type'] as String?;
+        if (messageType != null &&
+            messageType != 'stream' &&
+            messageType != 'channel') {
+          return;
+        }
+        final streamId = (evt['stream_id'] as num?)?.toInt();
+        if (streamId != null) {
+          final cached = _streamIdCache[channel];
+          if (cached != null && cached != streamId) return;
+        }
+        final topicStr = evt['topic'] as String?;
+        if (topic != null && topicStr != null && topicStr != topic) return;
+      case DmScope(:final userIds):
+        final messageType = evt['message_type'] as String?;
+        if (messageType != null &&
+            messageType != 'private' &&
+            messageType != 'direct') {
+          return;
+        }
+        // Recipient ids live under `message_to_user_ids` (or the legacy
+        // `recipients`). Normalize and compare against our canonical
+        // participant set.
+        final rawIds = (evt['message_to_user_ids'] as List?) ?? const [];
+        final eventIds = {
+          for (final raw in rawIds) (raw as num).toInt(),
+        }..add((evt['sender']?['user_id'] as num?)?.toInt() ?? -1);
+        final expected = {for (final id in userIds) id};
+        if (eventIds.length != expected.length) return;
+        for (final id in expected) {
+          if (!eventIds.contains(id)) return;
+        }
     }
-    final streamId = (evt['stream_id'] as num?)?.toInt();
-    if (streamId != null) {
-      final cached = _streamIdCache[scope.channel];
-      if (cached != null && cached != streamId) return;
-    }
-    final topic = evt['topic'] as String?;
-    if (scope.topic != null && topic != null && topic != scope.topic) return;
 
     final sender = evt['sender'];
     if (sender is! Map<String, dynamic>) return;
@@ -495,16 +536,27 @@ class ZulipTransport implements Transport {
     // rather than surfacing transient network hiccups as errors on the
     // composer.
     try {
-      final streamId = await _resolveStreamId(scope.channel);
-      if (streamId == null) return;
-      final body = <String, String>{
-        'op': op == TypingOp.start ? 'start' : 'stop',
-        'stream_id': '$streamId',
-      };
-      if (scope.topic != null) {
-        body['topic'] = scope.topic!;
+      switch (scope) {
+        case ChannelScope(:final channel, :final topic):
+          final streamId = await _resolveStreamId(channel);
+          if (streamId == null) return;
+          final body = <String, String>{
+            'op': op == TypingOp.start ? 'start' : 'stop',
+            // Wire value 'stream' for Zulip < 9 compat — see _buildNarrow.
+            'type': 'stream',
+            'stream_id': '$streamId',
+          };
+          if (topic != null) body['topic'] = topic;
+          await _postForm('/api/v1/typing', body);
+        case DmScope(:final userIds):
+          final canonical = [...userIds]..sort();
+          final body = <String, String>{
+            'op': op == TypingOp.start ? 'start' : 'stop',
+            'type': 'direct',
+            'to': jsonEncode(canonical),
+          };
+          await _postForm('/api/v1/typing', body);
       }
-      await _postForm('/api/v1/typing', body);
     } catch (_) {
       // Best-effort: swallow.
     }
@@ -563,6 +615,99 @@ class ZulipTransport implements Transport {
       );
     }
     return List.unmodifiable(topics);
+  }
+
+  @override
+  Future<List<DirectMessageConversation>>
+      listDirectMessageConversations() async {
+    // Zulip doesn't expose a dedicated "list DM threads" endpoint; we
+    // mine the viewer's recent private messages and bucket by the set of
+    // participants. 200 is a reasonable upper bound for the last batch —
+    // enough to surface active conversations without paginating.
+    try {
+      final narrow = [
+        ['is', 'private'],
+      ];
+      final uri = _endpoint('/api/v1/messages', {
+        'anchor': 'newest',
+        'num_before': '200',
+        'num_after': '0',
+        'narrow': jsonEncode(narrow),
+        'apply_markdown': 'false',
+        'client_gravatar': 'true',
+      });
+      final resp = await _http.get(uri, headers: _authHeaders);
+      if (resp.statusCode >= 400) return const [];
+      final body = jsonDecode(resp.body) as Map<String, dynamic>;
+      final raw = (body['messages'] as List).cast<Map<String, dynamic>>();
+
+      // Key: comma-joined sorted participant id list. Value: bucket
+      // accumulating the most recent message seen + participant records.
+      final buckets = <String, _DmBucket>{};
+      for (final m in raw) {
+        final wireType = m['type'] as String?;
+        if (wireType != 'private' && wireType != 'direct') continue;
+        final messageId = (m['id'] as num).toInt();
+        final senderId = (m['sender_id'] as num?)?.toInt() ?? 0;
+        final senderName = (m['sender_full_name'] as String?) ?? '';
+        final senderEmail = (m['sender_email'] as String?) ?? '';
+
+        final users = <int, User>{};
+        // Seed the bucket with the sender — Zulip's display_recipient
+        // includes all participants (including the sender), but being
+        // defensive avoids an empty bucket if the server ever omits one.
+        if (senderId != 0) {
+          users[senderId] = User(
+            id: senderId,
+            fullName: senderName,
+            email: senderEmail,
+          );
+        }
+        final displayRecipient = m['display_recipient'];
+        if (displayRecipient is List) {
+          for (final r in displayRecipient) {
+            if (r is! Map<String, dynamic>) continue;
+            final uid = (r['id'] as num?)?.toInt();
+            if (uid == null) continue;
+            users[uid] = User(
+              id: uid,
+              fullName: (r['full_name'] as String?) ?? '',
+              email: (r['email'] as String?) ?? '',
+            );
+          }
+        }
+        if (users.isEmpty) continue;
+        final ids = users.keys.toList()..sort();
+        final key = ids.join(',');
+        final bucket = buckets.putIfAbsent(
+          key,
+          () => _DmBucket(
+            userIds: ids,
+            users: users.values.toList(),
+            lastMessageId: messageId,
+          ),
+        );
+        if (messageId > bucket.lastMessageId) {
+          bucket.lastMessageId = messageId;
+        }
+      }
+
+      final conversations = [
+        for (final b in buckets.values)
+          DirectMessageConversation(
+            userIds: b.userIds,
+            users: b.users,
+            lastMessageId: b.lastMessageId,
+          ),
+      ];
+      conversations.sort(
+        (a, b) =>
+            (b.lastMessageId ?? 0).compareTo(a.lastMessageId ?? 0),
+      );
+      return List.unmodifiable(conversations);
+    } catch (_) {
+      return const [];
+    }
   }
 
   @override
@@ -756,6 +901,21 @@ ErrorCode _classifyStatus(int status) {
   if (status == 429) return ErrorCode.rateLimited;
   if (status >= 500) return ErrorCode.network;
   return ErrorCode.unknown;
+}
+
+/// Mutable accumulator used by
+/// `ZulipTransport.listDirectMessageConversations` while bucketing recent
+/// private messages by participant set. The final record handed back to
+/// callers is an immutable [DirectMessageConversation].
+class _DmBucket {
+  _DmBucket({
+    required this.userIds,
+    required this.users,
+    required this.lastMessageId,
+  });
+  final List<int> userIds;
+  final List<User> users;
+  int lastMessageId;
 }
 
 int? _retryAfterMs(http.Response resp) {

@@ -45,22 +45,50 @@ class ZulipClient {
     return transport.getMessages(scope: s, limit: limit);
   }
 
-  /// Post [content] into the currently-connected scope. For DM flows or
-  /// sending to a channel other than the active scope, call
-  /// [sendMessageWithParams] directly.
+  /// Post [content] into the currently-connected scope. Branches on the
+  /// active [ScopeFilter]: channel scope sends a ChannelSendParams (default
+  /// topic "general chat" if unset), DM scope sends a DirectSendParams with
+  /// the scope's user ids. For sending to a different scope than the
+  /// active one, call [sendMessageWithParams] directly.
   Future<Message> sendMessage(String content) {
     final s = _scope;
     if (s == null) {
       throw StateError('ZulipClient.sendMessage called before connect().');
     }
-    return transport.sendMessage(
-      ChannelSendParams(
-        channel: s.channel,
-        topic: s.topic ?? 'general chat',
-        content: content,
-      ),
-    );
+    switch (s) {
+      case ChannelScope(:final channel, :final topic):
+        return transport.sendMessage(
+          ChannelSendParams(
+            channel: channel,
+            topic: topic ?? 'general chat',
+            content: content,
+          ),
+        );
+      case DmScope(:final userIds):
+        // Exclude the viewer from the recipients list — the Zulip
+        // /messages endpoint rejects self-addressed DMs when the viewer
+        // is included as a non-self recipient. Fall back to the raw list
+        // if the transport hasn't reported a user id yet.
+        final viewerId = transport.currentUserId;
+        final canonical = [...userIds]..sort();
+        final filtered = viewerId == null
+            ? canonical
+            : canonical.where((id) => id != viewerId).toList();
+        final recipients = filtered.isEmpty ? canonical : filtered;
+        return transport.sendMessage(
+          DirectSendParams(
+            recipients: [for (final id in recipients) '$id'],
+            content: content,
+          ),
+        );
+    }
   }
+
+  /// List recent direct-message conversations. Returns empty for
+  /// transports that don't implement discovery.
+  Future<List<DirectMessageConversation>>
+      listDirectMessageConversations() =>
+          transport.listDirectMessageConversations();
 
   /// Send a message using an explicit discriminated [SendMessageParams]
   /// (either [ChannelSendParams] or [DirectSendParams]). Does not require

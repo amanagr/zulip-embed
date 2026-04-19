@@ -112,6 +112,51 @@ class SnapshotTransport extends Transport {
   }
 
   @override
+  Future<List<DirectMessageConversation>>
+      listDirectMessageConversations() async {
+    // Scan the full parse (not just the scope-filtered slice) so a
+    // consumer that opens a snapshot against a channel scope can still
+    // list the DM threads inside it.
+    final buckets = <String, _SnapDmBucket>{};
+    for (final m in _allMessages) {
+      if (m is! DirectMessage) continue;
+      final users = <int, User>{
+        m.senderId: User(
+          id: m.senderId,
+          fullName: m.senderName,
+          email: '',
+        ),
+      };
+      for (final r in m.recipients) {
+        users[r.id] = r;
+      }
+      final ids = users.keys.toList()..sort();
+      final key = ids.join(',');
+      final bucket = buckets.putIfAbsent(
+        key,
+        () => _SnapDmBucket(
+          userIds: ids,
+          users: users.values.toList(),
+          lastMessageId: m.id,
+        ),
+      );
+      if (m.id > bucket.lastMessageId) bucket.lastMessageId = m.id;
+    }
+    final conversations = [
+      for (final b in buckets.values)
+        DirectMessageConversation(
+          userIds: b.userIds,
+          users: b.users,
+          lastMessageId: b.lastMessageId,
+        ),
+    ];
+    conversations.sort(
+      (a, b) => (b.lastMessageId ?? 0).compareTo(a.lastMessageId ?? 0),
+    );
+    return List.unmodifiable(conversations);
+  }
+
+  @override
   Future<Message?> fetchMessage(int messageId) async {
     for (final m in _allMessages) {
       if (m.id == messageId) return m;
@@ -167,6 +212,20 @@ class SnapshotTransport extends Transport {
   }
 }
 
+/// Accumulator for DM conversation bucketing. Mirror of the per-transport
+/// `_DmBucket` helpers elsewhere; kept private so the snapshot module
+/// stays self-contained.
+class _SnapDmBucket {
+  _SnapDmBucket({
+    required this.userIds,
+    required this.users,
+    required this.lastMessageId,
+  });
+  final List<int> userIds;
+  final List<User> users;
+  int lastMessageId;
+}
+
 ErrorCode _classifyError(Object e) {
   if (e is SocketException) return ErrorCode.network;
   if (e is http.ClientException) return ErrorCode.network;
@@ -174,11 +233,26 @@ ErrorCode _classifyError(Object e) {
 }
 
 bool _inScope(Message message, ScopeFilter scope) {
-  // Snapshots are channel feeds — only ChannelMessages match. DMs in a
-  // snapshot (if any) are filtered out since ScopeFilter has no DM form.
-  if (message is! ChannelMessage) return false;
-  if (message.channelName != scope.channel) return false;
-  if (scope.topic != null && message.topic != scope.topic) return false;
+  return switch (scope) {
+    ChannelScope(:final channel, :final topic) =>
+      message is ChannelMessage &&
+          message.channelName == channel &&
+          (topic == null || message.topic == topic),
+    DmScope(:final userIds) => message is DirectMessage &&
+        _dmParticipantsMatch(message, userIds),
+  };
+}
+
+bool _dmParticipantsMatch(DirectMessage m, List<int> userIds) {
+  final expected = {...userIds};
+  final actual = <int>{m.senderId};
+  for (final r in m.recipients) {
+    actual.add(r.id);
+  }
+  if (actual.length != expected.length) return false;
+  for (final id in expected) {
+    if (!actual.contains(id)) return false;
+  }
   return true;
 }
 

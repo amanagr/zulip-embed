@@ -180,11 +180,85 @@ class TypingUser {
   final String fullName;
 }
 
+/// Where messages are fetched from and sent to. Mirrors TS
+/// `ScopeFilter`: a discriminated union of [ChannelScope] (narrow on a
+/// channel + optional topic) and [DmScope] (narrow on a direct-message
+/// conversation identified by a sorted user id list).
+///
+/// Construct with `ScopeFilter.channel(...)` / `ScopeFilter.dm(...)` and
+/// branch with `switch (scope)` at the call site when the behavior
+/// depends on the variant.
+sealed class ScopeFilter {
+  const ScopeFilter();
+
+  /// Shortcut factory for a channel+topic scope.
+  const factory ScopeFilter.channel(String channel, {String? topic}) =
+      ChannelScope;
+
+  /// Shortcut factory for a DM scope. The [userIds] list should include
+  /// the viewer's own user id so the narrow resolves identically across
+  /// peers. Canonicalization (dedupe + sort ascending) happens lazily
+  /// via [DmScope.canonicalUserIds].
+  const factory ScopeFilter.dm(List<int> userIds) = DmScope;
+}
+
+/// A channel + optional topic narrow. Topic null means "all topics".
 @immutable
-class ScopeFilter {
-  const ScopeFilter({required this.channel, this.topic});
+class ChannelScope extends ScopeFilter {
+  const ChannelScope(this.channel, {this.topic});
   final String channel;
   final String? topic;
+}
+
+/// A direct-message conversation identified by the full participant set
+/// (always including the viewer). The SDK treats two [DmScope]s as
+/// equivalent when their [canonicalUserIds] lists are equal.
+@immutable
+class DmScope extends ScopeFilter {
+  const DmScope(this.userIds);
+
+  /// Raw list supplied by the caller. May be unsorted / contain
+  /// duplicates — use [canonicalUserIds] for equality checks.
+  final List<int> userIds;
+
+  /// Deduped, sorted copy of [userIds]. Mirrors the TS
+  /// `canonicalUserIds` helper so both SDKs compute scope equality the
+  /// same way.
+  List<int> get canonicalUserIds {
+    final set = <int>{};
+    for (final id in userIds) {
+      set.add(id);
+    }
+    final sorted = set.toList()..sort();
+    return sorted;
+  }
+}
+
+/// A direct-message conversation summary surfaced by
+/// `Transport.listDirectMessageConversations`. Mirrors TS
+/// `DirectMessageConversation`. Participants always include the viewer so
+/// the set uniquely identifies the conversation across peers.
+@immutable
+class DirectMessageConversation {
+  const DirectMessageConversation({
+    required this.userIds,
+    required this.users,
+    this.lastMessageId,
+    this.unreadCount = 0,
+  });
+
+  /// Canonical (deduped + sorted ascending) participant user ids.
+  final List<int> userIds;
+
+  /// Display records for the participants, aligned with [userIds] by
+  /// user id. The order is not guaranteed.
+  final List<User> users;
+
+  /// Most-recent message id in the conversation, used to sort
+  /// conversations by recency. Null when the transport can't report it.
+  final int? lastMessageId;
+
+  final int unreadCount;
 }
 
 @immutable

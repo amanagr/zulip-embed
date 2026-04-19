@@ -27,4 +27,5 @@ export 'src/widgets/message_list.dart' show MessageList;
 export 'src/widgets/topic_list.dart' show ZulipTopicList;
 export 'src/widgets/zulip_announcement.dart' show ZulipAnnouncement;
 export 'src/widgets/zulip_chat.dart' show ZulipChat;
+export 'src/widgets/zulip_dm_list.dart' show ZulipDmList;
 export 'src/zulip_transport.dart';

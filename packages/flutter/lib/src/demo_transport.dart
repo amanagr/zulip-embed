@@ -44,28 +44,100 @@ class DemoTransport extends Transport {
   }
 
   void _seed(ScopeFilter scope) {
-    final topic = scope.topic ?? 'welcome';
+    if (_seeded) return;
+    _seeded = true;
     final now = DateTime.now();
+    _seedDms(now);
+    switch (scope) {
+      case ChannelScope(:final channel, :final topic):
+        final t = topic ?? 'welcome';
+        _messages.addAll([
+          ChannelMessage(
+            id: 1,
+            senderId: _demoBotId,
+            senderName: 'Zulip Bot',
+            channelName: channel,
+            topic: t,
+            content: 'Welcome to the Zulip embed preview.',
+            timestamp: now.subtract(const Duration(minutes: 5)),
+          ),
+          ChannelMessage(
+            id: 2,
+            senderId: _demoBotId,
+            senderName: 'Zulip Bot',
+            channelName: channel,
+            topic: t,
+            content:
+                'Messages you send will be echoed back by this in-process '
+                'bot — no Zulip server is involved in demo mode.',
+            timestamp: now.subtract(const Duration(minutes: 4)),
+          ),
+        ]);
+      case DmScope():
+        // DM scope: seed demo DM threads only. The threads are the same
+        // whether the viewer narrows to a specific DM or lists them via
+        // listDirectMessageConversations.
+        break;
+    }
+  }
+
+  bool _seeded = false;
+
+  // Deterministic synthetic peers so demos and tests can match against
+  // known ids. Avatars omitted to keep the demo transport free of
+  // network dependencies.
+  static const _peerAlice = User(
+    id: 101,
+    fullName: 'Alice Anderson',
+    email: 'alice@example.com',
+  );
+  static const _peerBob = User(
+    id: 102,
+    fullName: 'Bob Bernard',
+    email: 'bob@example.com',
+  );
+  static const _peerCarla = User(
+    id: 103,
+    fullName: 'Carla Carter',
+    email: 'carla@example.com',
+  );
+
+  void _seedDms(DateTime now) {
     _messages.addAll([
-      ChannelMessage(
-        id: 1,
-        senderId: _demoBotId,
-        senderName: 'Zulip Bot',
-        channelName: scope.channel,
-        topic: topic,
-        content: 'Welcome to the Zulip embed preview. 👋',
-        timestamp: now.subtract(const Duration(minutes: 5)),
+      // Alice <-> viewer 1:1
+      DirectMessage(
+        id: 500,
+        senderId: _peerAlice.id,
+        senderName: _peerAlice.fullName,
+        recipients: const [_peerAlice, _demoGuestUser],
+        content: 'Hey, free for a quick sync later?',
+        timestamp: now.subtract(const Duration(hours: 1)),
       ),
-      ChannelMessage(
-        id: 2,
-        senderId: _demoBotId,
-        senderName: 'Zulip Bot',
-        channelName: scope.channel,
-        topic: topic,
-        content:
-            'Messages you send will be echoed back by this in-process bot — '
-            'no Zulip server is involved in demo mode.',
-        timestamp: now.subtract(const Duration(minutes: 4)),
+      DirectMessage(
+        id: 501,
+        senderId: _viewerId,
+        senderName: 'You',
+        recipients: const [_peerAlice, _demoGuestUser],
+        content: 'Sure — 3pm works.',
+        timestamp: now.subtract(const Duration(minutes: 55)),
+      ),
+      // Bob <-> viewer 1:1
+      DirectMessage(
+        id: 502,
+        senderId: _peerBob.id,
+        senderName: _peerBob.fullName,
+        recipients: const [_peerBob, _demoGuestUser],
+        content: 'Landed the fix, review when you can.',
+        timestamp: now.subtract(const Duration(minutes: 40)),
+      ),
+      // Alice + Bob + viewer group DM
+      DirectMessage(
+        id: 503,
+        senderId: _peerCarla.id,
+        senderName: _peerCarla.fullName,
+        recipients: const [_peerAlice, _peerBob, _peerCarla, _demoGuestUser],
+        content: 'All hands in 10 minutes.',
+        timestamp: now.subtract(const Duration(minutes: 15)),
       ),
     ]);
   }
@@ -85,16 +157,33 @@ class DemoTransport extends Transport {
     int limit = 50,
   }) async {
     final matching = _messages.where((m) {
-      // Demo transport only ever seeds ChannelMessages, but narrow
-      // defensively so future DM support doesn't silently leak DMs
-      // into channel scopes.
-      if (m is! ChannelMessage) return false;
-      if (m.channelName != scope.channel) return false;
-      if (scope.topic != null && m.topic != scope.topic) return false;
-      return true;
+      return switch (scope) {
+        ChannelScope(:final channel, :final topic) =>
+          m is ChannelMessage &&
+              m.channelName == channel &&
+              (topic == null || m.topic == topic),
+        DmScope(:final userIds) => m is DirectMessage &&
+            _dmParticipantsMatch(m, userIds),
+      };
     }).toList();
     if (matching.length <= limit) return matching;
     return matching.sublist(matching.length - limit);
+  }
+
+  // Scope.userIds includes the viewer; a DM's participant set is
+  // sender + recipients (minus the sender's duplicate entry in the
+  // recipient list). Compare as sorted id sets.
+  bool _dmParticipantsMatch(DirectMessage m, List<int> userIds) {
+    final expected = {...userIds};
+    final actual = <int>{m.senderId};
+    for (final r in m.recipients) {
+      actual.add(r.id);
+    }
+    if (actual.length != expected.length) return false;
+    for (final id in expected) {
+      if (!actual.contains(id)) return false;
+    }
+    return true;
   }
 
   @override
@@ -132,6 +221,52 @@ class DemoTransport extends Transport {
     return [
       for (final e in entries) Topic(name: e.key, maxMessageId: e.value),
     ];
+  }
+
+  @override
+  Future<List<DirectMessageConversation>>
+      listDirectMessageConversations() async {
+    if (!_seeded) {
+      _seeded = true;
+      _seedDms(DateTime.now());
+    }
+    final buckets = <String, _DmBucket>{};
+    for (final m in _messages) {
+      if (m is! DirectMessage) continue;
+      final users = <int, User>{
+        m.senderId: User(
+          id: m.senderId,
+          fullName: m.senderName,
+          email: '',
+        ),
+      };
+      for (final r in m.recipients) {
+        users[r.id] = r;
+      }
+      final ids = users.keys.toList()..sort();
+      final key = ids.join(',');
+      final bucket = buckets.putIfAbsent(
+        key,
+        () => _DmBucket(
+          userIds: ids,
+          users: users.values.toList(),
+          lastMessageId: m.id,
+        ),
+      );
+      if (m.id > bucket.lastMessageId) bucket.lastMessageId = m.id;
+    }
+    final conversations = [
+      for (final b in buckets.values)
+        DirectMessageConversation(
+          userIds: b.userIds,
+          users: b.users,
+          lastMessageId: b.lastMessageId,
+        ),
+    ];
+    conversations.sort(
+      (a, b) => (b.lastMessageId ?? 0).compareTo(a.lastMessageId ?? 0),
+    );
+    return List.unmodifiable(conversations);
   }
 
   @override
@@ -283,11 +418,23 @@ class DemoTransport extends Transport {
 
   String _echoReply(ChannelMessage prompt) {
     final trimmed = prompt.content.trim();
-    if (trimmed.isEmpty) return 'I heard… nothing?';
+    if (trimmed.isEmpty) return 'I heard nothing?';
     if (trimmed.endsWith('?')) {
       return 'Great question — in a real deployment your team would answer '
           'this in #${prompt.channelName} > ${prompt.topic}.';
     }
     return 'Echo: $trimmed';
   }
+}
+
+/// Accumulator used while bucketing DM messages by participant set.
+class _DmBucket {
+  _DmBucket({
+    required this.userIds,
+    required this.users,
+    required this.lastMessageId,
+  });
+  final List<int> userIds;
+  final List<User> users;
+  int lastMessageId;
 }

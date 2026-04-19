@@ -18,22 +18,43 @@ import 'message_list.dart';
 /// The provided [Transport] is **not** closed when the widget disposes —
 /// callers that pass a shared transport are responsible for its lifetime.
 class ZulipChat extends StatefulWidget {
+  /// Channel-scoped constructor — the common entry point. Mirrors the
+  /// original 0.7 signature so upgrading callers don't change anything.
   const ZulipChat({
     super.key,
     required this.transport,
-    required this.channel,
+    required String this.channel,
     this.topic,
     this.theme = ZulipTheme.light,
     this.title,
     this.onError,
-  });
+  }) : dmUserIds = null;
+
+  /// DM-scoped constructor. Pass the full participant set (including the
+  /// viewer) so the scope resolves identically across peers.
+  const ZulipChat.dm({
+    super.key,
+    required this.transport,
+    required List<int> this.dmUserIds,
+    this.theme = ZulipTheme.light,
+    this.title,
+    this.onError,
+  })  : channel = null,
+        topic = null;
 
   final Transport transport;
-  final String channel;
+  final String? channel;
   final String? topic;
+  final List<int>? dmUserIds;
   final ZulipTheme theme;
   final String? title;
   final void Function(String message)? onError;
+
+  ScopeFilter get _scope {
+    final ids = dmUserIds;
+    if (ids != null) return ScopeFilter.dm(ids);
+    return ScopeFilter.channel(channel!, topic: topic);
+  }
 
   @override
   State<ZulipChat> createState() => _ZulipChatState();
@@ -58,12 +79,23 @@ class _ZulipChatState extends State<ZulipChat> {
     super.didUpdateWidget(oldWidget);
     final scopeChanged = oldWidget.channel != widget.channel ||
         oldWidget.topic != widget.topic ||
+        !_listsEqual(oldWidget.dmUserIds, widget.dmUserIds) ||
         oldWidget.transport != widget.transport;
     if (scopeChanged) {
       _teardown().then((_) {
         if (mounted) _bootstrap();
       });
     }
+  }
+
+  static bool _listsEqual(List<int>? a, List<int>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> _bootstrap() async {
@@ -77,9 +109,7 @@ class _ZulipChatState extends State<ZulipChat> {
       });
     }
     try {
-      await _client.connect(
-        ScopeFilter(channel: widget.channel, topic: widget.topic),
-      );
+      await _client.connect(widget._scope);
       final history = await _client.fetchMessages();
       if (!mounted) return;
       setState(() {
@@ -270,13 +300,20 @@ class _ZulipChatState extends State<ZulipChat> {
   Widget build(BuildContext context) {
     final t = widget.theme;
     final subtitle = widget.topic;
+    final String defaultTitle;
+    final dmIds = widget.dmUserIds;
+    if (dmIds != null) {
+      defaultTitle = dmIds.length <= 1 ? 'Direct' : 'Direct (${dmIds.length})';
+    } else {
+      defaultTitle = '#${widget.channel}';
+    }
     return Material(
       color: t.background,
       child: Column(
         children: [
           _ChatHeader(
             theme: t,
-            title: widget.title ?? '#${widget.channel}',
+            title: widget.title ?? defaultTitle,
             subtitle: subtitle,
             status: _status,
           ),

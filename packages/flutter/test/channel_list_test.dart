@@ -9,7 +9,7 @@ void main() {
     // Demo connect is a no-op for the list, but we emulate the usual
     // lifecycle so listChannels has something to enumerate.
     await transport.connect(
-      scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+      scope: const ScopeFilter.channel('general', topic: 'welcome'),
       onEvent: (_) {},
     );
 
@@ -44,7 +44,7 @@ void main() {
       (tester) async {
     final transport = DemoTransport();
     await transport.connect(
-      scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+      scope: const ScopeFilter.channel('general', topic: 'welcome'),
       onEvent: (_) {},
     );
 

@@ -61,11 +61,11 @@ void main() {
       );
       final events = <ZulipEvent>[];
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+        scope: const ScopeFilter.channel('general', topic: 'welcome'),
         onEvent: events.add,
       );
       final messages = await transport.getMessages(
-        scope: const ScopeFilter(channel: 'general', topic: 'welcome'),
+        scope: const ScopeFilter.channel('general', topic: 'welcome'),
       );
       expect(messages, hasLength(1));
       expect(messages.first.id, 1);
@@ -79,11 +79,11 @@ void main() {
         inlineData: _fixture(),
       );
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general'),
+        scope: const ScopeFilter.channel('general'),
         onEvent: (_) {},
       );
       final messages = await transport.getMessages(
-        scope: const ScopeFilter(channel: 'general'),
+        scope: const ScopeFilter.channel('general'),
       );
       // No topic filter — both messages survive.
       expect(messages, hasLength(2));
@@ -96,7 +96,7 @@ void main() {
         inlineData: _fixture(),
       );
       await transport.connect(
-        scope: const ScopeFilter(channel: 'general'),
+        scope: const ScopeFilter.channel('general'),
         onEvent: (_) {},
       );
       await expectLater(
@@ -144,7 +144,7 @@ void main() {
       );
       await expectLater(
         transport.connect(
-          scope: const ScopeFilter(channel: 'general'),
+          scope: const ScopeFilter.channel('general'),
           onEvent: (_) {},
         ),
         throwsA(isA<FormatException>()),
