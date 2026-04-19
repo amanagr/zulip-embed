@@ -43,5 +43,9 @@
     "react",
     "embed",
     "web-component"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

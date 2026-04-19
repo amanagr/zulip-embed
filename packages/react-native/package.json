@@ -41,5 +41,9 @@
     "chat",
     "react-native",
     "mobile"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
 }

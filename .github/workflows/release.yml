@@ -14,6 +14,17 @@ name: Release to npm
 # First publish is manual (dryRun: true) so the workflow gets validated
 # against a pristine tarball layout before a tag is cut. Once green we
 # enable NPM_TOKEN and push the first tag.
+#
+# Supply-chain posture:
+#   - `NPM_CONFIG_PROVENANCE=true` is set on the publish step so npm
+#     attaches a Sigstore provenance attestation to every published
+#     tarball (also gated by `publishConfig.provenance` in each
+#     package.json).
+#   - Before publish, `scripts/release.mjs` computes sha256 SRI hashes
+#     and gzipped sizes for every dist artifact; the resulting
+#     `dist/INTEGRITY.json` + `dist/INTEGRITY.md` are uploaded as
+#     workflow artifacts and — on tag push — spliced into the README
+#     between the `sri:start` / `sri:end` markers.
 
 on:
   workflow_dispatch:
@@ -43,6 +54,10 @@ jobs:
     environment: npm-publish
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so a follow-up SRI commit can be made against
+          # the tagged ref rather than a shallow clone.
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -62,6 +77,21 @@ jobs:
       # against a dirty tree.
       - run: pnpm -w run build
       - run: pnpm check:bundle
+
+      # Compute SRI hashes + gzipped sizes for every dist artifact
+      # before the workspace packages build — if this step fails the
+      # release is aborted before npm ever sees a tarball.
+      - name: Compute SRI manifest
+        run: node scripts/release.mjs
+
+      - name: Upload integrity manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrity-manifest
+          path: |
+            dist/INTEGRITY.json
+            dist/INTEGRITY.md
+          if-no-files-found: error
 
       - name: Build workspace packages
         run: |
@@ -99,6 +129,8 @@ jobs:
       - name: Publish in topological order
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # Sigstore provenance attestation; also gated by
+          # publishConfig.provenance in each package.json.
           NPM_CONFIG_PROVENANCE: "true"
         run: |
           echo "Publishing mode: ${{ steps.flags.outputs.mode }}"
@@ -108,3 +140,45 @@ jobs:
           pnpm publish --access public --no-git-checks ${{ steps.flags.outputs.dry }}
           pnpm --filter zulip-embed-react publish --access public --no-git-checks ${{ steps.flags.outputs.dry }}
           pnpm --filter zulip-embed-react-native publish --access public --no-git-checks ${{ steps.flags.outputs.dry }}
+
+  # Separate job so `contents: write` is scoped to SRI splicing only —
+  # the publish job above stays locked down to `contents: read`.
+  sri-readme:
+    needs: publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -w run build
+      - run: node scripts/release.mjs
+
+      - name: Splice SRI table into README
+        run: node scripts/splice-sri.mjs
+        shell: bash
+
+      - name: Commit + push SRI hashes
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet README.md; then
+            echo "README SRI table already up to date — nothing to commit."
+            exit 0
+          fi
+          git add README.md
+          git commit -m "chore(release): update SRI hashes for ${VERSION} [skip ci]"
+          git push origin main

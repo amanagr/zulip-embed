@@ -86,5 +86,9 @@
     "sdk",
     "messaging"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "packageManager": "pnpm@10.0.0"
 }
