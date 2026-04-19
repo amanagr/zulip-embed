@@ -2,7 +2,7 @@
 
 A minimal [Vite](https://vitejs.dev/) + Vue 3 app that mounts the
 framework-agnostic `<zulip-chat>` Web Component from
-[`zulip-embed`](https://www.npmjs.com/package/zulip-embed) in demo mode.
+[`zulip-embed`](https://github.com/amanagr/zulip-embed) in demo mode.
 
 ## Run it
 

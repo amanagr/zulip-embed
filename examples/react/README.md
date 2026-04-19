@@ -2,7 +2,7 @@
 
 A minimal [Vite](https://vitejs.dev/) + React app that wires the
 `<ZulipChat>` component from
-[`zulip-embed-react`](https://www.npmjs.com/package/zulip-embed-react)
+[`zulip-embed-react`](https://github.com/amanagr/zulip-embed/tree/main/packages/react)
 in demo mode.
 
 ## Run it

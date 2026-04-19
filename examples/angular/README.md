@@ -2,7 +2,7 @@
 
 A minimal [Vite](https://vitejs.dev/) + Angular 18 (standalone-component)
 app that mounts the framework-agnostic `<zulip-chat>` Web Component from
-[`zulip-embed`](https://www.npmjs.com/package/zulip-embed) in demo mode.
+[`zulip-embed`](https://github.com/amanagr/zulip-embed) in demo mode.
 
 Vite drives the build via
 [`@analogjs/vite-plugin-angular`](https://www.npmjs.com/package/@analogjs/vite-plugin-angular),

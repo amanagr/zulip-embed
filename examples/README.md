@@ -1,7 +1,7 @@
 # Zulip Embed — integration examples
 
 Minimal, copy-pasteable integrations of
-[`zulip-embed`](https://www.npmjs.com/package/zulip-embed) — one folder
+[`zulip-embed`](https://github.com/amanagr/zulip-embed) — one folder
 per host environment. Each example is self-contained: no shared lockfile,
 no workspace coupling, nothing depends on the repo root's `package.json`.
 
