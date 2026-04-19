@@ -130,7 +130,7 @@ describe("<zulip-chat> — integration", () => {
         await flushMany(3);
 
         let banner = el.shadowRoot?.querySelector(".error-banner");
-        expect(banner?.textContent ?? "").toContain('requires "server"');
+        expect(banner?.textContent ?? "").toContain('requires a "server"');
 
         // Flipping into demo mode should clear the config error.
         el.setAttribute("demo", "");
@@ -139,7 +139,7 @@ describe("<zulip-chat> — integration", () => {
         banner = el.shadowRoot?.querySelector(".error-banner");
         // Either the banner is gone entirely, or its text no longer
         // mentions the config error.
-        expect(banner?.textContent ?? "").not.toContain('requires "server"');
+        expect(banner?.textContent ?? "").not.toContain('requires a "server"');
     });
 
     test("removing channel attribute does not crash the component", async () => {
@@ -158,5 +158,90 @@ describe("<zulip-chat> — integration", () => {
         }).not.toThrow();
         await flushMany(5);
         expect(el.shadowRoot).toBeTruthy();
+    });
+
+    test("zulip-connection-change bubbles through the shadow DOM boundary", async () => {
+        // composed: true on the CustomEvent lets it cross shadow DOM.
+        // Pin that guarantee by listening on document rather than the
+        // element itself — if composed were flipped off, this test
+        // would silently stop receiving events.
+        const received: unknown[] = [];
+        const handler = (e: Event): void => {
+            received.push((e as CustomEvent).detail);
+        };
+        document.addEventListener("zulip-connection-change", handler);
+        try {
+            const el = document.createElement("zulip-chat");
+            el.setAttribute("demo", "");
+            el.setAttribute("channel", "general");
+            document.body.append(el);
+            await flushMany(10);
+            expect(received.length).toBeGreaterThan(0);
+        } finally {
+            document.removeEventListener("zulip-connection-change", handler);
+        }
+    });
+
+    test("dispatches zulip-connection-change when demo transport connects", async () => {
+        // Attach listener BEFORE append so we catch the synchronous
+        // connection event demo transport fires during connect().
+        const el = document.createElement("zulip-chat");
+        const statuses: string[] = [];
+        el.addEventListener("zulip-connection-change", (e) => {
+            statuses.push((e as CustomEvent).detail.status);
+        });
+        el.setAttribute("demo", "");
+        el.setAttribute("channel", "general");
+        document.body.append(el);
+        await flushMany(10);
+        // Demo transport flips straight to "connected"; we just pin that
+        // at least one connection-change event fired with a valid status.
+        expect(statuses.length).toBeGreaterThan(0);
+        expect(["connecting", "connected", "disconnected", "reconnecting"]).toContain(
+            statuses[statuses.length - 1],
+        );
+    });
+
+    test("auth-token attribute alone passes live-mode preflight", async () => {
+        // When auth-token is set we skip the "requires email + api-key"
+        // error and defer to the ZulipTransport JWT exchange. We stub the
+        // JWT endpoint to return immediately so connect() can proceed;
+        // the important thing for this test is that the config banner
+        // doesn't fire for a missing email/api-key.
+        const originalFetch = globalThis.fetch;
+        globalThis.fetch = (async (url: string) => {
+            if (url.includes("/api/internal/jwt/fetch_api_key")) {
+                return new Response(
+                    JSON.stringify({api_key: "k", email: "bot@x"}),
+                    {
+                        status: 200,
+                        headers: {"Content-Type": "application/json"},
+                    },
+                );
+            }
+            // Return a pending promise for /register and /events so the
+            // component stays in the connecting state; we're only asserting
+            // that the config-error banner doesn't fire.
+            return new Promise(() => {});
+        }) as unknown as typeof fetch;
+
+        try {
+            const el = document.createElement("zulip-chat");
+            el.setAttribute("server", "https://zulip.example");
+            el.setAttribute("auth-token", "jwt.signed");
+            el.setAttribute("channel", "general");
+            document.body.append(el);
+            await flushMany(3);
+
+            const banner = el.shadowRoot?.querySelector(".error-banner");
+            expect(banner?.textContent ?? "").not.toContain(
+                'requires a "server"',
+            );
+            expect(banner?.textContent ?? "").not.toContain(
+                'requires an "auth-token"',
+            );
+        } finally {
+            globalThis.fetch = originalFetch;
+        }
     });
 });

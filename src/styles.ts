@@ -227,7 +227,8 @@ button {
     background: var(--zc-color-success);
 }
 
-.status-dot[data-status="connecting"] {
+.status-dot[data-status="connecting"],
+.status-dot[data-status="reconnecting"] {
     background: #f59e0b;
 }
 
@@ -393,6 +394,79 @@ button {
 
 .message-action-danger:hover,
 .message-action-danger:focus-visible {
+    color: var(--zc-color-error);
+}
+
+.message-action-overflow {
+    position: relative;
+    display: inline-flex;
+}
+
+.message-actions-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 180px;
+    background: var(--zc-color-bg);
+    border: 1px solid var(--zc-color-border);
+    border-radius: var(--zc-radius-sm);
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    z-index: 2;
+}
+
+.message-actions-menu[hidden] {
+    display: none;
+}
+
+.message-actions-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    color: var(--zc-color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+.message-actions-item:hover,
+.message-actions-item:focus-visible {
+    background: var(--zc-color-surface);
+    outline: none;
+}
+
+.message-actions-item-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    color: var(--zc-color-muted);
+}
+
+.message-actions-item-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.message-actions-item-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+.message-actions-item-danger {
+    color: var(--zc-color-error);
+}
+
+.message-actions-item-danger .message-actions-item-icon {
     color: var(--zc-color-error);
 }
 

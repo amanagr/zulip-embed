@@ -14,6 +14,7 @@ import type {
     ScopeFilter,
     SendMessageParams,
     Topic,
+    User,
     ZulipEventListener,
 } from "./types.ts";
 
@@ -128,24 +129,41 @@ export class DemoTransport implements Transport {
         if (this.readOnly) {
             throw new Error("This demo channel is read-only");
         }
-        const message: Message = {
-            id: this.nextId++,
-            senderId: DEMO_GUEST_USER.userId,
-            senderFullName: DEMO_GUEST_USER.fullName,
-            senderEmail: DEMO_GUEST_USER.email,
-            avatarUrl: DEMO_GUEST_USER.avatarUrl,
-            timestamp: Date.now(),
-            content: params.content,
-            contentIsHtml: false,
-            type: "channel",
-            channelName: params.channel ?? this.scope.channel,
-            topic: params.topic ?? this.scope.topic,
-            reactions: [],
-        };
+        let message: Message;
+        if (params.type === "channel") {
+            message = {
+                id: this.nextId++,
+                senderId: DEMO_GUEST_USER.userId,
+                senderFullName: DEMO_GUEST_USER.fullName,
+                senderEmail: DEMO_GUEST_USER.email,
+                avatarUrl: DEMO_GUEST_USER.avatarUrl,
+                timestamp: Date.now(),
+                content: params.content,
+                contentIsHtml: false,
+                type: "channel",
+                channelName: params.channel,
+                topic: params.topic,
+                reactions: [],
+            };
+        } else {
+            message = {
+                id: this.nextId++,
+                senderId: DEMO_GUEST_USER.userId,
+                senderFullName: DEMO_GUEST_USER.fullName,
+                senderEmail: DEMO_GUEST_USER.email,
+                avatarUrl: DEMO_GUEST_USER.avatarUrl,
+                timestamp: Date.now(),
+                content: params.content,
+                contentIsHtml: false,
+                type: "direct",
+                recipients: [],
+                reactions: [],
+            };
+        }
         this.messages.push(message);
         this.onEvent?.({type: "message", message});
 
-        if (this.autoReply) {
+        if (this.autoReply && message.type === "channel") {
             this.scheduleAutoReply(message);
         }
         return Promise.resolve();
@@ -156,23 +174,29 @@ export class DemoTransport implements Transport {
         if (this.readOnly) throw new Error("This demo channel is read-only");
         const target = this.messages.find((m) => m.id === params.messageId);
         if (!target) throw new Error(`No such message: ${String(params.messageId)}`);
-        // Demo: restrict edits to the guest viewer's own messages, matching
-        // Zulip's default behavior. Bots/teammates rendered by the demo
-        // should be immutable from the composer.
         if (target.senderId !== DEMO_GUEST_USER.userId) {
             throw new Error("You can only edit your own messages");
         }
-        if (params.content !== undefined) {
+        let nextContent: string | undefined;
+        let nextTopic: string | undefined;
+        if (params.kind === "content" || params.kind === "both") {
             target.content = params.content;
             target.contentIsHtml = false;
+            nextContent = params.content;
         }
-        if (params.topic !== undefined) target.topic = params.topic;
+        if (params.kind === "topic" || params.kind === "both") {
+            if (target.type !== "channel") {
+                throw new Error("Only channel messages have topics");
+            }
+            target.topic = params.topic;
+            nextTopic = params.topic;
+        }
         this.onEvent?.({
             type: "message-update",
             messageId: params.messageId,
-            content: params.content,
-            contentIsHtml: params.content === undefined ? undefined : false,
-            topic: params.topic,
+            content: nextContent,
+            contentIsHtml: nextContent === undefined ? undefined : false,
+            topic: nextTopic,
         });
         return Promise.resolve();
     }
@@ -251,12 +275,10 @@ export class DemoTransport implements Transport {
     }
 
     async listTopics(channel: string): Promise<Topic[]> {
-        // Return whatever distinct topics the in-memory feed currently
-        // carries for this channel, newest-first by max id.
         const byTopic = new Map<string, number>();
         for (const m of this.messages) {
+            if (m.type !== "channel") continue;
             if (m.channelName !== channel) continue;
-            if (m.topic === undefined) continue;
             const prev = byTopic.get(m.topic) ?? -1;
             if (m.id > prev) byTopic.set(m.topic, m.id);
         }
@@ -268,6 +290,15 @@ export class DemoTransport implements Transport {
 
     getCurrentUserId(): number {
         return DEMO_GUEST_USER.userId;
+    }
+
+    getCurrentUser(): Promise<User> {
+        return Promise.resolve({
+            userId: DEMO_GUEST_USER.userId,
+            email: DEMO_GUEST_USER.email,
+            fullName: DEMO_GUEST_USER.fullName,
+            avatarUrl: DEMO_GUEST_USER.avatarUrl,
+        });
     }
 
     private toggleReaction(params: ReactionParams, op: "add" | "remove"): void {
@@ -296,7 +327,7 @@ export class DemoTransport implements Transport {
         this.onEvent?.({type: "reaction", messageId: params.messageId, reactions});
     }
 
-    private scheduleAutoReply(trigger: Message): void {
+    private scheduleAutoReply(trigger: Message & {type: "channel"}): void {
         const handle = setTimeout(() => {
             this.pendingReplies.delete(handle);
             if (this.closed) return;

@@ -21,11 +21,12 @@ describe("demo transport edit/delete", () => {
         await transport.sendMessage({
             type: "channel",
             channel: "general",
+            topic: "",
             content: "original",
         });
         const sent = events.find((e): e is {type: "message"; message: Message} => e.type === "message");
         const id = sent!.message.id;
-        await transport.editMessage({messageId: id, content: "edited"});
+        await transport.editMessage({messageId: id, kind: "content", content: "edited"});
         const update = events.find(
             (e): e is MessageUpdateEvent => e.type === "message-update",
         );
@@ -42,6 +43,7 @@ describe("demo transport edit/delete", () => {
         await transport.sendMessage({
             type: "channel",
             channel: "general",
+            topic: "",
             content: "bye",
         });
         const sent = events.find((e): e is {type: "message"; message: Message} => e.type === "message");
@@ -63,7 +65,7 @@ describe("demo transport edit/delete", () => {
         const other = messages.find((m) => m.senderId !== transport.getCurrentUserId());
         expect(other).toBeDefined();
         await expect(
-            transport.editMessage({messageId: other!.id, content: "hijack"}),
+            transport.editMessage({messageId: other!.id, kind: "content", content: "hijack"}),
         ).rejects.toThrow(/your own messages/);
         await transport.close();
     });
@@ -75,7 +77,7 @@ describe("demo transport edit/delete", () => {
         });
         await transport.connect(() => undefined);
         await expect(
-            transport.editMessage({messageId: 1, content: "x"}),
+            transport.editMessage({messageId: 1, kind: "content", content: "x"}),
         ).rejects.toThrow(/read-only/);
         await expect(transport.deleteMessage(1)).rejects.toThrow(/read-only/);
         await transport.close();
@@ -114,7 +116,7 @@ describe("<zulip-chat> edit flow", () => {
 
         // Wait for the guest message to render with its action menu.
         const mine = shadow.querySelector<HTMLElement>(
-            ".message:last-of-type .message-actions .message-action:not(.message-action-danger)",
+            '.message:last-of-type .message-actions [data-action-id="edit"]',
         );
         expect(mine).not.toBeNull();
         mine!.click();
@@ -153,7 +155,7 @@ describe("<zulip-chat> edit flow", () => {
 
         // Find the guest's message and click edit.
         const editBtn = shadow.querySelector<HTMLButtonElement>(
-            ".message:last-of-type .message-actions .message-action:not(.message-action-danger)",
+            '.message:last-of-type .message-actions [data-action-id="edit"]',
         );
         editBtn?.click();
         await flush();

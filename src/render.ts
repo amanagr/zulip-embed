@@ -1,6 +1,13 @@
 import DOMPurify from "dompurify";
 
 import {avatarColor, formatTimeOfDay, getInitials} from "./format.ts";
+import {
+    ACTION_ICONS,
+    DEFAULT_MESSAGE_ACTIONS,
+    resolveMessageActions,
+    type MessageActionDescriptor,
+    type MessageActionHostContext,
+} from "./message-actions.ts";
 import type {Message, Reaction} from "./types.ts";
 
 export interface RenderContext {
@@ -12,17 +19,11 @@ export interface RenderContext {
     currentUserId?: number | undefined;
     // Emitted when the viewer clicks a reaction pill.
     onToggleReaction?: ((message: Message, emoji: string) => void) | undefined;
-    // Emitted when the viewer clicks the "add reaction" affordance.
-    // The anchor element is the clicked button, used by the host to
-    // position an emoji picker next to it.
+    // Emitted when the viewer clicks the "add reaction" affordance on a
+    // reaction row (the small "+" next to existing pills). The per-message
+    // action bar's "add-reaction" entry routes through
+    // `messageActionHostContext.onAddReaction` instead.
     onAddReaction?: ((message: Message, anchor: HTMLElement) => void) | undefined;
-    // Emitted when the viewer picks "Edit" from a message's action menu.
-    // Only offered for messages the viewer authored (senderId matches
-    // currentUserId). Host prefills the composer in edit mode.
-    onEditMessage?: ((message: Message) => void) | undefined;
-    // Emitted when the viewer picks "Delete". Host is responsible for
-    // confirmation UX before actually calling the transport.
-    onDeleteMessage?: ((message: Message) => void) | undefined;
     // ID of the first message the viewer hasn't seen yet. When set, the
     // renderer inserts a horizontal "new messages" divider immediately
     // before the matching message.
@@ -31,6 +32,18 @@ export interface RenderContext {
     // matching row so the viewer sees which message the composer is
     // editing.
     editingMessageId?: number | undefined;
+    // Ordered list of built-in + custom action ids to render for each
+    // message. Undefined falls back to DEFAULT_MESSAGE_ACTIONS.
+    messageActionIds?: readonly string[] | undefined;
+    // Host-supplied context used to resolve built-in actions into concrete
+    // descriptors (edit / delete / copy / open-in-zulip). Undefined means
+    // "don't render an action bar at all" — useful in read-only snapshot
+    // mode where none of the side-effects would work anyway.
+    messageActionHostContext?: MessageActionHostContext | undefined;
+    // Adopter-supplied custom descriptors appended to the resolved list.
+    // These bypass the id allow-list on the attribute — hosts inject them
+    // via the `messageActions` JS property.
+    messageActionsExtra?: readonly MessageActionDescriptor[] | undefined;
 }
 
 // Per-DOM-node snapshot of what we last rendered for a given message, so
@@ -45,7 +58,7 @@ interface MessageSnapshot {
     sameSender: boolean;
     currentUserId: number | undefined;
     isEditing: boolean;
-    hasActions: boolean;
+    actionsKey: string;
 }
 
 function snapshotFor(
@@ -57,8 +70,6 @@ function snapshotFor(
     const reactionsKey = message.reactions
         .map((r) => `${r.emoji}:${r.userIds.slice().sort().join(",")}`)
         .join("|");
-    const isMine =
-        context.currentUserId !== undefined && message.senderId === context.currentUserId;
     return {
         content: message.content,
         contentIsHtml: message.contentIsHtml,
@@ -66,10 +77,7 @@ function snapshotFor(
         sameSender,
         currentUserId: context.currentUserId,
         isEditing: context.editingMessageId === message.id,
-        hasActions:
-            isMine &&
-            (context.onEditMessage !== undefined ||
-                context.onDeleteMessage !== undefined),
+        actionsKey: computeActionsKey(message, context),
     };
 }
 
@@ -81,8 +89,18 @@ function snapshotsEqual(a: MessageSnapshot, b: MessageSnapshot): boolean {
         a.sameSender === b.sameSender &&
         a.currentUserId === b.currentUserId &&
         a.isEditing === b.isEditing &&
-        a.hasActions === b.hasActions
+        a.actionsKey === b.actionsKey
     );
+}
+
+function computeActionsKey(message: Message, context: RenderContext): string {
+    const host = context.messageActionHostContext;
+    if (host === undefined) return "";
+    const ids = context.messageActionIds ?? DEFAULT_MESSAGE_ACTIONS;
+    const isOwn =
+        host.currentUserId !== undefined && message.senderId === host.currentUserId;
+    const extraIds = (context.messageActionsExtra ?? []).map((d) => d.id);
+    return `${ids.join(",")}|${extraIds.join(",")}|${isOwn ? "1" : "0"}`;
 }
 
 // Render messages by reconciling against the DOM already inside `container`
@@ -255,53 +273,156 @@ export function renderMessage(
     return wrapper;
 }
 
-// Per-message action affordance shown on hover/focus for the viewer's
-// own messages. Returns undefined when the context has no handlers or
-// the viewer didn't author the message — we don't even attach the
-// element so a rogue CSS rule can't make it clickable.
+// Per-message action affordance. The renderer asks `message-actions.ts`
+// to split the configured ids into "inline" (icon buttons) and "overflow"
+// (kebab-menu items); anything that's inapplicable for this viewer / this
+// message (e.g. `onlyOwn` on a message they didn't send) is filtered out
+// upstream. Returns undefined when nothing would render — that way a
+// rogue CSS rule can't light up an empty bar.
 function renderMessageActions(
     message: Message,
     context: RenderContext,
 ): HTMLElement | undefined {
-    const mine =
-        context.currentUserId !== undefined && message.senderId === context.currentUserId;
-    if (!mine) return undefined;
-    const canEdit = context.onEditMessage !== undefined;
-    const canDelete = context.onDeleteMessage !== undefined;
-    if (!canEdit && !canDelete) return undefined;
+    const host = context.messageActionHostContext;
+    if (host === undefined) return undefined;
+    const ids = context.messageActionIds ?? DEFAULT_MESSAGE_ACTIONS;
+    const extra = context.messageActionsExtra ?? [];
+    const {inline, overflow} = resolveMessageActions(ids, host, message, extra);
+    if (inline.length === 0 && overflow.length === 0) return undefined;
 
     const bar = document.createElement("div");
     bar.className = "message-actions";
 
-    if (canEdit) {
-        const edit = document.createElement("button");
-        edit.type = "button";
-        edit.className = "message-action";
-        edit.setAttribute("aria-label", "Edit message");
-        edit.title = "Edit";
-        edit.innerHTML =
-            '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l3.5-.7L17.2 5.6a1.5 1.5 0 0 0 0-2.1l-.7-.7a1.5 1.5 0 0 0-2.1 0L3.7 13.5 3 17z"/></svg>';
-        edit.addEventListener("click", () => {
-            context.onEditMessage?.(message);
-        });
-        bar.append(edit);
+    for (const descriptor of inline) {
+        bar.append(makeActionButton(descriptor, message));
     }
 
-    if (canDelete) {
-        const del = document.createElement("button");
-        del.type = "button";
-        del.className = "message-action message-action-danger";
-        del.setAttribute("aria-label", "Delete message");
-        del.title = "Delete";
-        del.innerHTML =
-            '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2m1 0v10a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6h8z"/></svg>';
-        del.addEventListener("click", () => {
-            context.onDeleteMessage?.(message);
-        });
-        bar.append(del);
+    if (overflow.length > 0) {
+        bar.append(makeOverflowMenu(overflow, message));
     }
 
     return bar;
+}
+
+function makeActionButton(
+    descriptor: MessageActionDescriptor,
+    message: Message,
+): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+        descriptor.variant === "danger"
+            ? "message-action message-action-danger"
+            : "message-action";
+    button.dataset["actionId"] = descriptor.id;
+    button.setAttribute("aria-label", descriptor.label);
+    button.title = descriptor.label;
+    if (descriptor.icon !== undefined) {
+        button.innerHTML = descriptor.icon;
+    } else {
+        button.textContent = descriptor.label;
+    }
+    button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        descriptor.run(message, button);
+    });
+    return button;
+}
+
+function makeOverflowMenu(
+    items: readonly MessageActionDescriptor[],
+    message: Message,
+): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "message-action-overflow";
+
+    const kebab = document.createElement("button");
+    kebab.type = "button";
+    kebab.className = "message-action message-action-kebab";
+    kebab.setAttribute("aria-label", "More actions");
+    kebab.setAttribute("aria-haspopup", "menu");
+    kebab.setAttribute("aria-expanded", "false");
+    kebab.title = "More actions";
+    kebab.innerHTML = ACTION_ICONS.kebab;
+    wrap.append(kebab);
+
+    const menu = document.createElement("div");
+    menu.className = "message-actions-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "menu");
+    for (const descriptor of items) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className =
+            descriptor.variant === "danger"
+                ? "message-actions-item message-actions-item-danger"
+                : "message-actions-item";
+        item.setAttribute("role", "menuitem");
+        item.dataset["actionId"] = descriptor.id;
+        if (descriptor.icon !== undefined) {
+            const iconSpan = document.createElement("span");
+            iconSpan.className = "message-actions-item-icon";
+            iconSpan.innerHTML = descriptor.icon;
+            item.append(iconSpan);
+        }
+        const label = document.createElement("span");
+        label.className = "message-actions-item-label";
+        label.textContent = descriptor.label;
+        item.append(label);
+        item.addEventListener("click", (event) => {
+            event.stopPropagation();
+            setOpen(false);
+            descriptor.run(message, item);
+        });
+        menu.append(item);
+    }
+    wrap.append(menu);
+
+    // The dropdown dismiss listener needs to live on the shadow root (or
+    // document, if we're not inside a shadow) so it catches clicks from
+    // the entire widget. Attach lazily on first open so we can read the
+    // right root once the node is mounted.
+    let listenersAttached = false;
+    const setOpen = (open: boolean): void => {
+        menu.hidden = !open;
+        kebab.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    const onRootClick = (event: Event): void => {
+        if (menu.hidden) return;
+        const target = event.target;
+        if (!(target instanceof Node)) {
+            setOpen(false);
+            return;
+        }
+        if (!wrap.contains(target)) setOpen(false);
+    };
+    const onRootKey = (event: Event): void => {
+        if (menu.hidden) return;
+        if (!(event instanceof KeyboardEvent)) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            setOpen(false);
+            kebab.focus();
+        }
+    };
+    const attachRootListeners = (): void => {
+        if (listenersAttached) return;
+        listenersAttached = true;
+        const root = wrap.getRootNode();
+        root.addEventListener("click", onRootClick, {capture: true});
+        (root as unknown as EventTarget).addEventListener("keydown", onRootKey, {
+            capture: true,
+        });
+    };
+
+    kebab.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const willOpen = menu.hidden;
+        setOpen(willOpen);
+        if (willOpen) attachRootListeners();
+    });
+
+    return wrap;
 }
 
 function renderContent(target: HTMLElement, message: Message, context: RenderContext): void {

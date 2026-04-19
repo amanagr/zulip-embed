@@ -14,6 +14,7 @@ import type {
     ScopeFilter,
     SendMessageParams,
     Topic,
+    User,
     ZulipEventListener,
 } from "./types.ts";
 
@@ -23,7 +24,14 @@ const reactionSchema = z.object({
     userIds: z.array(z.number()),
 });
 
-const messageSchema = z.object({
+const userSchema = z.object({
+    userId: z.number(),
+    email: z.string(),
+    fullName: z.string(),
+    avatarUrl: z.string(),
+});
+
+const messageBaseSchema = z.object({
     id: z.number(),
     senderId: z.number(),
     senderFullName: z.string(),
@@ -32,11 +40,24 @@ const messageSchema = z.object({
     timestamp: z.number(),
     content: z.string(),
     contentIsHtml: z.boolean(),
-    type: z.enum(["channel", "direct"]),
-    channelName: z.string().optional(),
-    topic: z.string().optional(),
     reactions: z.array(reactionSchema),
 });
+
+const channelMessageSchema = messageBaseSchema.extend({
+    type: z.literal("channel"),
+    channelName: z.string(),
+    topic: z.string(),
+});
+
+const directMessageSchema = messageBaseSchema.extend({
+    type: z.literal("direct"),
+    recipients: z.array(userSchema),
+});
+
+const messageSchema = z.discriminatedUnion("type", [
+    channelMessageSchema,
+    directMessageSchema,
+]);
 
 const channelSchema = z.object({
     channelId: z.number(),
@@ -127,7 +148,11 @@ export class SnapshotTransport implements Transport {
             onEvent({type: "connection", status: "connected"});
         } catch (error) {
             onEvent({type: "connection", status: "error"});
-            onEvent({type: "error", error: describeError(error)});
+            onEvent({
+                type: "error",
+                code: error instanceof TypeError ? "network" : "unknown",
+                error: describeError(error),
+            });
             throw error;
         }
     }
@@ -216,6 +241,12 @@ export class SnapshotTransport implements Transport {
         return undefined;
     }
 
+    getCurrentUser(): Promise<User> {
+        return Promise.reject(
+            new Error("Snapshot transport has no logged-in viewer"),
+        );
+    }
+
     private async fetchSnapshot(): Promise<SnapshotFile> {
         const response = await fetch(this.url);
         if (!response.ok) {
@@ -265,6 +296,7 @@ function validateSnapshotUrl(raw: string): string {
 
 function filterToScope(messages: Message[], scope: ScopeFilter): Message[] {
     return messages.filter((m) => {
+        if (m.type !== "channel") return false;
         if (m.channelName !== scope.channel) return false;
         if (scope.topic !== undefined && m.topic !== scope.topic) return false;
         return true;
@@ -312,24 +344,41 @@ function parseSnapshot(raw: unknown): SnapshotFile {
         topic: data.topic,
         ...(channels ? {channels} : {}),
         ...(topics ? {topics} : {}),
-        messages: data.messages.map((m) => ({
-            id: m.id,
-            senderId: m.senderId,
-            senderFullName: m.senderFullName,
-            senderEmail: m.senderEmail,
-            avatarUrl: m.avatarUrl,
-            timestamp: m.timestamp,
-            content: m.content,
-            contentIsHtml: m.contentIsHtml,
-            type: m.type,
-            channelName: m.channelName,
-            topic: m.topic,
-            reactions: m.reactions.map((r) => ({
-                emoji: r.emoji,
-                count: r.count,
-                userIds: r.userIds,
-            })),
-        })),
+        messages: data.messages.map((m): Message => {
+            const base = {
+                id: m.id,
+                senderId: m.senderId,
+                senderFullName: m.senderFullName,
+                senderEmail: m.senderEmail,
+                avatarUrl: m.avatarUrl,
+                timestamp: m.timestamp,
+                content: m.content,
+                contentIsHtml: m.contentIsHtml,
+                reactions: m.reactions.map((r) => ({
+                    emoji: r.emoji,
+                    count: r.count,
+                    userIds: r.userIds,
+                })),
+            };
+            if (m.type === "channel") {
+                return {
+                    ...base,
+                    type: "channel",
+                    channelName: m.channelName,
+                    topic: m.topic,
+                };
+            }
+            return {
+                ...base,
+                type: "direct",
+                recipients: m.recipients.map((u) => ({
+                    userId: u.userId,
+                    email: u.email,
+                    fullName: u.fullName,
+                    avatarUrl: u.avatarUrl,
+                })),
+            };
+        }),
     };
 }
 

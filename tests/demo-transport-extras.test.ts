@@ -86,7 +86,12 @@ describe("DemoTransport auto-reply variations", () => {
             autoReplyDelayMs: 50,
         });
         await t.connect((e) => events.push(e));
-        await t.sendMessage({type: "channel", channel: "general", content: "is this working?"});
+        await t.sendMessage({
+            type: "channel",
+            channel: "general",
+            topic: "",
+            content: "is this working?",
+        });
         vi.advanceTimersByTime(60);
 
         const reply = events
@@ -103,7 +108,12 @@ describe("DemoTransport auto-reply variations", () => {
             autoReplyDelayMs: 50,
         });
         await t.connect((e) => events.push(e));
-        await t.sendMessage({type: "channel", channel: "general", content: "   "});
+        await t.sendMessage({
+            type: "channel",
+            channel: "general",
+            topic: "",
+            content: "   ",
+        });
         vi.advanceTimersByTime(60);
 
         const reply = events
@@ -120,7 +130,12 @@ describe("DemoTransport auto-reply variations", () => {
             autoReplyDelayMs: 50,
         });
         await t.connect((e) => events.push(e));
-        await t.sendMessage({type: "channel", channel: "general", content: "hello there"});
+        await t.sendMessage({
+            type: "channel",
+            channel: "general",
+            topic: "",
+            content: "hello there",
+        });
         vi.advanceTimersByTime(60);
 
         const reply = events
@@ -148,8 +163,10 @@ describe("DemoTransport auto-reply variations", () => {
         const reply = events
             .filter((e): e is Extract<ZulipEvent, {type: "message"}> => e.type === "message")
             .at(-1);
-        expect(reply?.message.channelName).toBe("general");
-        expect(reply?.message.topic).toBe("my-topic");
+        const replyMessage = reply?.message;
+        if (replyMessage?.type !== "channel") throw new Error("expected channel reply");
+        expect(replyMessage.channelName).toBe("general");
+        expect(replyMessage.topic).toBe("my-topic");
     });
 });
 
@@ -228,7 +245,12 @@ describe("DemoTransport constructor options", () => {
             });
             await t.connect((e) => events.push(e));
             const before = events.filter((e) => e.type === "message").length;
-            await t.sendMessage({type: "channel", channel: "general", content: "ping"});
+            await t.sendMessage({
+                type: "channel",
+                channel: "general",
+                topic: "",
+                content: "ping",
+            });
             vi.advanceTimersByTime(1000);
             const after = events.filter((e) => e.type === "message").length;
             // Exactly one new message event — the guest's send, no bot reply.

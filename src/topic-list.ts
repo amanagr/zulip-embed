@@ -10,6 +10,7 @@ const OBSERVED_ATTRIBUTES = [
     "server",
     "email",
     "api-key",
+    "auth-token",
     "channel",
     "theme",
 ] as const;
@@ -20,6 +21,7 @@ const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "server",
     "email",
     "api-key",
+    "auth-token",
     "channel",
 ]);
 
@@ -229,14 +231,26 @@ export class ZulipTopicListElement extends HTMLElement {
             return new DemoTransport({scope});
         }
         const server = this.getAttribute("server");
+        const authToken = this.getAttribute("auth-token");
         const email = this.getAttribute("email");
         const apiKey = this.getAttribute("api-key");
-        if (!server || !email || !apiKey) {
+        if (!server) {
             throw new Error(
-                'Live mode requires "server", "email", and "api-key" attributes. Add the "demo" attribute to preview without a server.',
+                'Live mode requires a "server" attribute. Add the "demo" attribute to preview without a server.',
             );
         }
-        return new ZulipTransport({serverUrl: server, email, apiKey, scope});
+        if (authToken && authToken !== "") {
+            return new ZulipTransport({serverUrl: server, authToken, scope});
+        }
+        if (email && apiKey) {
+            console.warn(
+                "[zulip-topic-list] api-key auth ships a long-lived credential to the browser. Prefer auth-token (JWT) for production.",
+            );
+            return new ZulipTransport({serverUrl: server, email, apiKey, scope});
+        }
+        throw new Error(
+            'Live mode requires an "auth-token" attribute (preferred) or "email" + "api-key". Add the "demo" attribute to preview without a server.',
+        );
     }
 
     private async fetchTopics(): Promise<void> {

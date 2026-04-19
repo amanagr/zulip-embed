@@ -13,11 +13,18 @@ export type {ZulipChannelListProps, ChannelSelectedDetail} from "./zulip-channel
 export {ZulipTopicList} from "./zulip-topic-list.js";
 export type {ZulipTopicListProps, TopicSelectedDetail} from "./zulip-topic-list.js";
 
+// Headless hook for custom UIs built on the framework-agnostic client.
+export {useZulipChat} from "./hooks.js";
+export type {UseZulipChatResult} from "./hooks.js";
+
 // Re-export the domain types so consumers don't need to pull from
 // two packages when they type their handlers.
 export type {
     Channel,
+    ChannelMessage,
     ConnectionStatus,
+    DirectMessage,
+    ErrorCode,
     Message,
     MessageType,
     Reaction,
@@ -25,7 +32,11 @@ export type {
     SendMessageParams,
     Topic,
     User,
+    ZulipConnectionChangeEventDetail,
+    ZulipErrorEventDetail,
     ZulipEvent,
     ZulipEventListener,
+    ZulipMessageEventDetail,
 } from "@zulip/embed";
-export type {Transport} from "@zulip/embed";
+export {ZulipClient} from "@zulip/embed";
+export type {ClientState, Transport, ZulipClientOptions} from "@zulip/embed";

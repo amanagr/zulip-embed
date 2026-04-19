@@ -13,7 +13,7 @@ export interface Reaction {
     userIds: number[];
 }
 
-export interface Message {
+interface MessageBase {
     id: number;
     senderId: number;
     senderFullName: string;
@@ -22,19 +22,26 @@ export interface Message {
     timestamp: number;
     content: string;
     contentIsHtml: boolean;
-    type: MessageType;
-    channelName: string | undefined;
-    topic: string | undefined;
     reactions: Reaction[];
 }
+
+export interface ChannelMessage extends MessageBase {
+    type: "channel";
+    channelName: string;
+    topic: string;
+}
+
+export interface DirectMessage extends MessageBase {
+    type: "direct";
+    recipients: User[];
+}
+
+export type Message = ChannelMessage | DirectMessage;
 
 export interface Channel {
     channelId: number;
     name: string;
     description: string;
-    // Present for subscribed channels surfaced by listChannels(). Omit
-    // for channel objects that describe a scope the viewer isn't a
-    // member of (e.g. discovery flows) so UIs can branch on the shape.
     color?: string | undefined;
     pinToTop?: boolean | undefined;
     isMuted?: boolean | undefined;
@@ -43,26 +50,40 @@ export interface Channel {
 
 export interface Topic {
     name: string;
-    // Newest message id in the topic. Lets the UI sort without having to
-    // re-derive chronology from the message list.
     maxMessageId: number;
     unreadCount?: number | undefined;
     isResolved?: boolean | undefined;
 }
 
-export interface SendMessageParams {
-    type: "channel" | "direct";
-    channel?: string | undefined;
-    topic?: string | undefined;
-    recipients?: string[] | undefined;
-    content: string;
-}
+export type SendMessageParams =
+    | {
+          type: "channel";
+          channel: string;
+          topic: string;
+          content: string;
+      }
+    | {
+          type: "direct";
+          recipients: string[];
+          content: string;
+      };
 
-export type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
+export type ConnectionStatus =
+    | "idle"
+    | "connecting"
+    | "connected"
+    | "reconnecting"
+    | "disconnected"
+    | "error";
 
 export interface ConnectionEvent {
     type: "connection";
     status: ConnectionStatus;
+    // Populated when status === "reconnecting": the current backoff attempt
+    // (1-indexed) and the delay in ms before the next retry.
+    attempt?: number | undefined;
+    delayMs?: number | undefined;
+    reason?: string | undefined;
 }
 
 export interface MessageEvent {
@@ -73,13 +94,7 @@ export interface MessageEvent {
 export interface MessageUpdateEvent {
     type: "message-update";
     messageId: number;
-    // Updated content. Absent when the edit only touches topic/channel.
     content?: string | undefined;
-    // Whether `content` is server-rendered HTML (true for ZulipTransport,
-    // which always sets apply_markdown=true) or plain text. Consumers
-    // must honor this flag rather than inferring HTML from the presence
-    // of `content` — otherwise an edit from a future non-HTML transport
-    // would silently flow through the HTML sanitizer on the wrong path.
     contentIsHtml?: boolean | undefined;
     topic?: string | undefined;
     editedTimestamp?: number | undefined;
@@ -90,10 +105,6 @@ export interface MessageDeleteEvent {
     messageId: number;
 }
 
-// Zulip's reaction event stream is per-user: one event per (message, emoji,
-// user) tuple, with op: "add" | "remove". The transport keeps bucket state
-// in sync and re-emits the full updated reactions list for the message so
-// UI subscribers don't need to know about the per-user event shape.
 export interface ReactionEvent {
     type: "reaction";
     messageId: number;
@@ -107,15 +118,25 @@ export interface TypingUser {
 
 export interface TypingEvent {
     type: "typing";
-    // The full set of users currently typing in the active scope. Emit
-    // the full set on every change (rather than op=add/remove) so UI
-    // consumers don't have to track state themselves.
     users: TypingUser[];
 }
 
+// Error classification surfaced to consumers. Code is the stable machine
+// handle; `error` is the human-readable message. `retryAfterMs` is set on
+// rate-limit responses so UI can throttle.
+export type ErrorCode =
+    | "unauthorized"
+    | "channel-not-subscribed"
+    | "network"
+    | "rate-limited"
+    | "jwt-not-configured"
+    | "unknown";
+
 export interface ErrorEvent {
     type: "error";
+    code: ErrorCode;
     error: string;
+    retryAfterMs?: number | undefined;
 }
 
 export type ZulipEvent =
@@ -128,6 +149,26 @@ export type ZulipEvent =
     | ErrorEvent;
 
 export type ZulipEventListener = (event: ZulipEvent) => void;
+
+// Detail shapes for the CustomEvents the `<zulip-chat>` element dispatches
+// on its host. Consumers that listen with `addEventListener` (or React's
+// `on*` props) get these as `CustomEvent<T>["detail"]`.
+export interface ZulipMessageEventDetail {
+    message: Message;
+}
+
+export interface ZulipConnectionChangeEventDetail {
+    status: ConnectionStatus;
+    attempt?: number | undefined;
+    delayMs?: number | undefined;
+    reason?: string | undefined;
+}
+
+export interface ZulipErrorEventDetail {
+    code: ErrorCode;
+    error: string;
+    retryAfterMs?: number | undefined;
+}
 
 export interface ScopeFilter {
     channel: string;

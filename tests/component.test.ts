@@ -58,7 +58,7 @@ describe("<zulip-chat>", () => {
         for (let i = 0; i < 3; i++) await flush();
 
         const banner = el.shadowRoot?.querySelector(".error-banner");
-        expect(banner?.textContent ?? "").toContain('requires "server"');
+        expect(banner?.textContent ?? "").toContain('requires a "server"');
     });
 
     test("shows the new-messages pill when a message arrives while scrolled away", async () => {

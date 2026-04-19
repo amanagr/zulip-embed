@@ -80,4 +80,102 @@ describe("<ZulipChat />", () => {
         expect(ref.current).toBeInstanceOf(HTMLElement);
         expect(ref.current?.tagName.toLowerCase()).toBe("zulip-chat");
     });
+
+    test("forwards zulip-connection-change CustomEvent to onConnectionChange prop", () => {
+        // Dispatch the event directly on the host element — this
+        // verifies the wrapper's `addEventListener("zulip-connection-change", ...)`
+        // subscription without depending on the underlying component
+        // actually emitting it during the test (which depends on
+        // async transport setup).
+        const ref = createRef<HTMLElement>();
+        const received: Array<{status: string}> = [];
+        render(
+            <ZulipChat
+                ref={ref}
+                demo
+                channel="general"
+                onConnectionChange={(detail) => received.push(detail)}
+            />,
+        );
+        ref.current?.dispatchEvent(
+            new CustomEvent("zulip-connection-change", {
+                detail: {status: "connected"},
+            }),
+        );
+        expect(received).toHaveLength(1);
+        expect(received[0]?.status).toBe("connected");
+    });
+
+    test("forwards zulip-message CustomEvent to onMessage prop", () => {
+        const ref = createRef<HTMLElement>();
+        const received: Array<{message: {id: number}}> = [];
+        render(
+            <ZulipChat
+                ref={ref}
+                demo
+                channel="general"
+                onMessage={(detail) => received.push(detail)}
+            />,
+        );
+        ref.current?.dispatchEvent(
+            new CustomEvent("zulip-message", {detail: {message: {id: 42}}}),
+        );
+        expect(received).toHaveLength(1);
+        expect(received[0]?.message.id).toBe(42);
+    });
+
+    test("forwards zulip-error CustomEvent to onError prop", () => {
+        const ref = createRef<HTMLElement>();
+        const received: Array<{code: string; error: string}> = [];
+        render(
+            <ZulipChat
+                ref={ref}
+                demo
+                channel="general"
+                onError={(detail) => received.push(detail)}
+            />,
+        );
+        ref.current?.dispatchEvent(
+            new CustomEvent("zulip-error", {
+                detail: {code: "unauthorized", error: "bad token"},
+            }),
+        );
+        expect(received).toHaveLength(1);
+        expect(received[0]?.code).toBe("unauthorized");
+    });
+
+    test("callback refs stay current without rebinding listeners on prop change", () => {
+        // Re-rendering with a new `onMessage` handler should route
+        // subsequent events to the NEW handler, but the underlying
+        // addEventListener call should still only have happened once
+        // — we can't assert that directly, but we can check that the
+        // new handler receives events and the old handler doesn't.
+        const ref = createRef<HTMLElement>();
+        const first: Array<{message: {id: number}}> = [];
+        const second: Array<{message: {id: number}}> = [];
+        const {rerender} = render(
+            <ZulipChat
+                ref={ref}
+                demo
+                channel="general"
+                onMessage={(detail) => first.push(detail)}
+            />,
+        );
+        ref.current?.dispatchEvent(
+            new CustomEvent("zulip-message", {detail: {message: {id: 1}}}),
+        );
+        rerender(
+            <ZulipChat
+                ref={ref}
+                demo
+                channel="general"
+                onMessage={(detail) => second.push(detail)}
+            />,
+        );
+        ref.current?.dispatchEvent(
+            new CustomEvent("zulip-message", {detail: {message: {id: 2}}}),
+        );
+        expect(first.map((d) => d.message.id)).toEqual([1]);
+        expect(second.map((d) => d.message.id)).toEqual([2]);
+    });
 });

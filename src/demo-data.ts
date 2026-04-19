@@ -1,4 +1,4 @@
-import type {Channel, Message, Reaction, User} from "./types.ts";
+import type {Channel, ChannelMessage, Reaction, User} from "./types.ts";
 
 const AVATAR_PLACEHOLDER = "";
 
@@ -66,7 +66,7 @@ interface SeedOptions {
     reactions?: Reaction[];
 }
 
-function demoMessage(opts: SeedOptions): Message {
+function demoMessage(opts: SeedOptions): ChannelMessage {
     const sender = DEMO_USERS.find((u) => u.email === opts.senderEmail);
     if (sender === undefined) {
         throw new Error(`Unknown demo sender: ${opts.senderEmail}`);
@@ -101,7 +101,7 @@ function userMention(name: string, me = false): string {
     return `<span class="${cls}" data-user-id="0">@${name}</span>`;
 }
 
-export function seedMessages(channel: string, topic: string | undefined): Message[] {
+export function seedMessages(channel: string, topic: string | undefined): ChannelMessage[] {
     if (channel === "announce") {
         return announceSeed(topic ?? "server releases");
     }
@@ -111,7 +111,7 @@ export function seedMessages(channel: string, topic: string | undefined): Messag
     return generalSeed(channel, topic ?? "welcome");
 }
 
-function generalSeed(channel: string, topic: string): Message[] {
+function generalSeed(channel: string, topic: string): ChannelMessage[] {
     return [
         demoMessage({
             id: 101,
@@ -155,7 +155,7 @@ function generalSeed(channel: string, topic: string): Message[] {
 // Mirrors Zulip's own #announce channel: release notes, outage post-mortems,
 // GitHub-style changelogs. Read-only in the demo — users react but don't
 // reply.
-function announceSeed(topic: string): Message[] {
+function announceSeed(topic: string): ChannelMessage[] {
     return [
         demoMessage({
             id: 201,
@@ -237,7 +237,7 @@ Full notes are on the <a href="https://zulip.readthedocs.io/en/latest/overview/c
 
 // "One of each" showcase: every renderer feature we claim to support shows
 // up in at least one message. Inspired by Zulip's populate_db fixtures.
-function showcaseSeed(topic: string): Message[] {
+function showcaseSeed(topic: string): ChannelMessage[] {
     return [
         demoMessage({
             id: 301,

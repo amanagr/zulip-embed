@@ -87,8 +87,13 @@ describe("renderMessage action bar (edit/delete buttons)", () => {
         const notMine = plainTextMessage("theirs", 22);
         const ctx = {
             currentUserId: 11,
-            onEditMessage: () => {},
-            onDeleteMessage: () => {},
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: 11,
+                onEditMessage: () => {},
+                onDeleteMessage: () => {},
+            },
         };
         expect(renderMessage(mine, false, ctx).querySelector(".message-actions")).not.toBeNull();
         expect(renderMessage(notMine, false, ctx).querySelector(".message-actions")).toBeNull();
@@ -98,25 +103,42 @@ describe("renderMessage action bar (edit/delete buttons)", () => {
         const mine = plainTextMessage("m", 11);
         const node = renderMessage(mine, false, {
             currentUserId: 11,
-            onDeleteMessage: () => {},
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: 11,
+                onDeleteMessage: () => {},
+            },
         });
-        expect(node.querySelector('[aria-label="Edit message"]')).toBeNull();
-        expect(node.querySelector('[aria-label="Delete message"]')).not.toBeNull();
+        expect(node.querySelector('[aria-label="Edit"]')).toBeNull();
+        expect(node.querySelector('[aria-label="Delete"]')).not.toBeNull();
     });
 
     test("delete button is absent when only onEditMessage is provided", () => {
         const mine = plainTextMessage("m", 11);
         const node = renderMessage(mine, false, {
             currentUserId: 11,
-            onEditMessage: () => {},
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: 11,
+                onEditMessage: () => {},
+            },
         });
-        expect(node.querySelector('[aria-label="Edit message"]')).not.toBeNull();
-        expect(node.querySelector('[aria-label="Delete message"]')).toBeNull();
+        expect(node.querySelector('[aria-label="Edit"]')).not.toBeNull();
+        expect(node.querySelector('[aria-label="Delete"]')).toBeNull();
     });
 
     test("action bar is omitted when neither handler is provided even for own message", () => {
         const mine = plainTextMessage("m", 11);
-        const node = renderMessage(mine, false, {currentUserId: 11});
+        const node = renderMessage(mine, false, {
+            currentUserId: 11,
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: 11,
+            },
+        });
         expect(node.querySelector(".message-actions")).toBeNull();
     });
 
@@ -126,11 +148,16 @@ describe("renderMessage action bar (edit/delete buttons)", () => {
         let deleteArg: Message | undefined;
         const node = renderMessage(mine, false, {
             currentUserId: 11,
-            onEditMessage: (m) => (editArg = m),
-            onDeleteMessage: (m) => (deleteArg = m),
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: 11,
+                onEditMessage: (m) => (editArg = m),
+                onDeleteMessage: (m) => (deleteArg = m),
+            },
         });
-        node.querySelector<HTMLButtonElement>('[aria-label="Edit message"]')?.click();
-        node.querySelector<HTMLButtonElement>('[aria-label="Delete message"]')?.click();
+        node.querySelector<HTMLButtonElement>('[aria-label="Edit"]')?.click();
+        node.querySelector<HTMLButtonElement>('[aria-label="Delete"]')?.click();
         expect(editArg?.id).toBe(1);
         expect(deleteArg?.id).toBe(1);
     });
@@ -138,8 +165,13 @@ describe("renderMessage action bar (edit/delete buttons)", () => {
     test("action bar is omitted when currentUserId is undefined (anonymous viewer)", () => {
         const mine = plainTextMessage("m", 11);
         const node = renderMessage(mine, false, {
-            onEditMessage: () => {},
-            onDeleteMessage: () => {},
+            messageActionIds: ["edit", "delete"],
+            messageActionHostContext: {
+                serverOrigin: undefined,
+                currentUserId: undefined,
+                onEditMessage: () => {},
+                onDeleteMessage: () => {},
+            },
         });
         expect(node.querySelector(".message-actions")).toBeNull();
     });

@@ -1,14 +1,27 @@
+"use client";
+
 // Thin React wrapper for <zulip-chat>. The component owns all
 // rendering + transport logic; this wrapper just forwards props as
-// HTML attributes (inverting kebab-case where needed) and exposes the
+// HTML attributes (inverting kebab-case where needed), wires camelCase
+// `on*` callbacks to the underlying CustomEvents, and exposes the
 // underlying element via ref so advanced callers can call
 // element.open() / element.close() imperatively.
+//
+// The "use client" directive above lets Next.js / React Server
+// Component consumers drop this into a server tree without manually
+// marking their own wrapper; the component is inherently client-side
+// because it mounts a Web Component.
 
 import {createElement, useEffect, useRef, forwardRef, useImperativeHandle} from "react";
 import type {CSSProperties, ReactElement} from "react";
 
 import "@zulip/embed";
-import type {ZulipChatElement} from "@zulip/embed";
+import type {
+    ZulipChatElement,
+    ZulipConnectionChangeEventDetail,
+    ZulipErrorEventDetail,
+    ZulipMessageEventDetail,
+} from "@zulip/embed";
 
 export interface ZulipChatProps {
     // Live-connection credentials. Leave server/email/apiKey undefined
@@ -16,6 +29,9 @@ export interface ZulipChatProps {
     server?: string;
     email?: string;
     apiKey?: string;
+    // JWT for server-side handoff. Preferred over api-key for live mode;
+    // see docs/jwt.md for the exchange details.
+    authToken?: string;
 
     // Scope: channel is required for live mode; topic is optional —
     // omitting it shows all topics in the channel.
@@ -42,6 +58,14 @@ export interface ZulipChatProps {
     // Optional CDN override for KaTeX CSS (pulled on demand).
     katexCss?: string;
 
+    // Typed event callbacks. These subscribe to the custom events the
+    // underlying `<zulip-chat>` element dispatches on its host. They
+    // receive the event's `detail` object directly — consumers don't
+    // need to unwrap `CustomEvent`.
+    onMessage?: (detail: ZulipMessageEventDetail) => void;
+    onConnectionChange?: (detail: ZulipConnectionChangeEventDetail) => void;
+    onError?: (detail: ZulipErrorEventDetail) => void;
+
     // Escape hatches — forwarded so callers can style the container
     // from their own stylesheet.
     className?: string;
@@ -62,6 +86,7 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             applyAttr(el, "server", props.server);
             applyAttr(el, "email", props.email);
             applyAttr(el, "api-key", props.apiKey);
+            applyAttr(el, "auth-token", props.authToken);
             applyAttr(el, "channel", props.channel);
             applyAttr(el, "topic", props.topic);
             applyAttr(el, "demo-variant", props.demoVariant);
@@ -78,6 +103,7 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             props.server,
             props.email,
             props.apiKey,
+            props.authToken,
             props.channel,
             props.topic,
             props.demo,
@@ -91,6 +117,42 @@ export const ZulipChat = forwardRef<ZulipChatElement, ZulipChatProps>(
             props.brandLogo,
             props.katexCss,
         ]);
+
+        // Wire event callbacks. Each effect registers a listener that
+        // reads the latest callback off a ref so consumers can pass
+        // inline `() => setState(...)` handlers without retriggering
+        // attach/detach on every render. We intentionally depend on the
+        // refs only — the element identity is stable inside one mount.
+        const onMessageRef = useRef(props.onMessage);
+        const onConnectionChangeRef = useRef(props.onConnectionChange);
+        const onErrorRef = useRef(props.onError);
+        onMessageRef.current = props.onMessage;
+        onConnectionChangeRef.current = props.onConnectionChange;
+        onErrorRef.current = props.onError;
+
+        useEffect(() => {
+            const el = innerRef.current;
+            if (!el) return;
+            const onMessage = (e: Event): void => {
+                onMessageRef.current?.((e as CustomEvent<ZulipMessageEventDetail>).detail);
+            };
+            const onConnection = (e: Event): void => {
+                onConnectionChangeRef.current?.(
+                    (e as CustomEvent<ZulipConnectionChangeEventDetail>).detail,
+                );
+            };
+            const onErr = (e: Event): void => {
+                onErrorRef.current?.((e as CustomEvent<ZulipErrorEventDetail>).detail);
+            };
+            el.addEventListener("zulip-message", onMessage);
+            el.addEventListener("zulip-connection-change", onConnection);
+            el.addEventListener("zulip-error", onErr);
+            return () => {
+                el.removeEventListener("zulip-message", onMessage);
+                el.removeEventListener("zulip-connection-change", onConnection);
+                el.removeEventListener("zulip-error", onErr);
+            };
+        }, []);
 
         // Using createElement with the lowercase tag keeps this file
         // compatible with React 17/18/19 without a JSX module

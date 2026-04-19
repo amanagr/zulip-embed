@@ -112,6 +112,7 @@ describe("DemoTransport", () => {
             transport.sendMessage({
                 type: "channel",
                 channel: "announce",
+                topic: "server releases",
                 content: "try to reply",
             }),
         ).rejects.toThrow(/read-only/i);
@@ -126,7 +127,12 @@ describe("DemoTransport", () => {
         });
         const received: ZulipEvent[] = [];
         await transport.connect((e) => received.push(e));
-        await transport.sendMessage({type: "channel", channel: "general", content: "Hello?"});
+        await transport.sendMessage({
+            type: "channel",
+            channel: "general",
+            topic: "",
+            content: "Hello?",
+        });
 
         await transport.close();
         vi.advanceTimersByTime(1_000);

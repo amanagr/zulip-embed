@@ -10,6 +10,11 @@ import {DemoTransport} from "./demo-transport.ts";
 import {createEmojiPicker, type EmojiPickerHandle} from "./emoji-picker.ts";
 import {enhanceKatex} from "./katex.ts";
 import {
+    parseMessageActionIds,
+    type MessageActionDescriptor,
+    type MessageActionHostContext,
+} from "./message-actions.ts";
+import {
     EMOJI_GLYPHS,
     isNearBottom,
     renderMessages,
@@ -26,6 +31,7 @@ import type {
     Reaction,
     ScopeFilter,
     TypingUser,
+    ZulipEvent,
 } from "./types.ts";
 import {ZulipTransport} from "./zulip-transport.ts";
 
@@ -36,6 +42,7 @@ const OBSERVED_ATTRIBUTES = [
     "server",
     "email",
     "api-key",
+    "auth-token",
     "channel",
     "topic",
     "theme",
@@ -45,6 +52,7 @@ const OBSERVED_ATTRIBUTES = [
     "katex-css",
     "brand-logo",
     "brand-name",
+    "message-actions",
 ] as const;
 
 const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
@@ -54,6 +62,7 @@ const REINIT_ATTRIBUTES: ReadonlySet<string> = new Set([
     "server",
     "email",
     "api-key",
+    "auth-token",
     "channel",
     "topic",
 ]);
@@ -149,6 +158,19 @@ export class ZulipChatElement extends HTMLElement {
     private typingActive = false;
     private typingIdleTimer: ReturnType<typeof setTimeout> | undefined;
     private typingRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+    // Adopter-supplied custom message-action descriptors. Appended to
+    // whatever the `message-actions` attribute resolved to, so hosts can
+    // inject a "Flag for review" / "Open ticket" etc. alongside the
+    // built-ins. Set via the `messageActions` JS property.
+    private customMessageActions: readonly MessageActionDescriptor[] = [];
+
+    get messageActions(): readonly MessageActionDescriptor[] {
+        return this.customMessageActions;
+    }
+    set messageActions(value: readonly MessageActionDescriptor[]) {
+        this.customMessageActions = value;
+        if (this.attachedToDom) this.applyStateToDom();
+    }
 
     constructor() {
         super();
@@ -654,7 +676,7 @@ export class ZulipChatElement extends HTMLElement {
             return;
         }
 
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope});
         this.client = client;
         this.unsubscribe = client.subscribe((event) => {
             if (token !== this.initToken) return;
@@ -684,6 +706,7 @@ export class ZulipChatElement extends HTMLElement {
             } else if (event.type === "error") {
                 this.setState({error: event.error});
             }
+            this.dispatchZulipEvent(event);
         });
 
         try {
@@ -706,6 +729,54 @@ export class ZulipChatElement extends HTMLElement {
                 error: describeError(error),
                 loading: false,
             });
+        }
+    }
+
+    private dispatchZulipEvent(event: ZulipEvent): void {
+        // Forward the transport's event stream as typed CustomEvents on
+        // the host element so framework-agnostic consumers can
+        // `el.addEventListener("zulip-message", ...)` without reaching
+        // into the shadow DOM. Only surface the events that are stable
+        // across transports — message arrival, connection transitions,
+        // and errors. Typing / reaction / edit events can be wired in a
+        // later sprint once their payloads are locked down.
+        if (event.type === "message") {
+            this.dispatchEvent(
+                new CustomEvent("zulip-message", {
+                    detail: {message: event.message},
+                    bubbles: true,
+                    composed: true,
+                }),
+            );
+            return;
+        }
+        if (event.type === "connection") {
+            this.dispatchEvent(
+                new CustomEvent("zulip-connection-change", {
+                    detail: {
+                        status: event.status,
+                        attempt: event.attempt,
+                        delayMs: event.delayMs,
+                        reason: event.reason,
+                    },
+                    bubbles: true,
+                    composed: true,
+                }),
+            );
+            return;
+        }
+        if (event.type === "error") {
+            this.dispatchEvent(
+                new CustomEvent("zulip-error", {
+                    detail: {
+                        code: event.code,
+                        error: event.error,
+                        retryAfterMs: event.retryAfterMs,
+                    },
+                    bubbles: true,
+                    composed: true,
+                }),
+            );
         }
     }
 
@@ -740,14 +811,30 @@ export class ZulipChatElement extends HTMLElement {
             });
         }
         const server = this.getAttribute("server");
+        const authToken = this.getAttribute("auth-token");
         const email = this.getAttribute("email");
         const apiKey = this.getAttribute("api-key");
-        if (!server || !email || !apiKey) {
+        if (!server) {
             throw new Error(
-                'Live mode requires "server", "email", and "api-key" attributes. Add the "demo" attribute to preview without a server.',
+                'Live mode requires a "server" attribute. Add the "demo" attribute to preview without a server.',
             );
         }
-        return new ZulipTransport({serverUrl: server, email, apiKey, scope});
+        if (authToken && authToken !== "") {
+            return new ZulipTransport({serverUrl: server, authToken, scope});
+        }
+        if (email && apiKey) {
+            // api-key auth is still supported for local development, but
+            // production hosts should front the embed with a JWT exchange:
+            // shipping a real api-key to the browser grants full account
+            // access, not just the embed scope.
+            console.warn(
+                "[zulip-chat] api-key auth ships a long-lived credential to the browser. Prefer auth-token (JWT) for production. See docs/jwt.md.",
+            );
+            return new ZulipTransport({serverUrl: server, email, apiKey, scope});
+        }
+        throw new Error(
+            'Live mode requires an "auth-token" attribute (preferred) or "email" + "api-key". Add the "demo" attribute to preview without a server.',
+        );
     }
 
     private readScope(): ScopeFilter {
@@ -793,12 +880,21 @@ export class ZulipChatElement extends HTMLElement {
             // HTML from `content !== undefined`. A future non-HTML transport
             // emitting an edit event would otherwise flow plain text through
             // the HTML sanitizer on the wrong render path.
+            const nextContent = content ?? m.content;
+            const nextContentIsHtml =
+                content === undefined ? m.contentIsHtml : contentIsHtml ?? false;
+            if (m.type === "channel") {
+                return {
+                    ...m,
+                    content: nextContent,
+                    contentIsHtml: nextContentIsHtml,
+                    topic: topic ?? m.topic,
+                };
+            }
             return {
                 ...m,
-                content: content ?? m.content,
-                contentIsHtml:
-                    content === undefined ? m.contentIsHtml : contentIsHtml ?? false,
-                topic: topic ?? m.topic,
+                content: nextContent,
+                contentIsHtml: nextContentIsHtml,
             };
         });
         this.setState({messages: next});
@@ -872,9 +968,11 @@ export class ZulipChatElement extends HTMLElement {
     }
 
     private renderContext(): RenderContext {
+        const serverOrigin = this.getAttribute("server") ?? undefined;
+        const currentUserId = this.client?.getCurrentUserId();
         const context: RenderContext = {
-            serverOrigin: this.getAttribute("server") ?? undefined,
-            currentUserId: this.client?.getCurrentUserId(),
+            serverOrigin,
+            currentUserId,
         };
         if (this.hasAttribute("read-only") || this.hasAttribute("snapshot-url")) {
             // Read-only + snapshot modes don't accumulate unread state or
@@ -889,13 +987,76 @@ export class ZulipChatElement extends HTMLElement {
         context.onAddReaction = (m, anchor) => {
             this.handleAddReaction(m, anchor);
         };
-        context.onEditMessage = (m) => {
-            this.startEdit(m);
+
+        const hostContext: MessageActionHostContext = {
+            serverOrigin,
+            currentUserId,
+            onEditMessage: (m) => {
+                this.startEdit(m);
+            },
+            onDeleteMessage: (m) => {
+                void this.handleDelete(m);
+            },
+            onAddReaction: (m, anchor) => {
+                this.handleAddReaction(m, anchor);
+            },
+            copyText: (s) => {
+                this.copyTextToClipboard(s);
+            },
+            openUrl: (url) => {
+                this.openExternalUrl(url);
+            },
         };
-        context.onDeleteMessage = (m) => {
-            void this.handleDelete(m);
-        };
+        context.messageActionHostContext = hostContext;
+        context.messageActionIds = parseMessageActionIds(
+            this.getAttribute("message-actions"),
+        );
+        if (this.customMessageActions.length > 0) {
+            context.messageActionsExtra = this.customMessageActions;
+        }
         return context;
+    }
+
+    // Clipboard write via the Async Clipboard API. Falls back to the
+    // legacy textarea-exec-command trick when the API is unavailable
+    // (older browsers, insecure contexts). Both paths are best-effort —
+    // the UI already dismissed, so throwing here would surprise the user.
+    private copyTextToClipboard(text: string): void {
+        const asyncWrite = globalThis.navigator?.clipboard?.writeText;
+        if (typeof asyncWrite === "function") {
+            void asyncWrite
+                .call(globalThis.navigator.clipboard, text)
+                .catch(() => {
+                    this.copyTextLegacy(text);
+                });
+            return;
+        }
+        this.copyTextLegacy(text);
+    }
+
+    private copyTextLegacy(text: string): void {
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "absolute";
+            ta.style.left = "-9999px";
+            document.body.append(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+        } catch {
+            // Last-resort: quota exceeded, removed API. Give up quietly.
+        }
+    }
+
+    private openExternalUrl(url: string): void {
+        try {
+            globalThis.window?.open(url, "_blank", "noopener,noreferrer");
+        } catch {
+            // window.open can be blocked (popup blocker, sandbox iframe).
+            // Nothing safer to do from a click handler.
+        }
     }
 
     private startEdit(message: Message): void {
@@ -968,12 +1129,16 @@ export class ZulipChatElement extends HTMLElement {
 
         try {
             if (editingId !== undefined) {
-                await this.client.editMessage({messageId: editingId, content});
+                await this.client.editMessage({
+                    messageId: editingId,
+                    kind: "content",
+                    content,
+                });
             } else {
                 await this.client.sendMessage({
                     type: "channel",
                     channel: scope.channel,
-                    topic: scope.topic,
+                    topic: scope.topic ?? "",
                     content,
                 });
             }

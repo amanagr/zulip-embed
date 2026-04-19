@@ -64,7 +64,7 @@ describe("SnapshotTransport", () => {
         });
         await transport.connect(() => {});
         await expect(
-            transport.sendMessage({type: "channel", channel: "announce", content: "hi"}),
+            transport.sendMessage({type: "channel", channel: "announce", topic: "", content: "hi"}),
         ).rejects.toThrow(/read-only/);
         await expect(transport.addReaction({messageId: 1, emoji: "tada"})).rejects.toThrow(
             /read-only/,

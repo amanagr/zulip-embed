@@ -3,7 +3,7 @@ import {registerZulipChatElement} from "./component.ts";
 import {registerZulipTopicListElement} from "./topic-list.ts";
 
 export {ZulipClient} from "./client.ts";
-export type {ZulipClientOptions} from "./client.ts";
+export type {ClientState, ZulipClientOptions} from "./client.ts";
 export {DemoTransport} from "./demo-transport.ts";
 export type {DemoTransportOptions} from "./demo-transport.ts";
 export {SnapshotTransport} from "./snapshot-transport.ts";
@@ -15,18 +15,36 @@ export {ZulipChannelListElement, registerZulipChannelListElement} from "./channe
 export {ZulipTopicListElement, registerZulipTopicListElement} from "./topic-list.ts";
 export type {
     Channel,
+    ChannelMessage,
+    ConnectionEvent,
     ConnectionStatus,
+    DirectMessage,
+    ErrorCode,
+    ErrorEvent,
     Message,
     MessageType,
     Reaction,
+    ReactionEvent,
     ScopeFilter,
     SendMessageParams,
     Topic,
+    TypingEvent,
+    TypingUser,
     User,
+    ZulipConnectionChangeEventDetail,
+    ZulipErrorEventDetail,
     ZulipEvent,
     ZulipEventListener,
+    ZulipMessageEventDetail,
 } from "./types.ts";
-export type {Transport} from "./transport.ts";
+export type {
+    EditMessageParams,
+    GetMessagesOptions,
+    GetMessagesResult,
+    ReactionParams,
+    Transport,
+    TypingOp,
+} from "./transport.ts";
 
 registerZulipChatElement();
 registerZulipChannelListElement();

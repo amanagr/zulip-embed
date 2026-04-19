@@ -183,7 +183,7 @@ describe("<zulip-topic-list>", () => {
         for (let i = 0; i < 3; i++) await flush();
 
         const err = el.shadowRoot?.querySelector(".error");
-        expect(err?.textContent ?? "").toContain('requires "server"');
+        expect(err?.textContent ?? "").toContain('requires a "server"');
     });
 
     test("refresh() re-fetches topics", async () => {

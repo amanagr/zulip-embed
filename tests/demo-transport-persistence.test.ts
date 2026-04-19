@@ -103,6 +103,7 @@ describe("DemoTransport — persistence & scope", () => {
         await transport.sendMessage({
             type: "channel",
             channel: "other-channel",
+            topic: "",
             content: "stray",
         });
         const page = await transport.getMessages({channel: "general", topic: "hello"});
@@ -121,7 +122,7 @@ describe("DemoTransport — persistence & scope", () => {
         });
         await transport.connect(() => {});
         await expect(
-            transport.editMessage({messageId: 1, content: "nope"}),
+            transport.editMessage({messageId: 1, kind: "content", content: "nope"}),
         ).rejects.toThrow(/read-only/i);
         await expect(transport.deleteMessage(1)).rejects.toThrow(/read-only/i);
         await transport.close();
@@ -139,7 +140,7 @@ describe("DemoTransport — persistence & scope", () => {
         const otherSender = messages.find((m) => m.senderEmail !== "you@demo.example");
         if (!otherSender) throw new Error("expected a non-guest seed");
         await expect(
-            transport.editMessage({messageId: otherSender.id, content: "tamper"}),
+            transport.editMessage({messageId: otherSender.id, kind: "content", content: "tamper"}),
         ).rejects.toThrow(/own messages/i);
         await transport.close();
     });
@@ -181,7 +182,7 @@ describe("DemoTransport — persistence & scope", () => {
         await transport.connect(() => {});
         await transport.close();
         await expect(
-            transport.sendMessage({type: "channel", channel: "general", content: "x"}),
+            transport.sendMessage({type: "channel", channel: "general", topic: "", content: "x"}),
         ).rejects.toThrow(/closed/i);
     });
 });

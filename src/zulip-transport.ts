@@ -10,21 +10,33 @@ import type {
 } from "./transport.ts";
 import type {
     Channel,
+    ErrorCode,
     Message,
     Reaction,
     ScopeFilter,
     SendMessageParams,
     Topic,
     TypingUser,
+    User,
     ZulipEventListener,
 } from "./types.ts";
 
 export interface ZulipTransportOptions {
     serverUrl: string;
-    email: string;
-    apiKey: string;
     scope: ScopeFilter;
     historyLimit?: number;
+    // Two credential paths are supported. Exactly one must be provided:
+    //  - {email, apiKey}: legacy direct-auth. Requires a Zulip API key in
+    //    the host page — fine for local development but a disclosure risk
+    //    in production because any script on the page can read the DOM.
+    //  - {authToken}: short-lived JWT minted by the embedder's own
+    //    backend (HS256 signed with the shared secret provisioned in the
+    //    Zulip org). We exchange it via POST /api/internal/jwt/fetch_api_key
+    //    for an api_key + email that we then use transparently. No
+    //    long-lived credentials touch the page.
+    email?: string;
+    apiKey?: string;
+    authToken?: string;
 }
 
 const messageSchema = z.object({
@@ -149,7 +161,11 @@ const topicsResponseSchema = z.object({
 
 export class ZulipTransport implements Transport {
     private readonly serverUrl: string;
-    private readonly authHeader: string;
+    // Filled lazily: if the caller supplied an authToken, we don't know
+    // the email/api-key until the JWT exchange returns. Every request()
+    // awaits ensureAuthHeader(), which resolves as soon as auth is ready.
+    private authHeader: string | undefined;
+    private readonly authTokenExchange: Promise<void>;
     private readonly scope: ScopeFilter;
     private readonly historyLimit: number;
     private queueId: string | undefined;
@@ -158,6 +174,13 @@ export class ZulipTransport implements Transport {
     private pollController: AbortController | undefined;
     private closed = false;
     private currentUserId: number | undefined;
+    private currentUser: User | undefined;
+    // Deferred so ZulipClient.whenReady can `await` the full user record
+    // even when the caller beats the /users/me round-trip. Settled by
+    // loadCurrentUser() on success or by connect()/close() on failure.
+    private readonly currentUserPromise: Promise<User>;
+    private resolveCurrentUser!: (user: User) => void;
+    private rejectCurrentUser!: (reason: unknown) => void;
     // Per-message reaction state. Zulip's reaction events are per-user
     // add/remove, but UI subscribers want the full bucketed list. We keep a
     // map here so we can emit that list on every op.
@@ -175,13 +198,49 @@ export class ZulipTransport implements Transport {
 
     constructor(options: ZulipTransportOptions) {
         this.serverUrl = validateServerUrl(options.serverUrl);
-        // btoa can't encode non-ASCII (email/apiKey with extended chars
-        // throw InvalidCharacterError). Encode to UTF-8 first so we match
-        // RFC 7617 and surface a clean error instead of a cryptic one.
-        this.authHeader = "Basic " + base64EncodeUtf8(`${options.email}:${options.apiKey}`);
         this.scope = options.scope;
         this.historyLimit = options.historyLimit ?? 50;
         this.lastEventId = -1;
+        this.currentUserPromise = new Promise<User>((resolve, reject) => {
+            this.resolveCurrentUser = resolve;
+            this.rejectCurrentUser = reject;
+        });
+        this.currentUserPromise.catch(() => {
+            /* prevent unhandled-rejection warnings; real rejection still
+               propagates to callers that await whenReady */
+        });
+
+        const hasDirect = options.email !== undefined && options.apiKey !== undefined;
+        const hasToken = options.authToken !== undefined && options.authToken !== "";
+        if (!hasDirect && !hasToken) {
+            throw new Error(
+                "ZulipTransport requires either {email, apiKey} or {authToken}",
+            );
+        }
+        if (hasDirect && hasToken) {
+            throw new Error(
+                "ZulipTransport: pass either {email, apiKey} or {authToken}, not both",
+            );
+        }
+
+        if (hasDirect) {
+            // btoa can't encode non-ASCII (email/apiKey with extended chars
+            // throw InvalidCharacterError). Encode to UTF-8 first so we match
+            // RFC 7617 and surface a clean error instead of a cryptic one.
+            this.authHeader =
+                "Basic " +
+                base64EncodeUtf8(`${options.email ?? ""}:${options.apiKey ?? ""}`);
+            this.authTokenExchange = Promise.resolve();
+        } else {
+            this.authTokenExchange = this.exchangeAuthToken(options.authToken!);
+            // Prevent an unhandled-rejection warning when the exchange
+            // fails before the first request() awaits it. The rejection
+            // still propagates through every subsequent `await
+            // this.authTokenExchange`.
+            this.authTokenExchange.catch(() => {
+                /* suppressed — see comment above */
+            });
+        }
     }
 
     async connect(onEvent: ZulipEventListener): Promise<void> {
@@ -196,8 +255,18 @@ export class ZulipTransport implements Transport {
             onEvent({type: "connection", status: "connected"});
             void this.pollLoop();
         } catch (error) {
+            const classified =
+                error instanceof ClassifiedError
+                    ? error
+                    : classifyThrownError(error);
             onEvent({type: "connection", status: "error"});
-            onEvent({type: "error", error: describeError(error)});
+            onEvent({
+                type: "error",
+                code: classified.code,
+                error: classified.message,
+                retryAfterMs: classified.retryAfterMs,
+            });
+            if (this.currentUser === undefined) this.rejectCurrentUser(error);
             throw error;
         }
     }
@@ -211,6 +280,11 @@ export class ZulipTransport implements Transport {
             } catch {
                 // Best-effort: Zulip will GC abandoned queues anyway.
             }
+        }
+        if (this.currentUser === undefined) {
+            this.rejectCurrentUser(
+                new Error("Transport closed before user identity was resolved"),
+            );
         }
         this.onEvent?.({type: "connection", status: "disconnected"});
         this.onEvent = undefined;
@@ -268,14 +342,13 @@ export class ZulipTransport implements Transport {
     }
 
     async editMessage(params: EditMessageParams): Promise<void> {
-        if (params.content === undefined && params.topic === undefined) {
-            // Nothing to change. Avoid sending an empty PATCH that the
-            // server would reject with BAD_REQUEST.
-            return;
-        }
         const body: Record<string, string> = {};
-        if (params.content !== undefined) body["content"] = params.content;
-        if (params.topic !== undefined) body["topic"] = params.topic;
+        const newContent =
+            params.kind === "content" || params.kind === "both" ? params.content : undefined;
+        const newTopic =
+            params.kind === "topic" || params.kind === "both" ? params.topic : undefined;
+        if (newContent !== undefined) body["content"] = newContent;
+        if (newTopic !== undefined) body["topic"] = newTopic;
         await this.request(
             "PATCH",
             `/api/v1/messages/${String(params.messageId)}`,
@@ -294,9 +367,9 @@ export class ZulipTransport implements Transport {
             // server will re-render and broadcast the HTML via the event
             // queue. Flag as non-HTML so the sanitizer isn't invoked on
             // user-typed markdown in the interim.
-            content: params.content,
-            contentIsHtml: params.content === undefined ? undefined : false,
-            topic: params.topic,
+            content: newContent,
+            contentIsHtml: newContent === undefined ? undefined : false,
+            topic: newTopic,
         });
     }
 
@@ -317,11 +390,11 @@ export class ZulipTransport implements Transport {
             // "stream" here means the embed works against old and new Zulip
             // without version sniffing.
             body["type"] = "stream";
-            body["to"] = params.channel ?? this.scope.channel;
-            body["topic"] = params.topic ?? this.scope.topic ?? "";
+            body["to"] = params.channel;
+            body["topic"] = params.topic;
         } else {
             body["type"] = "direct";
-            body["to"] = JSON.stringify(params.recipients ?? []);
+            body["to"] = JSON.stringify(params.recipients);
         }
         const response = await this.request("POST", "/api/v1/messages", body);
         sendMessageResponseSchema.parse(response);
@@ -400,6 +473,10 @@ export class ZulipTransport implements Transport {
 
     getCurrentUserId(): number | undefined {
         return this.currentUserId;
+    }
+
+    getCurrentUser(): Promise<User> {
+        return this.currentUserPromise;
     }
 
     private async resolveChannelId(channel: string): Promise<number | undefined> {
@@ -547,13 +624,73 @@ export class ZulipTransport implements Transport {
         }));
     }
 
+    private async exchangeAuthToken(token: string): Promise<void> {
+        // POST {token} to /api/internal/jwt/fetch_api_key. Returns
+        // {api_key, email, user_id} on success; we only need api_key + email
+        // here since /users/me will fetch the rest during connect(). No
+        // auth header on this request — the JWT is the credential.
+        const url = new URL(this.serverUrl + "/api/internal/jwt/fetch_api_key");
+        const body = new URLSearchParams({token}).toString();
+        let response: Response;
+        try {
+            response = await fetch(url.toString(), {
+                method: "POST",
+                headers: {"Content-Type": "application/x-www-form-urlencoded"},
+                body,
+            });
+        } catch (error) {
+            throw classifyThrownError(error);
+        }
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new ClassifiedError(
+                    "JWT login is not configured on this Zulip server. Ask the admin to enable JWT_AUTH_KEYS.",
+                    "jwt-not-configured",
+                );
+            }
+            throw await classifyHttpError(response, "/api/internal/jwt/fetch_api_key");
+        }
+        const payload = (await response.json()) as {
+            api_key?: unknown;
+            email?: unknown;
+        };
+        if (typeof payload.api_key !== "string" || typeof payload.email !== "string") {
+            throw new ClassifiedError(
+                "JWT exchange response missing api_key or email",
+                "unauthorized",
+            );
+        }
+        this.authHeader =
+            "Basic " + base64EncodeUtf8(`${payload.email}:${payload.api_key}`);
+    }
+
     private async loadCurrentUser(): Promise<void> {
         const response = await this.request("GET", "/api/v1/users/me");
-        const me = z.object({user_id: z.number()}).parse(response);
+        const me = z
+            .object({
+                user_id: z.number(),
+                email: z.string().optional(),
+                full_name: z.string().optional(),
+                avatar_url: z.string().nullable().optional(),
+            })
+            .parse(response);
         this.currentUserId = me.user_id;
+        const user: User = {
+            userId: me.user_id,
+            email: me.email ?? "",
+            fullName: me.full_name ?? "",
+            avatarUrl: me.avatar_url ?? "",
+        };
+        this.currentUser = user;
+        this.resolveCurrentUser(user);
     }
 
     private async pollLoop(): Promise<void> {
+        // Exponential backoff with decorrelated jitter, capped at 30s. After
+        // any successful poll we reset the attempt counter so a healthy
+        // queue stays in the "connected" state and the next failure starts
+        // from a short delay.
+        let attempt = 0;
         while (!this.closed && this.queueId !== undefined) {
             this.pollController = new AbortController();
             try {
@@ -566,6 +703,12 @@ export class ZulipTransport implements Transport {
                     },
                     this.pollController.signal,
                 );
+                if (attempt > 0) {
+                    // We were in the reconnecting state; tell subscribers
+                    // the queue is healthy again so the UI banner clears.
+                    this.onEvent?.({type: "connection", status: "connected"});
+                    attempt = 0;
+                }
                 const parsed = eventsResponseSchema.parse(response);
                 for (const event of parsed.events) {
                     this.lastEventId = Math.max(this.lastEventId, event.id);
@@ -574,8 +717,26 @@ export class ZulipTransport implements Transport {
             } catch (error) {
                 if (this.closed) return;
                 if ((error as {name?: string}).name === "AbortError") return;
-                this.onEvent?.({type: "error", error: describeError(error)});
-                await wait(2000);
+                const classified =
+                    error instanceof ClassifiedError
+                        ? error
+                        : classifyThrownError(error);
+                attempt += 1;
+                const delayMs = classified.retryAfterMs ?? computeBackoffMs(attempt);
+                this.onEvent?.({
+                    type: "error",
+                    code: classified.code,
+                    error: classified.message,
+                    retryAfterMs: classified.retryAfterMs,
+                });
+                this.onEvent?.({
+                    type: "connection",
+                    status: "reconnecting",
+                    attempt,
+                    delayMs,
+                    reason: classified.message,
+                });
+                await wait(delayMs);
             }
         }
     }
@@ -586,6 +747,16 @@ export class ZulipTransport implements Transport {
         params: Record<string, string> | undefined = undefined,
         signal?: AbortSignal,
     ): Promise<unknown> {
+        // Block on JWT exchange the first time (resolves immediately on the
+        // direct-auth path). Subsequent awaits are no-ops against the
+        // settled promise.
+        await this.authTokenExchange;
+        if (this.authHeader === undefined) {
+            throw new ClassifiedError(
+                "Authorization header unavailable",
+                "unauthorized",
+            );
+        }
         const url = new URL(this.serverUrl + path);
         const headers: Record<string, string> = {Authorization: this.authHeader};
         let body: string | undefined;
@@ -603,9 +774,17 @@ export class ZulipTransport implements Transport {
         if (body !== undefined) init.body = body;
         if (signal) init.signal = signal;
 
-        const response = await fetch(url.toString(), init);
+        let response: Response;
+        try {
+            response = await fetch(url.toString(), init);
+        } catch (error) {
+            // AbortError is a legitimate close, not a network failure —
+            // preserve the AbortError shape so pollLoop's check still works.
+            if ((error as {name?: string}).name === "AbortError") throw error;
+            throw classifyThrownError(error);
+        }
         if (!response.ok) {
-            throw new Error(await describeHttpError(response, path));
+            throw await classifyHttpError(response, path);
         }
         return response.json();
     }
@@ -656,20 +835,83 @@ function base64EncodeUtf8(input: string): string {
     return btoa(binary);
 }
 
-async function describeHttpError(response: Response, path: string): Promise<string> {
+// Thrown by `request()` after a failed fetch so call sites (including
+// the poll loop) can surface a typed ErrorCode on the event bus without
+// re-parsing the response. Plain `Error` would lose the classification.
+class ClassifiedError extends Error {
+    readonly code: ErrorCode;
+    readonly retryAfterMs: number | undefined;
+    constructor(
+        message: string,
+        code: ErrorCode,
+        retryAfterMs: number | undefined = undefined,
+    ) {
+        super(message);
+        this.code = code;
+        this.retryAfterMs = retryAfterMs;
+    }
+}
+
+async function classifyHttpError(
+    response: Response,
+    path: string,
+): Promise<ClassifiedError> {
     // Zulip returns JSON like {"result": "error", "msg": "Invalid narrow operator: foo", "code": "BAD_REQUEST"}.
     // Surface that msg directly so the chat banner is actionable.
     const status = String(response.status);
+    let serverMsg: string | undefined;
+    let serverCode: string | undefined;
     try {
         const body = (await response.json()) as {msg?: unknown; code?: unknown};
-        const msg = typeof body.msg === "string" ? body.msg : undefined;
-        if (msg !== undefined && msg !== "") {
-            return `HTTP ${status} from ${path}: ${msg}`;
-        }
+        if (typeof body.msg === "string" && body.msg !== "") serverMsg = body.msg;
+        if (typeof body.code === "string") serverCode = body.code;
     } catch {
         // Response wasn't JSON; fall through to the bare status line.
     }
-    return `HTTP ${status} from ${path}`;
+    const message =
+        serverMsg === undefined
+            ? `HTTP ${status} from ${path}`
+            : `HTTP ${status} from ${path}: ${serverMsg}`;
+
+    let code: ErrorCode = "unknown";
+    let retryAfterMs: number | undefined;
+    if (response.status === 401) {
+        code = "unauthorized";
+    } else if (response.status === 403) {
+        // Zulip surfaces "Not subscribed to channel …" as a 400/403 with a
+        // matching `code`. Prefer the machine code when the server gives
+        // us one, otherwise pattern-match the message.
+        if (
+            serverCode === "STREAM_DOES_NOT_EXIST" ||
+            serverCode === "NOT_SUBSCRIBED" ||
+            (serverMsg !== undefined && /not subscribed/i.test(serverMsg))
+        ) {
+            code = "channel-not-subscribed";
+        } else {
+            code = "unauthorized";
+        }
+    } else if (response.status === 429) {
+        code = "rate-limited";
+        const retryHeader = response.headers.get("Retry-After");
+        if (retryHeader !== null) {
+            const seconds = Number(retryHeader);
+            if (Number.isFinite(seconds) && seconds >= 0) {
+                retryAfterMs = Math.round(seconds * 1000);
+            }
+        }
+    }
+    return new ClassifiedError(message, code, retryAfterMs);
+}
+
+function classifyThrownError(error: unknown): ClassifiedError {
+    if (error instanceof ClassifiedError) return error;
+    // fetch() rejects with TypeError on DNS failure, CORS preflight
+    // rejection, or a dropped TCP connection — classify as network so UI
+    // can show a "check your connection" hint rather than a generic banner.
+    if (error instanceof TypeError) {
+        return new ClassifiedError(describeError(error), "network");
+    }
+    return new ClassifiedError(describeError(error), "unknown");
 }
 
 function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
@@ -685,15 +927,17 @@ function buildNarrow(scope: ScopeFilter): Array<[string, string]> {
     return narrow;
 }
 
+const directRecipientSchema = z.object({
+    id: z.number(),
+    email: z.string().optional(),
+    full_name: z.string().optional(),
+});
+
 function convertMessage(api: ApiMessage): Message {
     // Normalize Zulip's wire-level "stream"/"private" to the current
     // "channel"/"direct" terminology. Callers of this SDK should never have
     // to know that the server speaks the older dialect.
     const isChannelMessage = api.type === "stream" || api.type === "channel";
-    const channelName =
-        isChannelMessage && typeof api.display_recipient === "string"
-            ? api.display_recipient
-            : undefined;
     const reactionsByEmoji = new Map<string, {emoji: string; userIds: Set<number>}>();
     for (const r of api.reactions) {
         let bucket = reactionsByEmoji.get(r.emoji_name);
@@ -703,8 +947,12 @@ function convertMessage(api: ApiMessage): Message {
         }
         bucket.userIds.add(r.user_id);
     }
-
-    return {
+    const reactions = [...reactionsByEmoji.values()].map((bucket) => ({
+        emoji: bucket.emoji,
+        count: bucket.userIds.size,
+        userIds: [...bucket.userIds],
+    }));
+    const base = {
         id: api.id,
         senderId: api.sender_id,
         senderFullName: api.sender_full_name,
@@ -713,14 +961,39 @@ function convertMessage(api: ApiMessage): Message {
         timestamp: api.timestamp * 1000,
         content: api.content,
         contentIsHtml: true,
-        type: isChannelMessage ? "channel" : "direct",
-        channelName,
-        topic: api.subject,
-        reactions: [...reactionsByEmoji.values()].map((bucket) => ({
-            emoji: bucket.emoji,
-            count: bucket.userIds.size,
-            userIds: [...bucket.userIds],
-        })),
+        reactions,
+    };
+    if (isChannelMessage) {
+        // Zulip's channel messages always include a string display_recipient
+        // and a subject; the fallback to "" is defensive — a malformed
+        // server response shouldn't crash the renderer, it just produces
+        // an orphan-looking message.
+        const channelName =
+            typeof api.display_recipient === "string" ? api.display_recipient : "";
+        return {
+            ...base,
+            type: "channel",
+            channelName,
+            topic: api.subject ?? "",
+        };
+    }
+    const recipients: User[] = [];
+    if (Array.isArray(api.display_recipient)) {
+        for (const entry of api.display_recipient) {
+            const parsed = directRecipientSchema.safeParse(entry);
+            if (!parsed.success) continue;
+            recipients.push({
+                userId: parsed.data.id,
+                email: parsed.data.email ?? "",
+                fullName: parsed.data.full_name ?? "",
+                avatarUrl: "",
+            });
+        }
+    }
+    return {
+        ...base,
+        type: "direct",
+        recipients,
     };
 }
 
@@ -731,4 +1004,14 @@ function describeError(error: unknown): string {
 
 function wait(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Decorrelated-jitter backoff. 1s base, exponential to 30s cap, with
+// uniform jitter in [0, delay) so many simultaneously-reconnecting clients
+// don't hammer the server in lockstep.
+const BACKOFF_BASE_MS = 1000;
+const BACKOFF_CAP_MS = 30_000;
+function computeBackoffMs(attempt: number): number {
+    const exp = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
+    return Math.floor(Math.random() * exp) + BACKOFF_BASE_MS;
 }

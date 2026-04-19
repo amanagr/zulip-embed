@@ -107,6 +107,7 @@ describe("public API surface", () => {
             () =>
                 new ZulipClient({
                     transport: stub as unknown as ConstructorParameters<typeof ZulipClient>[0]["transport"],
+                    scope: {channel: "general"},
                 }),
         ).not.toThrow();
     });

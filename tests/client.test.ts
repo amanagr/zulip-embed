@@ -14,6 +14,7 @@ import type {
     ScopeFilter,
     SendMessageParams,
     Topic,
+    User,
     ZulipEvent,
     ZulipEventListener,
 } from "../src/types.ts";
@@ -86,12 +87,21 @@ class FakeTransport implements Transport {
     getCurrentUserId(): number | undefined {
         return this.currentUserId;
     }
+
+    getCurrentUser(): Promise<User> {
+        return Promise.resolve({
+            userId: this.currentUserId ?? 0,
+            email: "fake@example.com",
+            fullName: "Fake",
+            avatarUrl: "",
+        });
+    }
 }
 
 describe("ZulipClient", () => {
     test("subscribe receives events emitted by the transport", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         const received: ZulipEvent[] = [];
@@ -123,7 +133,7 @@ describe("ZulipClient", () => {
 
     test("unsubscribe stops further delivery but leaves other listeners intact", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         const a: ZulipEvent[] = [];
@@ -149,7 +159,7 @@ describe("ZulipClient", () => {
         // behavior so any intentional change (wrap in try/catch) shows
         // up as a failure that forces an owner review.
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         const calls: string[] = [];
@@ -177,12 +187,17 @@ describe("ZulipClient", () => {
 
     test("delegates getMessages/sendMessage/editMessage/deleteMessage to transport", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         await client.getMessages({channel: "general"}, {limit: 10});
-        await client.sendMessage({type: "channel", channel: "general", content: "hi"});
-        await client.editMessage({messageId: 1, content: "edit"});
+        await client.sendMessage({
+            type: "channel",
+            channel: "general",
+            topic: "t",
+            content: "hi",
+        });
+        await client.editMessage({messageId: 1, kind: "content", content: "edit"});
         await client.deleteMessage(7);
 
         const methods = transport.calls.map((c) => c.method);
@@ -194,7 +209,7 @@ describe("ZulipClient", () => {
 
     test("delegates add/removeReaction and sendTyping to transport", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         await client.addReaction({messageId: 1, emoji: "tada"});
@@ -210,13 +225,13 @@ describe("ZulipClient", () => {
     test("getCurrentUserId passes through from transport", () => {
         const transport = new FakeTransport();
         transport.currentUserId = 1234;
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         expect(client.getCurrentUserId()).toBe(1234);
     });
 
     test("disconnect calls transport.close", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
         await client.disconnect();
         expect(transport.closed).toBe(true);
@@ -224,7 +239,7 @@ describe("ZulipClient", () => {
 
     test("reconnect re-registers listener and existing subscribers keep receiving", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         const received: ZulipEvent[] = [];
         client.subscribe((e) => received.push(e));
 
@@ -243,7 +258,7 @@ describe("ZulipClient", () => {
 
     test("subscribe callbacks do not fire after disconnect if transport emits nothing", async () => {
         const transport = new FakeTransport();
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         const received: ZulipEvent[] = [];
@@ -257,7 +272,7 @@ describe("ZulipClient", () => {
     test("vi.fn spy confirms exact argument shape on delegated call", async () => {
         const transport = new FakeTransport();
         const spy = vi.spyOn(transport, "sendMessage");
-        const client = new ZulipClient({transport});
+        const client = new ZulipClient({transport, scope: {channel: "general"}});
         await client.connect();
 
         const params: SendMessageParams = {

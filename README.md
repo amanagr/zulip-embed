@@ -409,11 +409,58 @@ dart test
 7. ✅ React wrapper package (`@zulip/react`)
 8. ✅ React Native package (`@zulip/react-native`)
 9. ✅ Branded header (`brand-name`, `brand-logo`) + theming playground
-10. ⏳ Composer file / image upload (multipart to `/user_uploads`)
-11. ⏳ Direct messages, presence, search, inbox/recent views
-12. ⏳ JWT SSO handoff (replace HTML-attribute `api-key`)
-13. ⏳ SwiftUI + Compose native SDKs
-14. ⏳ Publish to npm + pub.dev; dedicated developer-docs site
+10. ✅ Compose toolbar (B/I/strike/code/link/quote/lists/spoiler/mention/emoji) + keyboard shortcuts
+11. ✅ Categorized, searchable emoji picker with recents
+12. ✅ Customizable message-action menu (add-reaction, edit, delete, open-in-zulip, copy-link, copy-text)
+13. ⏳ Direct messages — 1:1 and group DM conversations + sending; `/api/v1/messages` with `type=direct`
+14. ⏳ Composer file / image upload — paste, drag-and-drop, and paperclip button; multipart to `/api/v1/user_uploads`
+15. ⏳ `@user` / `#channel` / `:emoji:` autocomplete in the composer — so mentions, channel refs, and emoji shortcodes can be typed inline
+16. ⏳ Presence indicators — online / idle / offline dot on avatars; `/api/v1/users/me/presence` + presence events
+17. ⏳ Message search — keyword + filter bar backed by the `narrow` operators on `/api/v1/messages`
+18. ⏳ Starred (bookmarked) messages — toggle via `/api/v1/messages/flags` and a "Starred" view
+19. ⏳ Unread tracking + unread counts — per-channel and per-topic badges driven by the existing event queue
+20. ⏳ Mark-as-read / mark-as-unread controls — `/api/v1/messages/flags`, including "mark all read" on a topic
+21. ⏳ Resolve / unresolve topic — participant-facing toggle in the topic header; `/api/v1/messages/{id}` with `topic="✔ …"`
+22. ⏳ Rename / move topic — drag-and-drop-free UI for participants with permission; `/api/v1/messages/{id}`
+23. ⏳ Quote-reply and forward — pre-fill composer with a permalink-quoted block
+24. ⏳ Click-to-open image/video lightbox with zoom, download, and prev/next across the current view
+25. ⏳ User card popover on avatar/name click — name, status, availability, "Send DM", "View messages sent"
+26. ⏳ Inbox view (`<zulip-inbox>`) — unreads grouped by channel > topic
+27. ⏳ Recent conversations view (`<zulip-recent>`) — most-recent topics + DMs with unread/participated filters
+28. ⏳ Edit history viewer — show the "(edited)" trail for a message via `/api/v1/messages/{id}/history`
+29. ⏳ Draft persistence — autosave the composer to local storage per scope and restore on reopen
+30. ⏳ JWT SSO handoff — server-side token exchange so adopters don't embed an `api-key` attribute
+31. ⏳ SwiftUI + Compose native SDKs
+32. ⏳ Publish to npm + pub.dev; dedicated developer-docs site
+
+**v1.x follow-ups**
+
+1. ⏳ Scheduled messages — send later via `/api/v1/scheduled_messages`, plus a "Scheduled" view to edit/cancel
+2. ⏳ Message reminders — "remind me about this" via `/api/v1/reminders`, delivered as a DM from Notification Bot
+3. ⏳ Saved snippets — insert reusable message templates via `/api/v1/saved_snippets`
+4. ⏳ Read receipts — "who has read this" popover via `/api/v1/messages/{id}/read_receipts`, honoring the viewer's privacy setting
+5. ⏳ Mute / unmute a topic, channel, or user — personal visibility filters, including the "click to reveal" interstitial for muted senders
+6. ⏳ Follow / unfollow a topic with follow-specific notification preferences
+7. ⏳ User status and availability — read/write via `/api/v1/users/me/status`, rendered next to names
+8. ⏳ Channel subscribe / unsubscribe from inside the widget (`/api/v1/users/me/subscriptions`)
+9. ⏳ Pin / unpin a channel — personal left-sidebar ordering
+10. ⏳ Channel and topic permalink rendering polish — `#channel > topic @ message` pills linking back into the widget's own scope
+11. ⏳ Wildcard and group mentions (`@all`, `@topic`, user groups) with the same autocomplete as personal mentions
+12. ⏳ Scroll-to-date and jump-to-message affordances in longer feeds
+13. ⏳ Collapse / expand long messages with a "Show more" fold
+14. ⏳ View-original (Markdown source) and copy-as-Markdown message actions
+
+**Future iterations**
+
+1. ⏳ Polls — render `/poll` widget messages and let participants add and vote on options (`submessage` events)
+2. ⏳ Collaborative to-do lists — render `/todo` widget messages and let participants check off tasks
+3. ⏳ GIF picker — integrated Tenor/GIPHY/KLIPY search using the server's configured provider
+4. ⏳ Video/voice call link insertion — call-provider-aware button (Jitsi, Zoom, BBB, etc.) via `create-*-video-call` endpoints
+5. ⏳ Alert words — highlight configurable per-user keywords in incoming messages
+6. ⏳ Report-a-message moderation requests — surface the moderation flow when the org has it enabled
+7. ⏳ Uploaded-files manager — browse, download, and delete files the viewer has uploaded
+8. ⏳ Navigation views / `is:starred`, `is:mentioned`, `is:followed` saved filters in the search UI
+9. ⏳ Full offline / background-sync mode for mobile wrappers
 
 See [`SECURITY.md`](./SECURITY.md) for the threat model and
 [`CLAUDE.md`](./CLAUDE.md) for code conventions (including why this

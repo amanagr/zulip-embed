@@ -163,7 +163,12 @@ describe("ZulipTransport — mutations", () => {
             },
         ]);
 
-        await transport.editMessage({messageId: 42, content: "new", topic: "renamed"});
+        await transport.editMessage({
+            messageId: 42,
+            kind: "both",
+            content: "new",
+            topic: "renamed",
+        });
 
         const patchCall = calls.find(
             ([url, init]) =>
@@ -173,19 +178,6 @@ describe("ZulipTransport — mutations", () => {
         const body = new URLSearchParams(patchCall![1]!.body as string);
         expect(body.get("content")).toBe("new");
         expect(body.get("topic")).toBe("renamed");
-        await transport.close();
-    });
-
-    test("editMessage with neither content nor topic skips the network call", async () => {
-        // The server would reject an empty PATCH as BAD_REQUEST; the
-        // transport short-circuits before making the fetch. Regression
-        // guard: if the guard is ever removed the embed will burn one
-        // 400 per debounced edit cancellation.
-        const {transport, calls} = await makeConnectedTransport([]);
-        const callsBefore = calls.length;
-        await transport.editMessage({messageId: 1});
-        const newCalls = calls.slice(callsBefore);
-        expect(newCalls.find(([url]) => /\/api\/v1\/messages\/1/.test(url))).toBeUndefined();
         await transport.close();
     });
 
