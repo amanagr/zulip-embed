@@ -122,38 +122,27 @@ export function createAgentReplyHandle(deps: AgentReplyDeps): AgentReplyHandle {
     let resolvedMessageId: number | undefined;
     const {provisionalContent} = initialPartsState(options);
 
-    // Agent replies are channel-only for now — streamed edits only make
-    // sense against a stable message-id surface, and DM narrowing adds
-    // complications (ordering, membership) that aren't worth the
-    // surface area. Reject DM scopes up front so the caller sees a
-    // clean error rather than a downstream send-time failure.
+    // Resolve the provisional send params off the scope. Channel scopes
+    // route to `type: "channel"` on the wire; DM scopes route to
+    // `type: "direct"` with the recipient id list (stringified, matching
+    // the `SendMessageParams` discriminated union from 0.2). DM
+    // streaming edits are identical to the channel path — the
+    // server-assigned id is stable across narrow changes, so the same
+    // debounced `editMessage` loop works without DM-specific branching.
     const normalized = normalizeScope(scope);
-    if (normalized.kind !== "channel") {
-        const reason = "startAgentReply does not support DM scopes yet";
-        const handle: AgentReplyHandle = {
-            messageId: Promise.reject(new Error(reason)),
-            appendToken: () => {},
-            appendEvent: () => {},
-            finish: () => Promise.reject(new Error(reason)),
-            abort: () => Promise.resolve(),
-        };
-        handle.messageId.catch(() => {});
-        return handle;
-    }
-    const narrowChannel = normalized.channel;
-    const narrowTopic = normalized.topic;
     const sendParams: SendMessageParams =
-        narrowTopic !== undefined
+        normalized.kind === "channel"
             ? {
                   type: "channel",
-                  channel: narrowChannel,
-                  topic: narrowTopic,
+                  channel: normalized.channel,
+                  topic: normalized.topic ?? "",
                   content: provisionalContent,
               }
             : {
-                  type: "channel",
-                  channel: narrowChannel,
-                  topic: "",
+                  type: "direct",
+                  recipients: dmRecipients(normalized.userIds, () =>
+                      transport.getCurrentUserId?.(),
+                  ).map(String),
                   content: provisionalContent,
               };
 
@@ -339,6 +328,23 @@ function initialPartsState(_options: StartAgentReplyOptions): {provisionalConten
     return {provisionalContent: "\u200b"};
 }
 
+// Drops the viewer from a DM participant list so the Zulip /messages
+// endpoint doesn't reject the send with "you can't DM yourself". If the
+// viewer isn't resolved yet (transport still completing /users/me) or
+// the viewer is genuinely the only participant (self-DM), we hand the
+// raw list through untouched and let the server arbitrate. Mirrors
+// `ZulipClient.sendMessage`'s DM routing so the two code paths stay in
+// lock-step when either gains smarter recipient handling later.
+function dmRecipients(
+    userIds: readonly number[],
+    getCurrentUserId: (() => number | undefined) | undefined,
+): number[] {
+    const viewerId = getCurrentUserId?.();
+    if (viewerId === undefined) return [...userIds];
+    const filtered = userIds.filter((id) => id !== viewerId);
+    return filtered.length === 0 ? [...userIds] : filtered;
+}
+
 function flatten(parts: readonly MessagePart[]): string {
     // Only text parts contribute to the wire content; structured parts
     // are a local-render concern (#6 will introduce wire serialization).
@@ -362,43 +368,72 @@ async function emitInitialMessage(args: {
     messageId: number;
     content: string;
 }): Promise<void> {
-    const {emit, getCurrentUser, normalizedScope, options, messageId, content} =
-        args;
-    // Best-effort senderId lookup. Agents speak through the connected
+    const {emit, getCurrentUser, normalizedScope, options, messageId, content} = args;
+    // Best-effort viewer lookup. Agents speak through the connected
     // viewer's credentials on Zulip, so the backing message is "from
     // the viewer" on the wire; we override the display name + avatar
     // locally via the author option so the UI reflects the agent.
-    let senderId = -1;
-    let senderEmail = "";
+    let viewer: User | undefined;
     if (getCurrentUser !== undefined) {
         try {
-            const user = await getCurrentUser();
-            senderId = user.userId;
-            senderEmail = user.email;
+            viewer = await getCurrentUser();
         } catch {
             // Fall through to the synthetic defaults.
         }
     }
+    const senderId = viewer?.userId ?? -1;
+    const senderEmail = viewer?.email ?? "";
+    const base = {
+        id: messageId,
+        senderId,
+        senderFullName: options.author.fullName,
+        senderEmail,
+        avatarUrl: options.author.avatarUrl,
+        timestamp: Date.now(),
+        content,
+        contentIsHtml: false,
+        parts: [] as MessagePart[],
+        reactions: [],
+    };
+    if (normalizedScope.kind === "channel") {
+        emit({
+            type: "message",
+            message: {
+                ...base,
+                type: "channel",
+                channelName: normalizedScope.channel,
+                topic: normalizedScope.topic ?? "",
+            },
+        });
+        return;
+    }
+    // DM scope: synthesize a DirectMessage whose recipients (plus the
+    // sender) canonicalize to exactly normalizedScope.userIds, so the
+    // client's `isInScope` predicate accepts this provisional row. When
+    // the viewer can't be resolved yet we fall back to a placeholder
+    // that keeps the set-size invariant — the row still renders against
+    // the current scope even if the senderId echoes one of the
+    // recipients.
+    const recipients: User[] = [];
+    for (const id of normalizedScope.userIds) {
+        if (id === senderId) continue;
+        recipients.push(
+            id === viewer?.userId
+                ? {
+                      userId: id,
+                      email: viewer.email,
+                      fullName: viewer.fullName,
+                      avatarUrl: viewer.avatarUrl,
+                  }
+                : {userId: id, email: "", fullName: "", avatarUrl: ""},
+        );
+    }
     emit({
         type: "message",
         message: {
-            id: messageId,
-            senderId,
-            senderFullName: options.author.fullName,
-            senderEmail,
-            avatarUrl: options.author.avatarUrl,
-            timestamp: Date.now(),
-            content,
-            contentIsHtml: false,
-            parts: [],
-            reactions: [],
-            type: "channel",
-            channelName:
-                normalizedScope.kind === "channel" ? normalizedScope.channel : "",
-            topic:
-                normalizedScope.kind === "channel"
-                    ? normalizedScope.topic ?? ""
-                    : "",
+            ...base,
+            type: "direct",
+            recipients,
         },
     });
 }

@@ -401,4 +401,169 @@ describe("startAgentReply — streaming primitive", () => {
         // Second burst produced exactly one more edit.
         expect(transport.edits.length).toBe(firstCount + 1);
     });
+
+    test("DM 1:1 scope → provisional send routes type=direct with the peer's id", async () => {
+        const transport = new StreamingFakeTransport();
+        const client = new ZulipClient({
+            transport,
+            scope: {kind: "dm", userIds: [42, 99]},
+        });
+        await client.connect();
+
+        const handle = client.startAgentReply(
+            {kind: "dm", userIds: [42, 99]},
+            {author: {fullName: "Agent", avatarUrl: ""}},
+        );
+        await flushMicrotasks();
+        const messageId = await handle.messageId;
+        expect(messageId).toBe(1000);
+
+        // Viewer id (42) gets filtered off the recipients list so Zulip
+        // doesn't reject the send as a self-addressed DM. Only the peer
+        // remains, stringified per SendMessageParams.
+        expect(transport.sends).toHaveLength(1);
+        expect(transport.sends[0]).toMatchObject({
+            type: "direct",
+            recipients: ["99"],
+        });
+    });
+
+    test("DM group scope → provisional send routes type=direct with all non-viewer ids", async () => {
+        const transport = new StreamingFakeTransport();
+        const client = new ZulipClient({
+            transport,
+            scope: {kind: "dm", userIds: [42, 77, 99]},
+        });
+        await client.connect();
+
+        const handle = client.startAgentReply(
+            {kind: "dm", userIds: [42, 77, 99]},
+            {author: {fullName: "Agent", avatarUrl: ""}},
+        );
+        await flushMicrotasks();
+        await handle.messageId;
+
+        expect(transport.sends).toHaveLength(1);
+        expect(transport.sends[0]).toMatchObject({
+            type: "direct",
+            recipients: ["77", "99"],
+        });
+    });
+
+    test("DM scope → streamed tokens broadcast through the same 4 Hz editMessage loop", async () => {
+        const transport = new StreamingFakeTransport();
+        const client = new ZulipClient({
+            transport,
+            scope: {kind: "dm", userIds: [42, 99]},
+        });
+        await client.connect();
+
+        const handle = client.startAgentReply(
+            {kind: "dm", userIds: [42, 99]},
+            {author: {fullName: "Agent", avatarUrl: ""}},
+        );
+        await flushMicrotasks();
+        await handle.messageId;
+
+        for (let i = 0; i < 50; i++) {
+            handle.appendToken(`dm${String(i)} `);
+        }
+        // Still inside the debounce window — no broadcast.
+        expect(transport.edits).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(STREAMING_EDIT_WINDOW_MS);
+        await flushMicrotasks();
+
+        expect(transport.edits).toHaveLength(1);
+        const first = transport.edits[0];
+        expect(first).toBeDefined();
+        if (first?.kind === "content") {
+            expect(first.content).toContain("dm0 ");
+            expect(first.content).toContain("dm49 ");
+        }
+    });
+
+    test("DM scope → abort lands a terminal edit + sentinel tool_result on the local update", async () => {
+        const transport = new StreamingFakeTransport();
+        const client = new ZulipClient({
+            transport,
+            scope: {kind: "dm", userIds: [42, 99]},
+        });
+        await client.connect();
+
+        const events: ZulipEvent[] = [];
+        client.subscribe((e) => events.push(e));
+
+        const handle = client.startAgentReply(
+            {kind: "dm", userIds: [42, 99]},
+            {author: {fullName: "Agent", avatarUrl: ""}},
+        );
+        await flushMicrotasks();
+        await handle.messageId;
+
+        handle.appendToken("partial");
+        await expect(handle.abort("user cancelled")).resolves.toBeUndefined();
+        await flushMicrotasks();
+
+        const lastEdit = transport.edits[transport.edits.length - 1];
+        expect(lastEdit).toBeDefined();
+        if (lastEdit?.kind === "content") {
+            expect(lastEdit.content).toContain("partial");
+        }
+
+        const updates = events.filter(
+            (e): e is Extract<ZulipEvent, {type: "message-update"}> => e.type === "message-update",
+        );
+        const finalUpdate = updates[updates.length - 1];
+        const abortPart = finalUpdate?.parts?.find(
+            (p) => p.type === "tool_result" && p.toolCallId === AGENT_REPLY_ABORT_TOOL_ID,
+        );
+        expect(abortPart).toBeDefined();
+        if (abortPart !== undefined && abortPart.type === "tool_result") {
+            expect(abortPart.isError).toBe(true);
+            expect(abortPart.output).toBe("user cancelled");
+        }
+    });
+
+    test("DM scope → provisional `message` event carries type=direct so the client's DM narrow accepts it", async () => {
+        const transport = new StreamingFakeTransport();
+        const client = new ZulipClient({
+            transport,
+            scope: {kind: "dm", userIds: [42, 99]},
+        });
+        await client.connect();
+
+        const events: ZulipEvent[] = [];
+        client.subscribe((e) => events.push(e));
+
+        const handle = client.startAgentReply(
+            {kind: "dm", userIds: [42, 99]},
+            {author: {fullName: "Agent", avatarUrl: ""}},
+        );
+        await flushMicrotasks();
+        await handle.messageId;
+        // Extra microtask flush: emitInitialMessage awaits getCurrentUser
+        // before dispatching, so the provisional row needs one more tick
+        // to settle after messageId resolves.
+        await flushMicrotasks();
+
+        const messageEvent = events.find(
+            (e): e is Extract<ZulipEvent, {type: "message"}> => e.type === "message",
+        );
+        expect(messageEvent).toBeDefined();
+        expect(messageEvent?.message.type).toBe("direct");
+        if (messageEvent?.message.type === "direct") {
+            // Viewer (42) is the sender; only the peer shows up as a
+            // recipient so the scope-filter predicate in ZulipClient
+            // accepts the provisional row.
+            expect(messageEvent.message.senderId).toBe(42);
+            const ids = messageEvent.message.recipients.map((r) => r.userId).sort();
+            expect(ids).toEqual([99]);
+        }
+        // The client's isInScope predicate for DM scopes folds in the
+        // sender id, so the provisional agent row should land in state
+        // even though it didn't include the viewer as a recipient.
+        const state = client.getState();
+        expect(state.messages.map((m) => m.id)).toContain(1000);
+    });
 });
